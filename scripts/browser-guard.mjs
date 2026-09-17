@@ -1,9 +1,9 @@
 /**
  * Target checks shared by the Playwright capture scripts.
  *
- * Both run Chromium with `--no-sandbox` as root and take their URL and output
- * path from argv, so unchecked they will render `file:///root/.grok/auth.json`
- * into a PNG the agent can read, and write it anywhere.
+ * Browser automation is restricted to explicit HTTP(S) targets and bounded
+ * output directories. This prevents accidental local-file capture and
+ * arbitrary filesystem writes when the capture helpers are invoked manually.
  */
 import { resolve, sep } from "node:path";
 
@@ -17,7 +17,6 @@ export function checkedUrl(url) {
   } catch {
     fail(`not a valid URL: ${url}`);
   }
-  // Rules out file:, data:, chrome:, view-source:.
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     fail(`only http/https URLs are allowed, got ${parsed.protocol} in ${url}`);
   }
@@ -32,7 +31,6 @@ export function checkedUrl(url) {
 
 /** Absolute `target` if it is strictly inside `allowedDirs`, else exit 1. */
 export function checkedOutputPath(target, allowedDirs, label = "screenshot") {
-  // Resolve first so `..` cannot slip past the prefix check.
   const abs = resolve(target);
   const allowed = allowedDirs.some((dir) => abs.startsWith(dir.endsWith(sep) ? dir : dir + sep));
   if (!allowed) {
