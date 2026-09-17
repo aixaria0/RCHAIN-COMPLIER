@@ -1,9 +1,5 @@
 import { createHash } from "node:crypto";
 import { getRequest } from "@tanstack/react-start/server";
-import {
-  assertSameSiteRequest,
-  CrossSiteRequestError,
-} from "../auth/isolation.server.ts";
 import { env, isWorkspacePreview } from "../env.server.ts";
 import { assertAppDataServerOnly } from "./server-only.ts";
 import {
@@ -243,18 +239,6 @@ function unauthorizedResult(
   };
 }
 
-function crossSiteBlockedResult(): CallToolResult | null {
-  try {
-    assertSameSiteRequest();
-    return null;
-  } catch (e) {
-    if (e instanceof CrossSiteRequestError) {
-      return { ok: false, data: null, errorMessage: e.message };
-    }
-    return null;
-  }
-}
-
 const FAILURE_MEMO_TTL_MS = 5_000;
 const failureMemo = new Map<string, { at: number; result: CallToolResult }>();
 
@@ -336,7 +320,7 @@ export async function callTool(
   args: ToolArgs,
   options: CallToolOptions,
 ): Promise<CallToolResult> {
-  const blocked = crossSiteBlockedResult() ?? nonPostBlockedResult();
+  const blocked = nonPostBlockedResult();
   if (blocked) return blocked;
 
   const ctx = inboundContext();
