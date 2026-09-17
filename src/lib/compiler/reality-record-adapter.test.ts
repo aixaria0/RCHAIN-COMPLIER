@@ -33,6 +33,15 @@ test("compileRealityRecord produces an inspectable baseline certificate", () => 
   assertLinkedChain(record);
 });
 
+test("equivalent compiler inputs produce the same portable certificate", () => {
+  const first = compileRealityRecord("exchange-commit", "none");
+  const second = compileRealityRecord("exchange-commit", "none");
+
+  assert.equal(first.integrity.recordDigest, second.integrity.recordDigest);
+  assert.deepEqual(first.observations, second.observations);
+  assert.deepEqual(first.verification, second.verification);
+});
+
 test("tampered replay becomes a divergent Reality Record", () => {
   const record = compileRealityRecord("exchange-commit", "tamper-trace");
 
