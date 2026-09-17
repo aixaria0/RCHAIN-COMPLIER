@@ -289,6 +289,24 @@ A useful result should expose:
 
 `VERIFIED` means the configured predicates passed over the supplied evidence. It does **not** mean protocol finality, economic truth, or live network consensus.
 
+## 🧠 ARIA CORE
+
+A completely unnecessary, absolutely non-production, mildly over-engineered Easter egg.
+
+**This page is a joke. The architecture is not.**
+
+ARIA CORE is a small interactive personal artifact inspired by the same ideas explored throughout the Reality Layer work: observation, evidence, verification, replay, causality, and deterministic certification.
+
+It is **not** an RChain protocol component, protocol specification, production verifier, or claim about the underlying network.
+
+It exists because sometimes an engineer needs to stop building serious infrastructure for five minutes and build something unnecessarily animated.
+
+> Built from a tablet. Because apparently laptops are optional. 😂
+
+### Enter ARIA CORE
+
+🧠 **[RUN THE ABSOLUTELY UNNECESSARY CORE →](https://aixaria0.github.io/RCHAIN-COMPLIER/)**
+
 ## Development
 
 Requirements:
