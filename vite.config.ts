@@ -6,8 +6,6 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { nitro } from "nitro/vite";
-// @ts-expect-error JS plugin alongside the TS vite config
-import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
 function hasMigrations(root: string): boolean {
@@ -53,7 +51,6 @@ export default defineConfig(({ command, isPreview }) => ({
   resolve: { tsconfigPaths: true },
   plugins: [
     pgliteBootstrapPlugin(),
-    appEnvPlugin(),
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview
