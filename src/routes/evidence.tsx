@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { shortHex } from "@/lib/compiler";
 import { useWorkbench } from "@/lib/workbench-state";
 import { MobileNav } from "@/components/wb/shell";
+import { RealityCalculusPanel } from "@/components/wb/reality-calculus";
 import { EvidenceList, Expandable, FieldRow, Panel, SeverityTag, StatusTag } from "@/components/wb/primitives";
 
 export const Route = createFileRoute("/evidence")({
@@ -14,6 +15,7 @@ function Evidence() {
   return (
     <div className="grid gap-3">
       <MobileNav />
+      <RealityCalculusPanel />
       <div className="grid gap-3 lg:grid-cols-2">
         <Panel title="Cross-node report" subtitle="Sentinel observation — not stake-weighted finality" right={c ? <StatusTag status={c.status} /> : null}>
           {c ? (
