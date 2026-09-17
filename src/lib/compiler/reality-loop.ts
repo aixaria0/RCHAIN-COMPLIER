@@ -119,7 +119,7 @@ function project(
   }
 
   if (state === "OBSERVED") {
-    const nextState = proof.openCount === 0 && proof.failedCount === 0 && propositions.fixedPoint
+    const nextState: RealityState = proof.openCount === 0 && proof.failedCount === 0 && propositions.fixedPoint
       ? "CONSISTENT"
       : "OBSERVED";
     return {
@@ -141,7 +141,7 @@ function project(
       currentState: state,
       predictedState: replayReady ? "REPRODUCED" : "CONSISTENT",
       nextAction: replayReady ? "RUN_REPLAY" : "CONTINUE_OBSERVATION",
-      basis: replayReady ? ["replay"] : ["replay"],
+      basis: ["replay"],
       rationale: replayReady
         ? "Consistency has been established; an available replay provides the next independent reproduction boundary."
         : "Consistency is established, but no replay input is currently available for promotion.",
@@ -183,15 +183,14 @@ function project(
 export function buildRealityLoop(args: {
   state: RealityState;
   record: RealityRecord;
-  reality: RealityCalculusResult;
   propositions: PropositionCalculusResult;
   proof: RealityProofBundle;
 }): RealityLoop {
   const measurement = measurementOf(args.record, args.propositions, args.proof);
   const projection = project(args.state, args.record, args.propositions, args.proof);
-  const payload = {
+  const payload: Omit<RealityLoop, "loopDigest"> = {
     schema: "rchain-reality-loop/v1",
-    phases: ["OBSERVE", "MEASURE", "PROJECT"] as const,
+    phases: ["OBSERVE", "MEASURE", "PROJECT"],
     measurement,
     projection,
   };
