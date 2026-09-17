@@ -34,7 +34,7 @@ RChain Reality Compiler is a verification workbench. Its central responsibility 
 
 ### `src/lib/compiler`
 
-The semantic core of the workbench. It contains compilation logic, Rholang-oriented structures, QLF-oriented structures, hashing, observation, exchange handling, and shared types.
+The semantic core of the workbench. It contains compilation logic, Rholang-oriented structures, QLF-oriented structures, hashing, observation, exchange handling, proof artifacts, and shared types.
 
 ### `src/components/wb`
 
@@ -43,10 +43,6 @@ Reusable workbench presentation primitives. This layer remains independent of de
 ### `src/routes`
 
 User-facing views. Routes compose compiler/evidence primitives into the verification workbench.
-
-### `src/lib/app-data`
-
-Application data and readiness boundaries. It should not contain verification semantics that belong in the compiler layer.
 
 ### `src/lib/multiplayer`
 
@@ -58,7 +54,7 @@ Optional server/runtime integration. Server code may connect external systems to
 
 ### `scripts/`
 
-Build, migration, preview, and verification tooling. Scripts should be deterministic where practical and should fail loudly when an invariant is violated.
+Build, migration, browser verification, and repository tooling. Scripts should be deterministic where practical and should fail loudly when an invariant is violated.
 
 ## Evidence lifecycle
 
@@ -84,6 +80,7 @@ Adversarial and replay paths branch from the evidence stage so the original arti
 4. External services should be adapters, not hidden dependencies of core verification.
 5. A failing verification result should retain enough provenance to explain the failure.
 6. New protocol assumptions should be documented next to the implementation that consumes them.
+7. Provider-specific runtime concerns must not leak into the compiler boundary.
 
 ## Evolution path
 
