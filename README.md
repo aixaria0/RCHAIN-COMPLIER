@@ -90,6 +90,8 @@ Run the executable fixture directly with:
 npm run demo:reality-record
 ```
 
+The compiler test fixtures use explicit TypeScript module extensions so the same evidence graph runs under Vite and Node's native type-stripping test runner.
+
 ## Verification model
 
 The project treats verification as a first-class artifact rather than a UI decoration. A useful result should expose:
