@@ -15,7 +15,7 @@ observer / node / fixture
           ↓
      calculi + replay
           ↓
-     proof bundle
+     proof / diagnostic bundle
           ↓
      RealityCertificate
 ```
@@ -30,9 +30,9 @@ Reality Compiler applies the same architectural idea to evidence:
 - **Normalization:** canonical ordering, identifiers, relations, and digests.
 - **Analysis:** Reality Calculus and Proposition Calculus.
 - **Diagnostics:** missing prerequisites, conflicts, equivocation, and replay divergence.
-- **Output:** a deterministic certificate carrying state, provenance, proof obligations, and reasoning artifacts.
+- **Output:** a deterministic certificate carrying state, provenance, verification predicates, proof/diagnostic artifacts, and reasoning context.
 
-The output is therefore not simply `true` or `false`. It is a compiled representation of what the supplied evidence establishes.
+The output is therefore not simply `true` or `false`. It is a compiled representation of what the supplied evidence establishes under the configured rules.
 
 ## Why not put this into the protocol?
 
@@ -60,6 +60,14 @@ A system can execute something without having sufficient independent evidence to
 
 The compiler preserves those distinctions instead of collapsing them into a single success flag.
 
+## Proof boundary
+
+The engine can emit proof obligations, justification structures, conflict witnesses, replay diagnostics, deterministic digests, and other machine-inspectable reasoning artifacts.
+
+Those artifacts should not be confused with formal theorem proofs. A formal proof is a separately machine-checked mathematical result, such as a Lean theorem, when an explicit formal verification boundary is connected to the certificate.
+
+This separation lets the repository provide a strong executable verification core today without overstating the current formal-methods coverage.
+
 ## Relationship to Web3
 
 This project does not depend on a consumer-Web3 thesis.
@@ -81,7 +89,7 @@ RChain / Sentinel / archive / another observer
                     ↓
              Reality Compiler
                     ↓
-          proof-carrying certificate
+          evidence-carrying certificate
 ```
 
-The current repository is an executable research prototype of that boundary, not a claim that the full production system already exists.
+The current repository is an executable research prototype of that boundary, not a claim that the full production system exists today.

@@ -6,7 +6,7 @@ The Reality Loop closes the verification boundary into three explicit phases:
 OBSERVE → MEASURE → PROJECT → OBSERVE …
 ```
 
-It is deliberately deterministic. `PROJECT` is a proof-state transition, not a machine-learning prediction. The loop never invents future evidence or promotes an unverified claim.
+It is deliberately deterministic. `PROJECT` is a justified state transition, not a machine-learning prediction. The loop never invents future evidence or promotes an unverified claim.
 
 ## Observe
 
@@ -24,7 +24,7 @@ Observations, evidence, claims, verification records, replay inputs, and record 
 
 ## Measure
 
-The engine materializes a `RealityMeasurement` from the proof-producing execution:
+The engine materializes a `RealityMeasurement` from the verified evidence-processing path:
 
 - observation count
 - evidence count
@@ -36,11 +36,11 @@ The engine materializes a `RealityMeasurement` from the proof-producing executio
 - fixed-point state
 - proof coverage
 
-This turns the proof ledger into a stable measurement vector without assigning trust to an upstream source.
+This turns the evidence and reasoning ledger into a stable measurement vector without assigning trust to an upstream source.
 
 ## Project
 
-`RealityProjection` derives the next protocol-relevant state transition from the current proof state.
+`RealityProjection` derives the next justified state transition from the current evidence and verification state.
 
 Possible actions are:
 
@@ -60,8 +60,8 @@ Each projection carries a deterministic basis and rationale. The result is inclu
 The loop creates a clean separation between three different questions:
 
 1. **What was observed?** — evidence acquisition.
-2. **What can be measured/proved from it?** — deterministic verification and justification.
-3. **What transition is justified next?** — proof-carrying projection.
+2. **What can be established from it?** — deterministic verification and justification.
+3. **What transition is justified next?** — a bounded, evidence-derived state transition.
 
 That separation makes the system suitable for a future forecasting layer without coupling prediction to the trust boundary. A statistical or learned model may later consume a sequence of measured trajectory points, while the underlying certificate and verification core remain deterministic and independently checkable.
 

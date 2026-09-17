@@ -1,10 +1,38 @@
 # RChain Reality Compiler
 
-**A deterministic evidence compiler for turning distributed execution claims into inspectable, reproducible, proof-carrying reality records.**
+**A deterministic evidence compiler for turning distributed execution claims into inspectable, reproducible reality records.**
 
 > **Status:** Research prototype / executable Reality Layer
 >
 > This repository is **not** an RChain node, a replacement for RChain consensus, or a requirement for running RChain. The word *compiler* describes the verification boundary: it compiles observations, execution traces, propositions, and evidence into a deterministic certificate that can be inspected and replayed independently.
+
+## The core thesis
+
+Distributed networks do not only produce state. They produce observations, claims about state, supporting evidence, and sometimes conflicting accounts of what happened.
+
+The Reality Layer makes that boundary explicit:
+
+```text
+RChain / observer / fixture
+          ↓
+       Observe
+          ↓
+  canonical evidence
+          ↓
+       Measure
+          ↓
+ claims + justification + replay + consistency
+          ↓
+       Verify
+          ↓
+ Reality Certificate
+          ↓
+ justified next transition
+```
+
+The governing question is not merely **“what is the current status?”** but **“what does the supplied evidence actually establish, and can another verifier reproduce that judgment?”**
+
+RChain does not need this repository to execute its protocol. The Reality Layer is an independent evidence and verification boundary around execution.
 
 ## The problem
 
@@ -25,7 +53,7 @@ Reality Calculus
     ↓
 Proposition Calculus
     ↓
-Proof obligations + justification graph
+Verification predicates + justification graph
     ↓
 Replay / consistency / equivocation
     ↓
@@ -53,7 +81,7 @@ provider / observer / fixture
             ↓
      evidence compiler
             ↓
-     proof-carrying result
+     evidence-carrying result
 ```
 
 A future observer can replace today's synthetic fixture without replacing the verification model.
@@ -94,18 +122,33 @@ Run it directly:
 npm run demo:reality-engine
 ```
 
-## Proof-producing Reality Layer
+## Reality Certificate
 
-The engine emits more than a final state. Its proof bundle exposes:
+The certificate is the portable output of the verification boundary. It is an **evidence-backed, deterministic artifact**, not a blanket claim of protocol finality or mathematical theorem proving.
 
-- **Proof obligations** — what had to be established.
-- **Justification graph** — how observations, evidence, claims, propositions, and validations relate.
-- **Conflict core** — where incompatible evidence or propositions collide.
-- **Replay state** — whether the execution can be reproduced.
-- **Equivocation signals** — whether mutually incompatible statements are being asserted.
-- **Deterministic digests** — integrity anchors for the record, derivation, proposition judgement, and final certificate.
+A certificate contains:
 
-This makes failure informative. A divergent result is not a dead end; it is an auditable artifact describing the divergence.
+- the schema and engine version;
+- the normalized `RealityRecord`;
+- Reality Calculus judgement;
+- proposition judgement and convergence state;
+- detected equivocation;
+- proof/diagnostic artifacts derived from the supplied inputs;
+- the Observe → Measure → Project loop result;
+- source lineage;
+- a deterministic certificate digest.
+
+The dedicated contract is documented in [`docs/REALITY_CERTIFICATE.md`](docs/REALITY_CERTIFICATE.md).
+
+## Proof and formal verification boundary
+
+The project can produce deterministic proof/diagnostic artifacts and can consume explicit formal predicates, but the word **proof** is scoped carefully:
+
+- a proof artifact is a machine-inspectable explanation of what the engine derived from supplied evidence;
+- a formal proof is a separately machine-checked mathematical result, such as a Lean theorem, when such a predicate is explicitly connected;
+- `VERIFIED` in this repository is the result of configured predicates over the supplied evidence, not an assertion that every property of the underlying network has been formally proven.
+
+This distinction keeps the current executable system honest while leaving a clean integration point for QLF / Lean verification later.
 
 ## Reality Loop
 
@@ -146,6 +189,37 @@ The current implementation provides deterministic evidence artifacts and conserv
 ## Architecture
 
 ```text
+                   RChain / execution source
+                              │
+                              ▼
+                       Observer Adapter
+                              │
+                              ▼
+                     Canonical Event Model
+                              │
+                              ▼
+                       RealityRecord
+                 ┌────────────┼────────────┐
+                 ▼            ▼            ▼
+             Evidence      Claims      Causality
+                 │            │            │
+                 └────────────┼────────────┘
+                              ▼
+                     Reality / Proposition
+                         Calculi + replay
+                              │
+                              ▼
+                   Deterministic Certificate
+                              │
+                 ┌────────────┼─────────────┐
+                 ▼            ▼             ▼
+             Workbench     Adversarial     Next
+               / UI           checks      transition
+```
+
+Repository layers:
+
+```text
 src/
 ├── components/wb/       Workbench presentation
 ├── routes/              Interactive verification views
@@ -161,6 +235,7 @@ examples/                Small executable verification demonstrations
 
 Important documents:
 
+- [`docs/REALITY_CERTIFICATE.md`](docs/REALITY_CERTIFICATE.md)
 - [`docs/REALITY_ENGINE_CORE.md`](docs/REALITY_ENGINE_CORE.md)
 - [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md)
 - [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md)
@@ -185,6 +260,8 @@ RChain / observer / Sentinel / future provider
           auditable certificate
 ```
 
+The provider-specific observer is replaceable. Today that includes synthetic fixtures and a Sentinel adapter; future adapters can target a local node, testnet observer, archive, or another evidence source without changing the deterministic core.
+
 ## What this is not
 
 - Not a new blockchain.
@@ -193,6 +270,7 @@ RChain / observer / Sentinel / future provider
 - Not a replacement for consensus.
 - Not a claim of live mainnet evidence.
 - Not an AI oracle that invents missing facts.
+- Not a claim that every certificate constitutes a formal mathematical proof.
 
 It is infrastructure for **evidence, reasoning, replay, and provenance** around distributed execution.
 
