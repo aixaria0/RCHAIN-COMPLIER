@@ -11,7 +11,7 @@ import {
 test("selects a deterministic inclusion-maximal consistent proposition set", () => {
   const result = selectMaximallyConsistentPropositions([
     proposition("tx-2-before-tx-3", "p2"),
-    incompatible("tx-3-before-tx-2", "p3", ["p2"]),
+    incompatible("p3", "tx-3-before-tx-2", ["p2"]),
     proposition("tx-4-independent", "p4"),
   ]);
 
@@ -25,7 +25,7 @@ test("selects a deterministic inclusion-maximal consistent proposition set", () 
 test("requirements converge across rounds", () => {
   const result = selectMaximallyConsistentPropositions([
     { id: "p2", statement: "state transition", requires: ["p1"] },
-    proposition("p1", "prerequisite"),
+    proposition("prerequisite", "p1"),
   ]);
 
   assert.deepEqual(result.accepted.map((item) => item.id), ["p1", "p2"]);
