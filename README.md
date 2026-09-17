@@ -261,3 +261,7 @@ npm run demo:reality-engine
 ## License
 
 No license is declared in this repository yet. Until a license is added, assume the repository contents remain under the copyright of their respective rights holders and are not automatically licensed for reuse.
+
+## Validation
+
+The final branch is expected to pass the repository quality gates before merge: typecheck, lint, test, and production build.
