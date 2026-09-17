@@ -1,4 +1,4 @@
-import { digest, hexPrefixed, shortHex } from "./hash";
+import { digest, hexPrefixed, shortHex } from "./hash.ts";
 import {
   abort,
   cloneWorld,
@@ -7,7 +7,7 @@ import {
   prepareReceive,
   seedWorld,
   type ExchangeWorld,
-} from "./exchange";
+} from "./exchange.ts";
 import {
   casperInventory,
   crossNode,
@@ -20,9 +20,9 @@ import {
   type Deploy,
   type LatticeReport,
   type NodeObservation,
-} from "./observe";
-import { certify, phasesFromComms, type QlfCertificate } from "./qlf";
-import { exchangeProc, helloProc, reduce, type Execution, type ReductionStep } from "./rho";
+} from "./observe.ts";
+import { certify, phasesFromComms, type QlfCertificate } from "./qlf.ts";
+import { exchangeProc, helloProc, reduce, type Execution, type ReductionStep } from "./rho.ts";
 import type {
   Claim,
   EvidenceRef,
@@ -33,7 +33,7 @@ import type {
   ScenarioId,
   Status,
   VerificationCheck,
-} from "./types";
+} from "./types.ts";
 
 export interface ScenarioMeta {
   id: ScenarioId;

@@ -7,8 +7,8 @@
  * independently inspectable representation.
  */
 
-import type { ScenarioId, MutationId, Status } from "./types";
-import { compile, type EventEnvelope, type Reality } from "./compile";
+import type { ScenarioId, MutationId, Status } from "./types.ts";
+import { compile, type EventEnvelope, type Reality } from "./compile.ts";
 import {
   sealRealityRecord,
   type RealityClaim,
@@ -19,7 +19,7 @@ import {
   type RealityReplay,
   type RealityTransformation,
   type RealityVerification,
-} from "./reality-record";
+} from "./reality-record.ts";
 
 function verificationState(status: Status): RealityVerification["state"] {
   switch (status) {

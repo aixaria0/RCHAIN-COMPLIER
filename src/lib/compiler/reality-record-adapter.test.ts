@@ -4,8 +4,8 @@ import {
   compileRealityRecord,
   realityToRecord,
   verifyRealityRecordIntegrity,
-} from "./index";
-import { compile } from "./compile";
+} from "./index.ts";
+import { compile } from "./compile.ts";
 
 function assertLinkedChain(record: ReturnType<typeof compileRealityRecord>): void {
   assert.ok(record.observations.length >= 3, "expected multiple evidence-plane observations");
