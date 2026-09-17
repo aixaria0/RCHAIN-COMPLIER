@@ -38,19 +38,15 @@ The semantic core of the workbench. It contains compilation logic, Rholang-orien
 
 ### `src/components/wb`
 
-Reusable workbench presentation primitives. This layer should remain independent of deployment-provider-specific behavior.
+Reusable workbench presentation primitives. This layer remains independent of deployment-provider-specific behavior.
 
 ### `src/routes`
 
-User-facing views. Routes compose the compiler/evidence primitives into the verification workbench.
+User-facing views. Routes compose compiler/evidence primitives into the verification workbench.
 
 ### `src/lib/app-data`
 
 Application data and readiness boundaries. It should not contain verification semantics that belong in the compiler layer.
-
-### `src/lib/auth`
-
-Authentication/session concerns. Authentication is deliberately separated from the verification model so verification results do not depend on a particular identity provider.
 
 ### `src/lib/multiplayer`
 
@@ -58,7 +54,7 @@ Transport and peer-to-peer concerns. Networking is an integration boundary, not 
 
 ### `server/`
 
-Server/runtime integration. Server code may connect external systems to the application, but verification logic should remain testable without a live deployment.
+Optional server/runtime integration. Server code may connect external systems to the application, but verification logic should remain testable without a live deployment.
 
 ### `scripts/`
 
