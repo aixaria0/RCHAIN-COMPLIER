@@ -58,6 +58,59 @@ export function EnvelopeCard() {
   );
 }
 
+export function RealityRecordPanel() {
+  const { realityRecord } = useWorkbench();
+  const replayStatus = realityRecord.replay.state === "REPRODUCED"
+    ? "PASS"
+    : realityRecord.replay.state === "DIVERGENT"
+      ? "FAIL"
+      : "UNAVAILABLE";
+
+  return (
+    <Panel
+      title="Reality Certificate"
+      subtitle="Portable evidence artifact — independently inspectable"
+      right={<span className="rounded-full border border-border px-2 py-1 font-mono text-micro tracking-label">{realityRecord.state}</span>}
+    >
+      <div className="grid gap-px overflow-hidden rounded-md border border-border bg-border sm:grid-cols-2">
+        <div className="bg-elevated p-3">
+          <div className="font-mono text-micro tracking-label text-muted">RECORD</div>
+          <div className="mt-1 font-mono text-xs break-all">{shortHex(realityRecord.integrity.recordDigest, 10, 10)}</div>
+        </div>
+        <div className="bg-elevated p-3">
+          <div className="font-mono text-micro tracking-label text-muted">INTEGRITY</div>
+          <div className="mt-1 text-xs">{realityRecord.integrity.algorithm} · sealed</div>
+        </div>
+        <div className="bg-elevated p-3">
+          <div className="font-mono text-micro tracking-label text-muted">EVIDENCE</div>
+          <div className="mt-1 text-xs">{realityRecord.observations.length} observations · {realityRecord.claims.length} claims</div>
+        </div>
+        <div className="bg-elevated p-3">
+          <div className="font-mono text-micro tracking-label text-muted">VERIFICATION</div>
+          <div className="mt-1 text-xs">{realityRecord.verification.length} predicates</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <StatusTag status={replayStatus} />
+        <span className="text-xs text-muted">
+          replay: {realityRecord.replay.available ? realityRecord.replay.state.toLowerCase() : "not available"}
+        </span>
+        <span className="text-xs text-muted">
+          deps: {realityRecord.dependencies.length} · transforms: {realityRecord.transformations.length}
+        </span>
+      </div>
+
+      <details className="mt-3 rounded-md border border-border bg-bg p-3">
+        <summary className="cursor-pointer font-mono text-xxs tracking-label text-muted">INSPECT RECORD CONTRACT</summary>
+        <pre className="mt-3 max-h-80 overflow-auto font-mono text-xxs leading-relaxed text-fg">
+          {JSON.stringify(realityRecord, null, 2)}
+        </pre>
+      </details>
+    </Panel>
+  );
+}
+
 export function WhyPanel() {
   const { reality } = useWorkbench();
   return (
