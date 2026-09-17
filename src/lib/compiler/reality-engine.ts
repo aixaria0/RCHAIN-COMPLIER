@@ -1,10 +1,10 @@
 /**
- * Reality Engine Core v0.1
+ * Reality Engine Core v0.2
  *
- * The engine is the first executable boundary that turns observations,
+ * The engine is the executable boundary that turns observations,
  * verification records, replay evidence, and propositions into one portable
- * RealityCertificate. It deliberately composes the existing calculi instead
- * of creating a parallel evidence model.
+ * RealityCertificate. It composes the existing calculi and emits the proof
+ * artifacts needed to explain both successful and failed judgements.
  */
 
 import { digest } from "./hash.ts";
@@ -26,6 +26,10 @@ import {
   type RealityProposition,
 } from "./proposition-calculus.ts";
 import {
+  buildRealityProofBundle,
+  type RealityProofBundle,
+} from "./reality-proof-core.ts";
+import {
   sealRealityRecord,
   type RealityRecord,
   type RealityState,
@@ -40,12 +44,13 @@ export interface RealityEngineInput {
 
 export interface RealityEngineCertificate {
   schema: "rchain-reality-certificate/v1";
-  engineVersion: "0.1.0";
+  engineVersion: "0.2.0";
   state: RealityState;
   record: RealityRecord;
   reality: RealityCalculusResult;
   propositions: PropositionCalculusResult;
   equivocations: Equivocation[];
+  proof: RealityProofBundle;
   sourceLineage: {
     source: string;
     observationIds: string[];
@@ -187,6 +192,13 @@ export function runRealityEngine(input: RealityEngineInput): RealityEngineCertif
   const equivocations = detectEquivocation(input.bets ?? []);
   const state = resolveState(reality, propositions, equivocations);
   const record = sealRealityRecord({ ...normalized, state }, input.previousDigest);
+  const proof = buildRealityProofBundle({
+    record,
+    reality,
+    propositions,
+    bets: input.bets ?? [],
+    equivocations,
+  });
   const sourceLineage = {
     source: normalized.source,
     observationIds: stableIds(normalized.observations.map((item) => item.id)),
@@ -196,24 +208,26 @@ export function runRealityEngine(input: RealityEngineInput): RealityEngineCertif
   const certificateDigest = digest([
     normalizeValue({
       schema: "rchain-reality-certificate/v1",
-      engineVersion: "0.1.0",
+      engineVersion: "0.2.0",
       state,
       record,
       reality,
       propositions,
       equivocations,
+      proof,
       sourceLineage,
     }),
   ]);
 
   return {
     schema: "rchain-reality-certificate/v1",
-    engineVersion: "0.1.0",
+    engineVersion: "0.2.0",
     state,
     record,
     reality,
     propositions,
     equivocations,
+    proof,
     sourceLineage,
     certificateDigest,
   };

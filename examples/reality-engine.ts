@@ -82,6 +82,16 @@ console.log(JSON.stringify({
   recordDigest: certificate.record.integrity.recordDigest,
   propositionDigest: certificate.propositions.judgement.digest,
   fixedPoint: certificate.propositions.fixedPoint,
+  proof: {
+    state: certificate.proof.proofState,
+    satisfied: certificate.proof.satisfiedCount,
+    open: certificate.proof.openCount,
+    failed: certificate.proof.failedCount,
+    obligations: certificate.proof.obligations,
+    conflicts: certificate.proof.conflicts,
+    graphNodes: certificate.proof.graph.nodes.length,
+    graphEdges: certificate.proof.graph.edges.length,
+  },
   equivocations: certificate.equivocations,
   verified: verifyRealityCertificate(certificate),
 }, null, 2));

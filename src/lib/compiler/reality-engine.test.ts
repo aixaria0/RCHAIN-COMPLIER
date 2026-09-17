@@ -66,6 +66,27 @@ test("Reality Engine emits a verified deterministic certificate", () => {
   assert.equal(first.certificateDigest, second.certificateDigest);
   assert.equal(first.record.integrity.recordDigest, second.record.integrity.recordDigest);
   assert.equal(verifyRealityCertificate(first), true);
+  assert.equal(first.proof.proofState, "VERIFIED");
+  assert.equal(first.proof.failedCount, 0);
+  assert.equal(first.proof.openCount, 0);
+  assert.ok(first.proof.satisfiedCount >= 1);
+});
+
+test("Reality Engine emits a justification graph linking claims to evidence", () => {
+  const result = runRealityEngine(input());
+
+  assert.ok(result.proof.graph.nodes.some((node) => node.id === "obs-001" && node.kind === "observation"));
+  assert.ok(result.proof.graph.nodes.some((node) => node.id === "claim-001" && node.kind === "claim"));
+  assert.ok(
+    result.proof.graph.edges.some(
+      (edge) => edge.from === "claim-001" && edge.to === "obs-001" && edge.relation === "bases",
+    ),
+  );
+  assert.ok(
+    result.proof.obligations.some(
+      (obligation) => obligation.id === "replay" && obligation.status === "SATISFIED",
+    ),
+  );
 });
 
 test("Reality Engine is order-invariant after normalization", () => {
@@ -97,6 +118,8 @@ test("Replay divergence is terminal and cannot be hidden by a verified predicate
   );
 
   assert.equal(result.state, "DIVERGENT");
+  assert.ok(result.proof.conflicts.some((item) => item.kind === "REPLAY"));
+  assert.ok(result.proof.obligations.some((item) => item.kind === "REPLAY" && item.status === "FAILED"));
 });
 
 test("Missing proposition requirements fail closed", () => {
@@ -114,6 +137,7 @@ test("Missing proposition requirements fail closed", () => {
 
   assert.equal(result.state, "INCOMPLETE");
   assert.equal(result.propositions.judgement.state, "INCOMPLETE");
+  assert.ok(result.proof.openCount > 0);
 });
 
 test("Conflicting bets surface equivocation as divergence", () => {
@@ -141,4 +165,6 @@ test("Conflicting bets surface equivocation as divergence", () => {
   assert.equal(result.state, "DIVERGENT");
   assert.equal(result.equivocations.length, 1);
   assert.equal(result.equivocations[0]?.source, "validator-a");
+  assert.ok(result.proof.conflicts.some((item) => item.kind === "EQUIVOCATION"));
+  assert.ok(result.proof.obligations.some((item) => item.kind === "EQUIVOCATION" && item.status === "FAILED"));
 });
