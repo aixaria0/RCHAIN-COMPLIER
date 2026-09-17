@@ -57,7 +57,7 @@ test("missing capability is represented as incomplete replay evidence", () => {
   assert.equal(record.replay.available, false);
   assert.equal(record.replay.state, "INCOMPLETE");
   assert.notEqual(record.state, "VERIFIED");
-  assert.equal(record.observations.length, 2);
+  assert.equal(record.observations.length, 3);
   assert.equal(verifyRealityRecordIntegrity(record), true);
 });
 
