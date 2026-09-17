@@ -3,6 +3,7 @@ import {
   verifyRealityCertificate,
   type RealityEngineInput,
 } from "../src/lib/compiler/reality-engine.ts";
+import { verifyRealityLoop } from "../src/lib/compiler/reality-loop.ts";
 
 const input: RealityEngineInput = {
   record: {
@@ -82,6 +83,13 @@ console.log(JSON.stringify({
   recordDigest: certificate.record.integrity.recordDigest,
   propositionDigest: certificate.propositions.judgement.digest,
   fixedPoint: certificate.propositions.fixedPoint,
+  loop: {
+    phases: certificate.loop.phases,
+    measurement: certificate.loop.measurement,
+    projection: certificate.loop.projection,
+    loopDigest: certificate.loop.loopDigest,
+    verified: verifyRealityLoop(certificate.loop),
+  },
   proof: {
     state: certificate.proof.proofState,
     satisfied: certificate.proof.satisfiedCount,
