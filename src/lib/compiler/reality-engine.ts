@@ -207,7 +207,6 @@ export function runRealityEngine(input: RealityEngineInput): RealityEngineCertif
   const loop = buildRealityLoop({
     state,
     record,
-    reality,
     propositions,
     proof,
   });
