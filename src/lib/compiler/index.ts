@@ -6,4 +6,5 @@ export * from "./reality-record.ts";
 export * from "./reality-record-adapter.ts";
 export * from "./sentinel-adapter.ts";
 export * from "./reality-calculus.ts";
+export * from "./proposition-calculus.ts";
 export { shortHex, hexPrefixed } from "./hash.ts";
