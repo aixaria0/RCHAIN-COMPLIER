@@ -7,11 +7,28 @@ import {
   termReplay,
   termRequire,
   type RealityDerivation,
+  type RealityState,
   type RealityTerm,
+  type Status,
 } from "@/lib/compiler";
 import { shortHex } from "@/lib/compiler";
 import { useWorkbench } from "@/lib/workbench-state";
 import { Expandable, Panel, StatusTag } from "./primitives";
+
+function toUiStatus(state: RealityState): Status {
+  switch (state) {
+    case "OBSERVED":
+      return "WARN";
+    case "CONSISTENT":
+    case "REPRODUCED":
+    case "VERIFIED":
+      return "PASS";
+    case "INCOMPLETE":
+      return "UNAVAILABLE";
+    case "DIVERGENT":
+      return "FAIL";
+  }
+}
 
 function derivationForRecord(record: ReturnType<typeof useWorkbench>["realityRecord"]): RealityTerm {
   const observation = record.observations[0];
@@ -45,7 +62,8 @@ function RuleNode({ node, depth = 0 }: { node: RealityDerivation; depth?: number
           <span className="rounded border border-border bg-panel px-2 py-0.5 font-mono text-micro tracking-label text-primary">
             {node.rule}
           </span>
-          <StatusTag status={node.conclusion.state} />
+          <StatusTag status={toUiStatus(node.conclusion.state)} />
+          <span className="font-mono text-micro text-muted">state {node.conclusion.state}</span>
           <span className="font-mono text-micro text-muted">obs {node.conclusion.observationIds.length}</span>
           <span className="font-mono text-micro text-muted">proof {node.conclusion.verificationIds.length}</span>
         </div>
@@ -70,7 +88,7 @@ export function RealityCalculusPanel() {
     <Panel
       title="Reality Calculus"
       subtitle="OBS → COMP → REQ → CHK → REP · derivation, not assertion"
-      right={<StatusTag status={result.judgement.state} />}
+      right={<StatusTag status={toUiStatus(result.judgement.state)} />}
     >
       <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
         <div className="grid gap-2">
