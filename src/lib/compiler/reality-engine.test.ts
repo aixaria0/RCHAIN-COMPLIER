@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runRealityEngine, verifyRealityCertificate } from "./reality-engine.ts";
+import { verifyRealityLoop } from "./reality-loop.ts";
 import type { RealityEngineInput } from "./reality-engine.ts";
 
 function input(overrides: Partial<RealityEngineInput> = {}): RealityEngineInput {
@@ -63,13 +64,20 @@ test("Reality Engine emits a verified deterministic certificate", () => {
   const second = runRealityEngine(input());
 
   assert.equal(first.state, "VERIFIED");
+  assert.equal(first.engineVersion, "0.3.0");
   assert.equal(first.certificateDigest, second.certificateDigest);
   assert.equal(first.record.integrity.recordDigest, second.record.integrity.recordDigest);
   assert.equal(verifyRealityCertificate(first), true);
+  assert.equal(verifyRealityLoop(first.loop), true);
+  assert.equal(first.loop.phases.join(" -> "), "OBSERVE -> MEASURE -> PROJECT");
+  assert.equal(first.loop.projection.predictedState, "VERIFIED");
+  assert.equal(first.loop.projection.nextAction, "HOLD_VERIFIED_STATE");
   assert.equal(first.proof.proofState, "VERIFIED");
   assert.equal(first.proof.failedCount, 0);
   assert.equal(first.proof.openCount, 0);
   assert.ok(first.proof.satisfiedCount >= 1);
+  assert.equal(first.loop.measurement.failedObligations, 0);
+  assert.equal(first.loop.measurement.proofCoverage, 1);
 });
 
 test("Reality Engine emits a justification graph linking claims to evidence", () => {
@@ -118,11 +126,13 @@ test("Replay divergence is terminal and cannot be hidden by a verified predicate
   );
 
   assert.equal(result.state, "DIVERGENT");
+  assert.equal(result.loop.projection.predictedState, "DIVERGENT");
+  assert.equal(result.loop.projection.nextAction, "ISOLATE_CONFLICT");
   assert.ok(result.proof.conflicts.some((item) => item.kind === "REPLAY"));
   assert.ok(result.proof.obligations.some((item) => item.kind === "REPLAY" && item.status === "FAILED"));
 });
 
-test("Missing proposition requirements fail closed", () => {
+test("Missing proposition requirements fail closed and keep projection open", () => {
   const result = runRealityEngine(
     input({
       propositions: [
@@ -137,6 +147,9 @@ test("Missing proposition requirements fail closed", () => {
 
   assert.equal(result.state, "INCOMPLETE");
   assert.equal(result.propositions.judgement.state, "INCOMPLETE");
+  assert.equal(result.loop.projection.predictedState, "INCOMPLETE");
+  assert.equal(result.loop.projection.nextAction, "COLLECT_MISSING_EVIDENCE");
+  assert.ok(result.loop.measurement.openObligations > 0);
   assert.ok(result.proof.openCount > 0);
 });
 
@@ -165,6 +178,7 @@ test("Conflicting bets surface equivocation as divergence", () => {
   assert.equal(result.state, "DIVERGENT");
   assert.equal(result.equivocations.length, 1);
   assert.equal(result.equivocations[0]?.source, "validator-a");
+  assert.equal(result.loop.projection.nextAction, "ISOLATE_CONFLICT");
   assert.ok(result.proof.conflicts.some((item) => item.kind === "EQUIVOCATION"));
   assert.ok(result.proof.obligations.some((item) => item.kind === "EQUIVOCATION" && item.status === "FAILED"));
 });
