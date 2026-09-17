@@ -37,7 +37,7 @@ The workbench provides a visual surface for examining this pipeline and for test
 - Evidence graph visualization.
 - A dedicated architecture view documenting system boundaries.
 - TypeScript, React, TanStack Router, Vite, and a server-side runtime.
-- Automated type checking, linting, formatting, and test commands.
+- Automated type checking, linting, formatting, tests, and CI quality gates.
 
 ## Architecture
 
@@ -50,10 +50,9 @@ src/
 └── lib/
     ├── compiler/        Compilation, Rho, QLF, hashing, observation
     ├── app-data/        Application data and readiness boundaries
-    ├── auth/             Session/authentication boundary
     └── multiplayer/     Peer-to-peer transport boundary
 
-server/                  Server/runtime integration
+server/                  Optional server/runtime integration
 scripts/                 Build, migration, preview, and verification tooling
 docs/                    Architecture and engineering documentation
 ```
@@ -103,13 +102,15 @@ Formatting:
 npm run format
 ```
 
+The same gates run in GitHub Actions for pushes to `main` and pull requests targeting `main`.
+
 ## Project principles
 
 **Determinism.** Equivalent inputs should produce reproducible verification results.
 
 **Provenance.** A result is only useful when its origin and transformation path can be inspected.
 
-**Explicit boundaries.** Live chain state, synthetic fixtures, transport, authentication, and presentation are separate concerns.
+**Explicit boundaries.** Live chain state, synthetic fixtures, transport, and presentation are separate concerns.
 
 **Adversarial by design.** Verification must account for malformed, contradictory, divergent, and replayed evidence rather than only the happy path.
 
