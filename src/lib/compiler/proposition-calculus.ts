@@ -125,9 +125,7 @@ export function selectMaximallyConsistentPropositions(
   );
 
   const rejectedIds = normalizeIds(stillPending.map((p) => p.id));
-  for (const candidate of stillPending) {
-    rejected.push(candidate);
-  }
+  for (const candidate of stillPending) rejected.push(candidate);
 
   const state = hasHardConflict
     ? "CONFLICTING"
@@ -175,15 +173,10 @@ export function detectEquivocation(bets: RealityBet[]): Equivocation[] {
     .flatMap(([source, sourceBets]) => {
       const claims = normalizeIds(sourceBets.map((bet) => bet.claim));
       if (claims.length <= 1) return [];
-      return [
-        {
-          source,
-          claims,
-          betIds: sourceBets.map((bet) =>
-            digest([`${bet.source}|${bet.target}|${bet.claim}|${bet.belief}`]),
-          ),
-        },
-      ];
+      const betIds = sourceBets
+        .map((bet) => digest([`${bet.source}|${bet.target}|${bet.claim}|${bet.belief}|${normalizeIds(bet.justification).join(",")}`]))
+        .sort();
+      return [{ source, claims, betIds }];
     });
 }
 
@@ -192,7 +185,7 @@ export function proposition(statement: string, id = statement): RealityPropositi
 }
 
 export function incompatible(
- id: string,
+  id: string,
   statement: string,
   conflictsWith: string[],
 ): RealityProposition {
