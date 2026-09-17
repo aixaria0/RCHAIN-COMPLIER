@@ -6,6 +6,7 @@ import {
   EnvelopeCard,
   ExchangePanel,
   QlfPanel,
+  RealityRecordPanel,
   ReductionPanel,
   SourcePanel,
   WhyPanel,
@@ -79,6 +80,7 @@ function Home() {
           <PipelineSpine />
         </Panel>
         <div className="grid gap-3">
+          <RealityRecordPanel />
           <EnvelopeCard />
           <WitnessPanel />
         </div>

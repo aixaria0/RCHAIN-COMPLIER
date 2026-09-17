@@ -1,5 +1,5 @@
-import { digest, hexPrefixed, shortHex } from "./hash";
-import type { EvidenceRef, Status } from "./types";
+import { digest, hexPrefixed, shortHex } from "./hash.ts";
+import type { EvidenceRef, Status } from "./types.ts";
 
 export interface Deploy {
   id: string;

@@ -1,4 +1,4 @@
-import { digest, hexPrefixed } from "./hash";
+import { digest, hexPrefixed } from "./hash.ts";
 
 export type Name =
   | { k: "uf"; id: string }

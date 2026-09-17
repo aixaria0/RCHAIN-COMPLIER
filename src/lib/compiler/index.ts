@@ -1,5 +1,7 @@
-export * from "./types";
-export * from "./hash";
-export * from "./qlf";
-export * from "./compile";
-export { shortHex, hexPrefixed } from "./hash";
+export * from "./types.ts";
+export * from "./hash.ts";
+export * from "./qlf.ts";
+export * from "./compile.ts";
+export * from "./reality-record.ts";
+export * from "./reality-record-adapter.ts";
+export { shortHex, hexPrefixed } from "./hash.ts";

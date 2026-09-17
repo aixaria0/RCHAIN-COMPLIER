@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   compile,
+  compileRealityRecord,
   diffReality,
   MUTATIONS,
   SCENARIOS,
@@ -9,6 +10,7 @@ import {
   type MutationId,
   type Reality,
   type RealityDiff,
+  type RealityRecord,
   type ScenarioId,
 } from "@/lib/compiler";
 
@@ -18,6 +20,7 @@ interface WorkbenchValue {
   mutation: MutationId;
   setMutation: (id: MutationId) => void;
   reality: Reality;
+  realityRecord: RealityRecord;
   baseline: Reality;
   diff: RealityDiff;
   selectedEnvelope: string;
@@ -64,6 +67,10 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
   }, [applicableMutations, mutation]);
 
   const reality = useMemo(() => compile(scenario, mutation), [scenario, mutation, nonce]);
+  const realityRecord = useMemo(
+    () => compileRealityRecord(scenario, mutation),
+    [scenario, mutation, nonce],
+  );
   const baseline = useMemo(() => compile(scenario, "none"), [scenario]);
   const diff = useMemo(() => diffReality(baseline, reality), [baseline, reality]);
 
@@ -95,6 +102,7 @@ export function WorkbenchProvider({ children }: { children: ReactNode }) {
     mutation,
     setMutation,
     reality,
+    realityRecord,
     baseline,
     diff,
     selectedEnvelope,

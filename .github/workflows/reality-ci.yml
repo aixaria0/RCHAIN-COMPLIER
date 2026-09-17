@@ -4,8 +4,8 @@ on:
   pull_request:
   push:
     branches:
-      - professionalize/rchain-compiler
       - feature/reality-evidence-plane
+      - professionalize/rchain-compiler
       - main
 
 permissions:
