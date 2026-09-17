@@ -1,4 +1,4 @@
-import { digest } from "./hash";
+import { digest } from "./hash.ts";
 
 export type Phase = "+" | "-";
 
