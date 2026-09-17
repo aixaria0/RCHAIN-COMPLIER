@@ -21,6 +21,8 @@ Evidence envelope
    ↓
 Verification
    ↓
+Reality Record
+   ↓
 Human-auditable result
 ```
 
@@ -31,6 +33,7 @@ The workbench provides a visual surface for examining this pipeline and for test
 - Compiler-oriented pipeline for Rholang/RChain-shaped execution claims.
 - QLF-oriented representation and verification hooks.
 - Deterministic hashing and evidence structures.
+- Portable `RealityRecord` artifacts with observations, claims, evidence, causal dependencies, transformations, verification predicates, replay state, and SHA-256 integrity.
 - Causality exploration from event to verification result.
 - Counterfactual/adversarial case analysis.
 - Replay-divergence inspection.
@@ -55,9 +58,37 @@ src/
 server/                  Optional server/runtime integration
 scripts/                 Build, migration, preview, and verification tooling
 docs/                    Architecture and engineering documentation
+examples/                Small executable verification demos
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the system model and [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) for the engineering workflow.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md), and [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md) for the system model and evidence contract.
+
+## Reality Evidence Plane
+
+The current vertical slice converts the existing compiler output into a provider-neutral evidence artifact without introducing a second execution engine:
+
+```text
+QuantumOS event
+  → QLF certificate
+  → Rholang process
+  → deterministic execution trace
+  → block proposal
+  → independent observations
+  → verification checks
+  → replay
+  → Reality Record
+  → SHA-256 integrity
+```
+
+`src/lib/compiler/reality-record-adapter.ts` is intentionally an adapter over `compile()`. The existing compiler remains the source of truth for synthetic execution and evidence; the adapter packages that result into a portable record that can later be fed by another observation adapter, including the planned `rchain-sentinel` integration.
+
+A Reality Record deliberately keeps observation separate from verification. `VERIFIED` means the configured predicates passed over supplied evidence; it does not claim protocol finality or replace RChain consensus. `DIVERGENT` captures reproducible conflict, while `INCOMPLETE` captures insufficient evidence.
+
+Run the executable fixture directly with:
+
+```bash
+npm run demo:reality-record
+```
 
 ## Verification model
 
@@ -102,7 +133,7 @@ Formatting:
 npm run format
 ```
 
-The same gates run in GitHub Actions for pushes to `main` and pull requests targeting `main`.
+GitHub Actions includes a branch-agnostic Reality Plane workflow for pull requests, including the current stacked feature branch.
 
 ## Project principles
 
