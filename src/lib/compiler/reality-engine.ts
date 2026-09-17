@@ -1,10 +1,10 @@
 /**
- * Reality Engine Core v0.2
+ * Reality Engine Core v0.3
  *
  * The engine is the executable boundary that turns observations,
  * verification records, replay evidence, and propositions into one portable
- * RealityCertificate. It composes the existing calculi and emits the proof
- * artifacts needed to explain both successful and failed judgements.
+ * RealityCertificate. It composes the existing calculi and emits proof
+ * artifacts plus a deterministic Observe -> Measure -> Project loop.
  */
 
 import { digest } from "./hash.ts";
@@ -30,6 +30,10 @@ import {
   type RealityProofBundle,
 } from "./reality-proof-core.ts";
 import {
+  buildRealityLoop,
+  type RealityLoop,
+} from "./reality-loop.ts";
+import {
   sealRealityRecord,
   type RealityRecord,
   type RealityState,
@@ -44,13 +48,14 @@ export interface RealityEngineInput {
 
 export interface RealityEngineCertificate {
   schema: "rchain-reality-certificate/v1";
-  engineVersion: "0.2.0";
+  engineVersion: "0.3.0";
   state: RealityState;
   record: RealityRecord;
   reality: RealityCalculusResult;
   propositions: PropositionCalculusResult;
   equivocations: Equivocation[];
   proof: RealityProofBundle;
+  loop: RealityLoop;
   sourceLineage: {
     source: string;
     observationIds: string[];
@@ -199,6 +204,13 @@ export function runRealityEngine(input: RealityEngineInput): RealityEngineCertif
     bets: input.bets ?? [],
     equivocations,
   });
+  const loop = buildRealityLoop({
+    state,
+    record,
+    reality,
+    propositions,
+    proof,
+  });
   const sourceLineage = {
     source: normalized.source,
     observationIds: stableIds(normalized.observations.map((item) => item.id)),
@@ -208,26 +220,28 @@ export function runRealityEngine(input: RealityEngineInput): RealityEngineCertif
   const certificateDigest = digest([
     normalizeValue({
       schema: "rchain-reality-certificate/v1",
-      engineVersion: "0.2.0",
+      engineVersion: "0.3.0",
       state,
       record,
       reality,
       propositions,
       equivocations,
       proof,
+      loop,
       sourceLineage,
     }),
   ]);
 
   return {
     schema: "rchain-reality-certificate/v1",
-    engineVersion: "0.2.0",
+    engineVersion: "0.3.0",
     state,
     record,
     reality,
     propositions,
     equivocations,
     proof,
+    loop,
     sourceLineage,
     certificateDigest,
   };
