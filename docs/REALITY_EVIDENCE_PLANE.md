@@ -54,7 +54,7 @@ RealityRecord
 └── integrity
 ```
 
-The first implementation should keep this model provider-neutral. An RChain adapter may populate it, but the verification plane must not depend on a single transport or deployment environment.
+The implementation keeps this model provider-neutral. Provider-specific adapters populate it; the verification plane does not depend on a single transport or deployment environment.
 
 ## Verification states
 
@@ -84,6 +84,28 @@ These states are deliberately descriptive. The system must never upgrade an unsu
 8. Run optional formal predicates.
 9. Emit a verification result with provenance and failure reasons.
 
+## Sentinel observer boundary
+
+`rchain-sentinel` is the first provider-specific observer adapter. The adapter in `src/lib/compiler/sentinel-adapter.ts` targets Sentinel's current HTTP contracts rather than importing Sentinel's Rust implementation.
+
+The primary evidence input is:
+
+```text
+GET /api/evidence/last-finalized-block
+```
+
+An optional contextual input is:
+
+```text
+GET /api/network/status
+```
+
+These responses are normalized into `RealityObservation` objects with explicit source, endpoint, block identity, parent hash, proposer, signature/justification presence, canonical-consistency results, finality-hash results, and the original payload digest.
+
+The adapter then produces claims and verification predicates. A reported canonical mismatch is `DIVERGENT`. An observer-only record without replay remains `INCOMPLETE`; the adapter never upgrades observation into replay or protocol finality merely because Sentinel reports a finalized block.
+
+The adapter also exposes a fetch boundary for application code, while tests use the same response shapes without a live node. This keeps the verification core deterministic and the network transport replaceable.
+
 ## RChain alignment
 
 The design is informed by the RChain architecture documentation's emphasis on public compute infrastructure, compositional execution, formal verification, and consensus propositions with justification/evidence.
@@ -92,7 +114,7 @@ This repository remains an independent implementation and must not imply officia
 
 ## Initial milestone
 
-The first milestone is not a live-network integration. It is a deterministic vertical slice:
+The deterministic vertical slice is now followed by a real observer boundary:
 
 ```text
 synthetic execution fixture
@@ -103,9 +125,15 @@ synthetic execution fixture
         -> deterministic verification
         -> replay check
         -> Reality Record
+
+rchain-sentinel
+        -> HTTP observation
+        -> Sentinel adapter
+        -> Reality observation / claim / verification
+        -> Reality Record
 ```
 
-Once this contract is stable, `rchain-sentinel` can become the first observation adapter without coupling the verification core to the node transport.
+The provider-specific adapter is deliberately outside the core verification semantics, so another observer can be introduced without rewriting the Reality Record model.
 
 ## Design constraints
 

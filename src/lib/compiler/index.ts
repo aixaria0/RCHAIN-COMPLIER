@@ -4,4 +4,5 @@ export * from "./qlf.ts";
 export * from "./compile.ts";
 export * from "./reality-record.ts";
 export * from "./reality-record-adapter.ts";
+export * from "./sentinel-adapter.ts";
 export { shortHex, hexPrefixed } from "./hash.ts";
