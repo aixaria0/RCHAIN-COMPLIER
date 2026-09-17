@@ -7,5 +7,9 @@ node_modules/
 dist/
 build/
 artifacts/.tmp/
+artifacts/imagine_images/
+attachments/
+screenshots/app-builder-preview*.png
+screenshots/app-builder-preview*.json
 *.log
 .DS_Store
