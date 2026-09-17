@@ -151,11 +151,10 @@ src/
 ├── routes/              Interactive verification views
 └── lib/
     ├── compiler/        Reality Engine, calculi, evidence, hashing, adapters
-    ├── app-data/        Application data and readiness boundaries
     └── multiplayer/     Peer-to-peer transport boundary
 
 server/                  Optional runtime integration
-scripts/                 Build, migration, preview, verification tooling
+scripts/                 Build, migration, and verification tooling
 docs/                    Architecture and evidence contracts
 examples/                Small executable verification demonstrations
 ```
@@ -264,4 +263,4 @@ No license is declared in this repository yet. Until a license is added, assume 
 
 ## Validation
 
-The final branch is expected to pass the repository quality gates before merge: typecheck, lint, test, and production build.
+The main branch is expected to pass the repository quality gates before release: typecheck, lint, test, and production build.
