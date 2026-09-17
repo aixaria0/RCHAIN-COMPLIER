@@ -146,13 +146,31 @@ function transformationsFromReality(reality: Reality): RealityTransformation[] {
   return transformations.filter((transformation) => transformation.outputIds.length > 0);
 }
 
+function evidenceIdForRef(envelopes: EventEnvelope[], source: string, field: string, value: string): string | null {
+  const envelope = envelopes.find((candidate) =>
+    candidate.fields.some(
+      (candidateField) =>
+        candidateField.source === source && candidateField.field === field && candidateField.value === value,
+    ),
+  );
+  return envelope ? `evidence_${envelope.eventId}` : null;
+}
+
 function verificationsFromReality(reality: Reality): RealityVerification[] {
   return reality.checks.map((check) => ({
     id: check.id,
     predicate: check.name,
     state: verificationState(check.status),
     message: `${check.message} [source=${check.source}, severity=${check.severity}]`,
-    evidenceIds: check.evidence.map((evidence) => `evidence_${reality.envelopes.find((env) => env.fields.some((field) => field.source === evidence.source && field.field === evidence.field && field.value === evidence.value))?.eventId ?? "unlinked"}`),
+    evidenceIds: check.evidence.flatMap((evidence) => {
+      const evidenceId = evidenceIdForRef(
+        reality.envelopes,
+        evidence.source,
+        evidence.field,
+        evidence.value,
+      );
+      return evidenceId ? [evidenceId] : [];
+    }),
   }));
 }
 
@@ -179,7 +197,6 @@ function subjectId(reality: Reality): string {
 }
 
 export function realityToRecord(reality: Reality, previousDigest?: string): RealityRecord {
-  const observations = reality.envelopes.map(envelopeObservation);
   const input = {
     schema: "rchain-reality-record/v1" as const,
     id: subjectId(reality),
@@ -189,7 +206,7 @@ export function realityToRecord(reality: Reality, previousDigest?: string): Real
       label: `${reality.scenario} / ${reality.mutation}`,
     },
     source: "rchain-reality-compiler",
-    observations,
+    observations: reality.envelopes.map(envelopeObservation),
     claims: claimsFromReality(reality),
     evidence: evidenceFromReality(reality),
     dependencies: dependenciesFromEnvelopes(reality.envelopes),
