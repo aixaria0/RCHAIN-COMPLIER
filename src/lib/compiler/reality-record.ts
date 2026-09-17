@@ -6,7 +6,7 @@
  * deterministic predicates rather than asserted by an upstream adapter.
  */
 
-import { digest } from "./hash";
+import { digest } from "./hash.ts";
 
 export type RealityState =
   | "OBSERVED"
