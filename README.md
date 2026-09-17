@@ -61,7 +61,7 @@ docs/                    Architecture and engineering documentation
 examples/                Small executable verification demos
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md), and [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md) for the system model and evidence contract.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md), [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md), and [`docs/REALITY_ENGINE_CORE.md`](docs/REALITY_ENGINE_CORE.md) for the system model and evidence contract.
 
 ## Reality Evidence Plane
 
@@ -91,6 +91,36 @@ npm run demo:reality-record
 ```
 
 The compiler test fixtures use explicit TypeScript module extensions so the same evidence graph runs under Vite and Node's native type-stripping test runner.
+
+## Reality Engine Core
+
+The first executable Reality Layer engine now composes the evidence plane and both calculi into one deterministic certificate-producing boundary:
+
+```text
+Observation
+   ↓
+Canonical normalization
+   ↓
+RealityRecord
+   ↓
+Reality Calculus
+   ↓
+RChain Proposition Calculus
+   ↓
+Replay / consistency / equivocation
+   ↓
+RealityCertificate
+```
+
+`src/lib/compiler/reality-engine.ts` is deliberately small and portable. It does not replace RChain consensus or assert protocol finality. It resolves only what can be established from the supplied evidence and rules.
+
+State resolution is conservative: divergence wins over incompleteness; incompleteness wins over weaker positive states; `VERIFIED` requires successful verification, a consistent proposition judgement, and a proposition fixed point.
+
+Run the first engine fixture with:
+
+```bash
+npm run demo:reality-engine
+```
 
 ## Verification model
 
