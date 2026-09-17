@@ -1,5 +1,4 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
-import { AuthProvider } from "@/lib/auth/provider";
 import { WorkbenchProvider } from "@/lib/workbench-state";
 import { Shell } from "@/components/wb/shell";
 import appCss from "../styles.css?url";
@@ -35,13 +34,11 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
-        <AuthProvider>
-          <WorkbenchProvider>
-            <Shell>
-              <Outlet />
-            </Shell>
-          </WorkbenchProvider>
-        </AuthProvider>
+        <WorkbenchProvider>
+          <Shell>
+            <Outlet />
+          </Shell>
+        </WorkbenchProvider>
         <Scripts />
       </body>
     </html>
