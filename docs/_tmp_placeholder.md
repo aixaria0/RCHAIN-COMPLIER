@@ -1,1 +1,0 @@
-Temporary placeholder; replaced during final repository hardening.
