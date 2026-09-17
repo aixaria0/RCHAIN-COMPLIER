@@ -1,140 +1,216 @@
 # RChain Reality Compiler
 
-A verification-oriented workbench for turning distributed execution claims into structured, independently checkable evidence.
+**A deterministic evidence compiler for turning distributed execution claims into inspectable, reproducible, proof-carrying reality records.**
 
-> **Status:** Research prototype / verification workbench
+> **Status:** Research prototype / executable Reality Layer
 >
-> The current application is designed to make execution, causality, evidence, counterfactuals, and replay divergence inspectable. It should not be interpreted as a live RChain node or as production consensus infrastructure unless explicitly stated by the implementation.
+> This repository is **not** an RChain node, a replacement for RChain consensus, or a requirement for running RChain. The word *compiler* describes the verification boundary: it compiles observations, execution traces, propositions, and evidence into a deterministic certificate that can be inspected and replayed independently.
 
-## What this project is
+## The problem
 
-RChain Reality Compiler is organized around a simple boundary:
+Distributed systems do not only produce state. They produce claims about state.
 
-```text
-Execution
-   ↓
-Trace
-   ↓
-RChain state / block evidence
-   ↓
-Evidence envelope
-   ↓
-Verification
-   ↓
-Reality Record
-   ↓
-Human-auditable result
-```
+A block may claim an execution happened. An observer may report an event. A validator may justify a proposition. A replay may agree or diverge. A UI can display all of those things without establishing how they relate.
 
-The workbench provides a visual surface for examining this pipeline and for testing adversarial or divergent cases against deterministic fixtures.
-
-## Core capabilities
-
-- Compiler-oriented pipeline for Rholang/RChain-shaped execution claims.
-- QLF-oriented representation and verification hooks.
-- Deterministic hashing and evidence structures.
-- Portable `RealityRecord` artifacts with observations, claims, evidence, causal dependencies, transformations, verification predicates, replay state, and SHA-256 integrity.
-- Causality exploration from event to verification result.
-- Counterfactual/adversarial case analysis.
-- Replay-divergence inspection.
-- Evidence graph visualization.
-- A dedicated architecture view documenting system boundaries.
-- TypeScript, React, TanStack Router, Vite, and a server-side runtime.
-- Automated type checking, linting, formatting, tests, and CI quality gates.
-
-## Architecture
-
-The implementation is deliberately split into layers:
-
-```text
-src/
-├── components/wb/       Workbench presentation layer
-├── routes/              Application views
-└── lib/
-    ├── compiler/        Compilation, Rho, QLF, hashing, observation
-    ├── app-data/        Application data and readiness boundaries
-    └── multiplayer/     Peer-to-peer transport boundary
-
-server/                  Optional server/runtime integration
-scripts/                 Build, migration, preview, and verification tooling
-docs/                    Architecture and engineering documentation
-examples/                Small executable verification demos
-```
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md), [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md), and [`docs/REALITY_ENGINE_CORE.md`](docs/REALITY_ENGINE_CORE.md) for the system model and evidence contract.
-
-## Reality Evidence Plane
-
-The current vertical slice converts the existing compiler output into a provider-neutral evidence artifact without introducing a second execution engine:
-
-```text
-QuantumOS event
-  → QLF certificate
-  → Rholang process
-  → deterministic execution trace
-  → block proposal
-  → independent observations
-  → verification checks
-  → replay
-  → Reality Record
-  → SHA-256 integrity
-```
-
-`src/lib/compiler/reality-record-adapter.ts` is intentionally an adapter over `compile()`. The existing compiler remains the source of truth for synthetic execution and evidence; the adapter packages that result into a portable record that can later be fed by another observation adapter, including the planned `rchain-sentinel` integration.
-
-A Reality Record deliberately keeps observation separate from verification. `VERIFIED` means the configured predicates passed over supplied evidence; it does not claim protocol finality or replace RChain consensus. `DIVERGENT` captures reproducible conflict, while `INCOMPLETE` captures insufficient evidence.
-
-Run the executable fixture directly with:
-
-```bash
-npm run demo:reality-record
-```
-
-The compiler test fixtures use explicit TypeScript module extensions so the same evidence graph runs under Vite and Node's native type-stripping test runner.
-
-## Reality Engine Core
-
-The first executable Reality Layer engine now composes the evidence plane and both calculi into one deterministic certificate-producing boundary:
+Reality Compiler makes that relationship executable.
 
 ```text
 Observation
-   ↓
-Canonical normalization
-   ↓
-RealityRecord
-   ↓
+    ↓
+Normalization
+    ↓
+Evidence / RealityRecord
+    ↓
 Reality Calculus
-   ↓
-RChain Proposition Calculus
-   ↓
+    ↓
+Proposition Calculus
+    ↓
+Proof obligations + justification graph
+    ↓
 Replay / consistency / equivocation
-   ↓
-RealityCertificate
+    ↓
+Deterministic RealityCertificate
+    ↓
+Justified next transition
 ```
 
-`src/lib/compiler/reality-engine.ts` is deliberately small and portable. It does not replace RChain consensus or assert protocol finality. It resolves only what can be established from the supplied evidence and rules.
+The result is not merely a status label. The certificate carries the reasoning material needed to inspect why that status was produced.
 
-State resolution is conservative: divergence wins over incompleteness; incompleteness wins over weaker positive states; `VERIFIED` requires successful verification, a consistent proposition judgement, and a proposition fixed point.
+## Why a compiler?
 
-Run the first engine fixture with:
+RChain itself does not need this repository in order to execute its protocol.
+
+The compiler boundary exists for a different problem: **turning heterogeneous observations into a common, reproducible verification artifact.**
+
+A network can execute correctly while its surrounding evidence is fragmented, contradictory, difficult to replay, or impossible to audit after an observer disappears. Reality Compiler treats observation as input and verification as a separate, deterministic layer.
+
+The architecture is therefore closer to an evidence compiler than to a conventional blockchain application:
+
+```text
+provider / observer / fixture
+            ↓
+      canonical input
+            ↓
+     evidence compiler
+            ↓
+     proof-carrying result
+```
+
+A future observer can replace today's synthetic fixture without replacing the verification model.
+
+## Reality Engine Core
+
+The first executable engine boundary is `src/lib/compiler/reality-engine.ts`.
+
+```text
+RealityEngineInput
+        ↓
+canonical normalization
+        ↓
+RealityRecord
+   ┌────┴─────────────────┐
+   ↓                      ↓
+Reality Calculus     Proposition Calculus
+   ↓                      ↓
+   └───────┬──────────────┘
+           ↓
+ replay / consistency / equivocation
+           ↓
+     state resolution
+           ↓
+   RealityCertificate
+```
+
+The engine is deliberately conservative:
+
+- `DIVERGENT` takes precedence when replay diverges, propositions conflict, or equivocation is detected.
+- `INCOMPLETE` is emitted when required evidence or proposition prerequisites are missing.
+- `VERIFIED` requires successful verification, proposition consistency, and a fixed point.
+- weaker states such as `OBSERVED`, `CONSISTENT`, and `REPRODUCED` remain explicit instead of being promoted to `VERIFIED`.
+
+Run it directly:
 
 ```bash
 npm run demo:reality-engine
 ```
 
+## Proof-producing Reality Layer
+
+The engine emits more than a final state. Its proof bundle exposes:
+
+- **Proof obligations** — what had to be established.
+- **Justification graph** — how observations, evidence, claims, propositions, and validations relate.
+- **Conflict core** — where incompatible evidence or propositions collide.
+- **Replay state** — whether the execution can be reproduced.
+- **Equivocation signals** — whether mutually incompatible statements are being asserted.
+- **Deterministic digests** — integrity anchors for the record, derivation, proposition judgement, and final certificate.
+
+This makes failure informative. A divergent result is not a dead end; it is an auditable artifact describing the divergence.
+
+## Reality Loop
+
+The current Reality Layer closes an executable loop:
+
+```text
+OBSERVE → MEASURE → PROJECT → OBSERVE
+```
+
+`OBSERVE` captures provider-neutral evidence.
+
+`MEASURE` derives verification state, proposition consistency, replay state, proof obligations, and conflicts.
+
+`PROJECT` does not pretend to be an ML oracle. It derives the next justified transition from the current proof state. If the evidence is insufficient or contradictory, the engine can project **collect more evidence**, **isolate a conflict**, **replay**, or **hold state** rather than inventing certainty.
+
+This separation leaves room for future predictive or ML systems without making prediction the source of truth for verification.
+
+## Failure containment is a first-class concern
+
+The architecture treats infrastructure failure and epistemic failure as different problems.
+
+A node can disappear. A process can exhaust memory. An observer can disagree with another observer. A replay can diverge. None of those should silently become `VERIFIED` merely because the UI or service is still running.
+
+Reality Compiler therefore keeps:
+
+```text
+execution
+observation
+verification
+replay
+presentation
+```
+
+as separate boundaries.
+
+The current implementation provides deterministic evidence artifacts and conservative state resolution. Resource budgeting, streaming ingestion, checkpointing, and durable multi-observer aggregation are intentionally future integration points rather than claims about the current prototype.
+
+## Architecture
+
+```text
+src/
+├── components/wb/       Workbench presentation
+├── routes/              Interactive verification views
+└── lib/
+    ├── compiler/        Reality Engine, calculi, evidence, hashing, adapters
+    ├── app-data/        Application data and readiness boundaries
+    └── multiplayer/     Peer-to-peer transport boundary
+
+server/                  Optional runtime integration
+scripts/                 Build, migration, preview, verification tooling
+docs/                    Architecture and evidence contracts
+examples/                Small executable verification demonstrations
+```
+
+Important documents:
+
+- [`docs/REALITY_ENGINE_CORE.md`](docs/REALITY_ENGINE_CORE.md)
+- [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md)
+- [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md)
+- [`docs/WHY_THIS_IS_A_COMPILER.md`](docs/WHY_THIS_IS_A_COMPILER.md)
+- [`docs/FAILURE_CONTAINMENT.md`](docs/FAILURE_CONTAINMENT.md)
+
+## RChain / QLF boundary
+
+This repository is an independent research and engineering implementation. It is designed to provide verification-oriented tooling around RChain-shaped execution and Quantum Logical Framework concepts.
+
+It does not claim to be an official RChain implementation, reproduce historical RChain consensus, or require changes to the underlying protocol.
+
+The intended integration boundary is:
+
+```text
+RChain / observer / Sentinel / future provider
+                    ↓
+             Reality Adapter
+                    ↓
+             Reality Compiler
+                    ↓
+          auditable certificate
+```
+
+## What this is not
+
+- Not a new blockchain.
+- Not a token or Web3 consumer application.
+- Not an RChain fork.
+- Not a replacement for consensus.
+- Not a claim of live mainnet evidence.
+- Not an AI oracle that invents missing facts.
+
+It is infrastructure for **evidence, reasoning, replay, and provenance** around distributed execution.
+
 ## Verification model
 
-The project treats verification as a first-class artifact rather than a UI decoration. A useful result should expose:
+A useful result should expose:
 
 1. The claim being evaluated.
-2. The source execution or synthetic fixture.
-3. The transformation/compilation steps.
+2. The source execution or fixture.
+3. The transformation and compilation path.
 4. The evidence attached to the claim.
-5. The verification predicates that were evaluated.
+5. The predicates evaluated against that evidence.
 6. Any adversarial mutation or replay divergence.
-7. The final deterministic result and its provenance.
+7. The proof obligations and justification graph.
+8. The final deterministic result and its provenance.
 
-This separation makes it possible to replace synthetic fixtures with real chain evidence later without changing the conceptual verification boundary.
+`VERIFIED` means the configured predicates passed over the supplied evidence. It does **not** mean protocol finality, economic truth, or live network consensus.
 
 ## Development
 
@@ -142,8 +218,6 @@ Requirements:
 
 - Node.js with npm
 - A modern browser for the workbench
-
-Install dependencies and run the development server:
 
 ```bash
 npm install
@@ -159,40 +233,31 @@ npm test
 npm run build
 ```
 
-Formatting:
+Executable demonstrations:
 
 ```bash
-npm run format
+npm run demo:reality-record
+npm run demo:reality-calculus
+npm run demo:proposition-calculus
+npm run demo:reality-engine
 ```
 
-GitHub Actions includes a branch-agnostic Reality Plane workflow for pull requests, including the current stacked feature branch.
+## Design principles
 
-## Project principles
+**Determinism.** Equivalent normalized inputs should produce reproducible verification artifacts.
 
-**Determinism.** Equivalent inputs should produce reproducible verification results.
+**Evidence over assertion.** The system exposes the material behind a result rather than hiding it behind a status badge.
 
-**Provenance.** A result is only useful when its origin and transformation path can be inspected.
+**Provenance.** Every meaningful result should retain its origin and transformation path.
 
-**Explicit boundaries.** Live chain state, synthetic fixtures, transport, and presentation are separate concerns.
+**Fail closed.** Missing or contradictory evidence should reduce certainty, not manufacture it.
 
-**Adversarial by design.** Verification must account for malformed, contradictory, divergent, and replayed evidence rather than only the happy path.
+**Adversarial by design.** Contradiction, replay divergence, equivocation, malformed evidence, and incomplete inputs are first-class cases.
 
-**Evidence over assertion.** The system should expose the material needed to reproduce or independently inspect a result.
+**Explicit boundaries.** Live state, synthetic fixtures, transport, verification, and presentation remain separable.
 
-## Relationship to RChain and QLF
-
-This repository is an independent research and engineering implementation. It is intended to provide adapters and verification-oriented tooling around RChain-shaped execution and Quantum Logical Framework concepts; it is not presented as an official RChain implementation.
-
-Where an external protocol, repository, or specification is used, the implementation should preserve that boundary explicitly in code and documentation.
-
-## Contributing
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md). Changes that affect verification semantics should include tests and a short explanation of the invariant being preserved or changed.
-
-## Security
-
-See [`SECURITY.md`](SECURITY.md) for responsible vulnerability reporting and the project's security scope.
+**Replaceable observers.** The verification core should not care whether evidence originated from a fixture, Sentinel, an RChain node, or another observer implementation.
 
 ## License
 
-No license is declared in this repository yet. Until a license is added, assume that the repository contents remain under the copyright of their respective rights holders and are not automatically licensed for reuse.
+No license is declared in this repository yet. Until a license is added, assume the repository contents remain under the copyright of their respective rights holders and are not automatically licensed for reuse.
