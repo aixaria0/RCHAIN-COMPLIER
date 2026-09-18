@@ -8,4 +8,5 @@ export * from "./sentinel-adapter.ts";
 export * from "./reality-calculus.ts";
 export * from "./proposition-calculus.ts";
 export * from "./cbc-stress.ts";
+export * from "./casper-observation.ts";
 export { shortHex, hexPrefixed } from "./hash.ts";
