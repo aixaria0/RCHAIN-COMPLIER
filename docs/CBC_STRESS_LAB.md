@@ -100,3 +100,17 @@ The output includes the scenario, metrics, fragilities, improvement hypotheses a
 ## Next boundary
 
 The next meaningful step is not adding more UI. It is replacing the synthetic validator transition model with an adapter around the actual Casper/RChain code path or a faithful formal model, while keeping the same evidence and replay interfaces.
+
+
+## Upstream alignment
+
+The observation boundary is intentionally shaped around fields visible in the current `rchain-community/rchain-rust` Casper implementation:
+
+- `casper/src/multi_parent_casper.rs`: parent hashes, justifications, latest messages, bonds map, fringe calculation, block validation and replay validation;
+- `legacy/casper/src/main/scala/coop/rchain/casper/MultiParentCasper.scala`: the Scala oracle for the multi-parent Casper flow;
+- `legacy/casper/src/main/resources/casper.tla`: explicit message transfer, delivery/loosening, node state transitions and fairness assumptions;
+- `spec/Rchain/Casper/Validate.lean`: formalized laws around block height, sequence numbers, content addressing, merge channels and fringe identity.
+
+The repository now has a `CasperBlockObservation` boundary adapter for these concepts. It converts an observed block into a validator-style bet, a proposition with explicit prerequisites, and a canonical observation digest.
+
+This is intentionally an adapter boundary rather than copied upstream code. The next step is to feed it real block/DAG observations and compare the observed traces against the stress scenarios.
