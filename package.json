@@ -15,7 +15,7 @@
     "preview:restart": "node scripts/preview.mjs restart",
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/compiler/reality-record.test.ts src/lib/compiler/reality-record-adapter.test.ts src/lib/compiler/sentinel-adapter.test.ts src/lib/compiler/reality-calculus.test.ts src/lib/compiler/proposition-calculus.test.ts src/lib/compiler/cbc-stress.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/compiler/reality-record.test.ts src/lib/compiler/reality-record-adapter.test.ts src/lib/compiler/sentinel-adapter.test.ts src/lib/compiler/reality-calculus.test.ts src/lib/compiler/proposition-calculus.test.ts src/lib/compiler/cbc-stress.test.ts src/lib/compiler/casper-observation.test.ts",
     "demo:reality-record": "node --experimental-strip-types examples/reality-record.ts",
     "demo:reality-calculus": "node --experimental-strip-types examples/reality-calculus.ts",
     "demo:proposition-calculus": "node --experimental-strip-types examples/proposition-calculus.ts",
