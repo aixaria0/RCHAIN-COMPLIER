@@ -73,7 +73,7 @@ export function analyzeFragility(result: CbcResult): FragilityReport {
 
   for (const item of invariants.filter((entry) => !entry.satisfied)) {
     const minimalReplay = shrinkScenario(result.scenario, (candidate) => {
-      if (item.invariant === "REPLAY_DETERMINISM") return candidate.replayDigest !== replayCbc(candidate).replayDigest;
+      if (item.invariant === "REPLAY_DETERMINISM") return candidate.replayDigest !== replayCbc(candidate.scenario).replayDigest;
       if (item.invariant === "EQUIVOCATION_DETECTION") return (candidate.scenario.equivocations ?? 0) !== candidate.equivocations.length;
       if (item.invariant === "BASELINE_CONVERGENCE") return candidate.result !== "CONVERGED" || !candidate.fixedPoint;
       return candidate.scenario.partition !== undefined && candidate.evidence.justificationGraph.length === 0;
