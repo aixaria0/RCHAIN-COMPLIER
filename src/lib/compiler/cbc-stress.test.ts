@@ -49,6 +49,8 @@ test("partition is visible in the evidence report", () => {
 
   assert.equal(result.metrics.partitionedRounds, 3);
   assert.equal(result.metrics.replayStable, true);
+  assert.equal(result.metrics.divergence, true);
+  assert.equal(result.observations[0].acceptedClaims.length, 2);
   assert.equal(result.fragilities.some((item) => item.includes("partition")), true);
 });
 
