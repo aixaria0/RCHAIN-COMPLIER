@@ -11,3 +11,4 @@ export * from "./reality-proof-core.ts";
 export * from "./reality-loop.ts";
 export * from "./reality-engine.ts";
 export { shortHex, hexPrefixed } from "./hash.ts";
+export * from "../cbc/index.ts";
