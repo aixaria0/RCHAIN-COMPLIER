@@ -51,6 +51,22 @@ A failed invariant becomes a structured counterexample with a failed round, caus
 
 The stress demo includes a partition+reorder case so ordering pressure is represented in the matrix without changing the synthetic-first boundary.
 
+
+## M4 — Stake-aware adversarial matrix
+
+The law probe is now exercised through a small deterministic matrix covering:
+
+- exact 2/3 boundary;
+- strictly-over-2/3 support;
+- concentrated stake with incomplete message coverage;
+- concentrated stake with complete message coverage;
+- balanced stake without super-majority.
+
+The matrix classifies observations rather than declaring vulnerabilities. In particular, `STAKE_COVERAGE_TENSION` means the two upstream conditions point in different directions in the same observation: stake support exceeds 2/3 while minimum-message coverage is incomplete.
+
+That classification is a research hypothesis generator. The next bridge is to obtain the corresponding block/DAG evidence and determine whether the state can actually arise in the upstream execution path under realistic delivery and fault conditions.
+
+
 ## Next
 
 The next research step is to feed faithful upstream block/DAG observations into this same evidence path and then reproduce any candidate fragility against the upstream implementation or formal specification.
