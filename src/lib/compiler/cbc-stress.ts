@@ -59,10 +59,15 @@ function makeBetId(bet: RealityBet): string {
 function buildBets(scenario: CbcStressScenario, round: number): RealityBet[] {
   const ordered = stable(scenario.validators, (v) => v.id);
   const target = `round-${round}`;
+  const partitionGroup = new Set(scenario.partition?.[1] ?? []);
   const bets: RealityBet[] = ordered.map((validator) => ({
     source: validator.id,
     target,
-    claim: "block-A",
+    claim:
+      (scenario.fault === "partition" || scenario.fault === "partition+equivocation") &&
+      partitionGroup.has(validator.id)
+        ? "block-B"
+        : "block-A",
     belief: validator.stake,
     justification: [`parent-${Math.max(0, round - 1)}`],
   }));
