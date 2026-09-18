@@ -1,7 +1,7 @@
 import { digest } from "../compiler/hash.ts";
 import type { ValidatorState, ValidatorEvent } from "./validator.ts";
 
-export interface Equivocation {
+export interface CbcEquivocation {
   validator: string;
   round: number;
   propositions: string[];
@@ -25,7 +25,7 @@ export function equivocate(
   });
 }
 
-export function detectEquivocations(events: ValidatorEvent[]): Equivocation[] {
+export function detectEquivocations(events: ValidatorEvent[]): CbcEquivocation[] {
   const grouped = new Map<string, ValidatorEvent[]>();
   for (const event of events) {
     if (event.kind !== "EQUIVOCATE") continue;
