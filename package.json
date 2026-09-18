@@ -5,7 +5,9 @@
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "overrides": {"nf3": "0.3.17"},
+  "overrides": {
+    "nf3": "0.3.17"
+  },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
     "build": "vite build && npm run db:migrate",
@@ -19,7 +21,8 @@
     "demo:proposition-calculus": "node --experimental-strip-types examples/proposition-calculus.ts",
     "demo:reality-engine": "node --experimental-strip-types examples/reality-engine.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "demo:cbc-stress": "node --experimental-strip-types examples/cbc-stress.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
