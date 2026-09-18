@@ -4,7 +4,7 @@ import {
   selectMaximallyConsistentPropositions,
   type RealityProposition,
 } from "../compiler/proposition-calculus.ts";
-import { detectEquivocations, equivocate, type Equivocation } from "./equivocation-engine.ts";
+import { detectEquivocations, equivocate, type CbcEquivocation } from "./equivocation-engine.ts";
 import { partitionValidators, type NetworkPartition } from "./network-partition.ts";
 import { createValidators, validatorEvent, type ValidatorEvent, type ValidatorState } from "./validator.ts";
 
@@ -23,7 +23,7 @@ export interface CbcResult {
   scenario: CbcScenario;
   validators: ValidatorState[];
   events: ValidatorEvent[];
-  equivocations: Equivocation[];
+  equivocations: CbcEquivocation[];
   convergenceRounds: number;
   fixedPoint: boolean;
   replayDigest: string;
@@ -44,7 +44,6 @@ function propositions(events: ValidatorEvent[]): RealityProposition[] {
     return conflicts.length ? incompatible(id, id, conflicts) : { id, statement: id };
   });
 }
-
 
 function graph(events: ValidatorEvent[]): Array<{ from: string; to: string; relation: string }> {
   return events
@@ -67,6 +66,8 @@ export function simulateCbc(scenario: CbcScenario): CbcResult {
       : undefined;
   if (partition) partition.reorder = scenario.reorder ?? false;
 
+  const equivocationCount = scenario.equivocations ?? 0;
+
   for (let round = 1; round <= rounds; round++) {
     const proposition = partition && round <= (scenario.delayedRounds ?? 0) + 1
       ? `state:partition-${partition.groups[0]!.length}-${partition.groups[1]!.length}`
@@ -76,8 +77,8 @@ export function simulateCbc(scenario: CbcScenario): CbcResult {
       events.push(validatorEvent(round, validator, validator.honest ? proposition : "state:byzantine"));
     }
 
-    if ((scenario.equivocations ?? 0) > 0 && round === 2) {
-      for (const validator of validators.slice(0, Math.min(scenario.equivocations, validators.length))) {
+    if (equivocationCount > 0 && round === 2) {
+      for (const validator of validators.slice(0, Math.min(equivocationCount, validators.length))) {
         events.push(...equivocate(validator, round, ["state:canonical", "state:conflicting"]));
       }
     }
@@ -121,7 +122,7 @@ export function simulateCbc(scenario: CbcScenario): CbcResult {
 }
 
 function partitionedRound(partition: NetworkPartition, round: number): Array<{ round: number; from: string; to: string; proposition: string }> {
-  const deliveries = [];
+  const deliveries: Array<{ round: number; from: string; to: string; proposition: string }> = [];
   for (const [index, group] of partition.groups.entries()) {
     const other = partition.groups[1 - index] ?? [];
     for (const from of group) {
