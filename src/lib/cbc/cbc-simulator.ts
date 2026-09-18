@@ -2,7 +2,6 @@ import { digest } from "../compiler/hash.ts";
 import {
   incompatible,
   selectMaximallyConsistentPropositions,
-  type RealityBet,
   type RealityProposition,
 } from "../compiler/proposition-calculus.ts";
 import { detectEquivocations, equivocate, type Equivocation } from "./equivocation-engine.ts";
@@ -46,17 +45,6 @@ function propositions(events: ValidatorEvent[]): RealityProposition[] {
   });
 }
 
-function bets(events: ValidatorEvent[]): RealityBet[] {
-  return events
-    .filter((event) => event.kind !== "RECEIVE")
-    .map((event) => ({
-      source: event.validator,
-      target: `round:${event.round}`,
-      claim: event.proposition,
-      belief: 1,
-      justification: [event.digest],
-    }));
-}
 
 function graph(events: ValidatorEvent[]): Array<{ from: string; to: string; relation: string }> {
   return events
