@@ -10,3 +10,4 @@ export * from "./casper-finalizer-observation.ts";
 export * from "./casper-finalizer-delivery-matrix.ts";
 export * from "./casper-tension-minimizer.ts";
 export * from "./casper-upstream-gate.ts";
+export * from "./casper-upstream-adapter.ts";
