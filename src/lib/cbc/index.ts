@@ -7,3 +7,4 @@ export * from "./casper-finality.ts";
 export * from "./fragility-engine.ts";
 export * from "./casper-stake-matrix.ts";
 export * from "./casper-finalizer-observation.ts";
+export * from "./casper-finalizer-delivery-matrix.ts";
