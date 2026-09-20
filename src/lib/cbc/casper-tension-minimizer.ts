@@ -35,7 +35,9 @@ export function minimizeTensionObservation(
   let current = canonicalObservation(observation);
   const original = traceCasperFinalizerObservation(current);
   if (!isTension(original)) {
-    throw new Error("minimizeTensionObservation requires a supermajority/incomplete-coverage observation");
+    throw new Error(
+      "minimizeTensionObservation requires a supermajority/incomplete-coverage observation",
+    );
   }
 
   const removedValidators: string[] = [];
@@ -44,12 +46,15 @@ export function minimizeTensionObservation(
   while (changed) {
     changed = false;
     for (const validator of Object.keys(current.bondsMap).sort()) {
-      if (Object.keys(current.bondsMap).length <= 2) continue;\n      if (!(validator in current.bondsMap)) continue;
+      if (Object.keys(current.bondsMap).length <= 2) continue;
+      if (!(validator in current.bondsMap)) continue;
 
       const candidateBonds = { ...current.bondsMap };
       delete candidateBonds[validator];
 
-      const candidateMinimum = current.minimumMessageSenders.filter((sender) => sender !== validator);
+      const candidateMinimum = current.minimumMessageSenders.filter(
+        (sender) => sender !== validator,
+      );
       const candidateObservers = Object.fromEntries(
         Object.entries(current.supportObservers)
           .filter(([sender]) => sender !== validator)
