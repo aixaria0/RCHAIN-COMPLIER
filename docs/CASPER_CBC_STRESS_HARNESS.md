@@ -88,3 +88,23 @@ This still does not claim a protocol vulnerability. A STAKE_COVERAGE_TENSION
 observation is a concrete condition worth reproducing through the upstream
 execution path; it becomes a protocol finding only if an actual upstream
 execution demonstrates the relevant safety/liveness consequence.
+
+
+## M6 — deterministic DAG delivery/fault matrix
+
+The observation bridge now has a deterministic delivery matrix covering four
+observation states: complete delivery, an observer partition, a missing minimum
+sender, and reordering with complete coverage. The matrix does not simulate the
+network; it supplies explicit observed DAG/finalizer facts to the upstream-facing
+adapter so the resulting law trace can be compared without ambiguity.
+
+This gives the research path a clean separation:
+
+1. delivery/fault conditions produce an observation;
+2. the observation bridge derives full-partition support;
+3. the upstream law probe evaluates stake threshold and minimum-message coverage;
+4. deterministic digests make the observation replayable.
+
+The next target is to minimize a tension case while preserving the same finalizer
+observation, then attach the minimized observation to an actual upstream execution
+trace rather than treating the matrix itself as a protocol finding.
