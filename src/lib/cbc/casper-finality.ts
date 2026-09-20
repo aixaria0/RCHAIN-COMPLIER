@@ -7,6 +7,9 @@ export interface FinalityObservation {
   minimumMessageSenders: string[];
 }
 export interface FinalityAnalysis {
+  bonds: StakeMap;
+  support: string[];
+  minimumMessageSenders: string[];
   totalStake: number;
   supportingStake: number;
   thresholdNumerator: number;
@@ -45,6 +48,9 @@ export function analyzeCasperFinality(observation: FinalityObservation): Finalit
   const superMajority = supportingStake * 3 > totalStake * 2;
   const messageCoverage = minimum.length === bonded.length;
   return {
+    bonds,
+    support,
+    minimumMessageSenders: minimum,
     totalStake,
     supportingStake,
     thresholdNumerator: 2,
