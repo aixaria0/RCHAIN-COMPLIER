@@ -11,10 +11,10 @@ test("minimizes a stake/coverage tension to the smallest multi-validator observa
 
   assert.equal(result.original.superMajority, true);
   assert.equal(result.original.messageCoverage, false);
-  assert.equal(Object.keys(result.minimized.bondsMap).length, 2);
+  assert.equal(Object.keys(result.minimized.bonds).length, 2);
   assert.equal(result.minimized.superMajority, true);
   assert.equal(result.minimized.messageCoverage, false);
-  assert.deepEqual(result.minimized.bondsMap, { v0: 70, v3: 10 });
+  assert.deepEqual(result.minimized.bonds, { v0: 70, v3: 10 });
   assert.deepEqual(result.minimized.support, ["v0"]);
   assert.deepEqual(result.minimized.minimumMessageSenders, ["v0"]);
   assert.equal(result.removedValidators.length, 2);
