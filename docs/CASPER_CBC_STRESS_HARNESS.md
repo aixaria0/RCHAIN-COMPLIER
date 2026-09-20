@@ -108,3 +108,12 @@ This gives the research path a clean separation:
 The next target is to minimize a tension case while preserving the same finalizer
 observation, then attach the minimized observation to an actual upstream execution
 trace rather than treating the matrix itself as a protocol finding.
+
+
+## M7 — deterministic tension minimization
+
+The harness now minimizes a concrete STAKE_COVERAGE_TENSION observation while preserving the two defining predicates: strict supermajority stake support and incomplete minimum-message coverage. The minimizer removes bonded validators deterministically and stops at a two-validator case so the reproducer remains meaningfully multi-validator.
+
+For the existing 70/10/10/10 fixture, the minimized observation is 70/10 with support from the 70-stake validator and only one minimum-message sender. This is a smaller observation of the same law-level tension, not yet an upstream protocol finding. The runnable reproducer is npm run demo:casper-tension-minimizer.
+
+The next step is to map this minimized observation onto an actual upstream message/DAG construction and verify whether the upstream execution path can produce it, especially across check_min_messages and calculate_fringe.
