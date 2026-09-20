@@ -4,7 +4,7 @@ export interface TensionMinimizationResult {
   original: CasperFinalizerTrace;
   minimized: CasperFinalizerTrace;
   removedValidators: string[];
-  preservedPredicate: "SUPERMajority_AND_INCOMPLETE_COVERAGE";
+  preservedPredicate: "SUPERMAJORITY_AND_INCOMPLETE_COVERAGE";
 }
 
 function isTension(trace: CasperFinalizerTrace): boolean {
@@ -44,7 +44,7 @@ export function minimizeTensionObservation(
   while (changed) {
     changed = false;
     for (const validator of Object.keys(current.bondsMap).sort()) {
-      if (!(validator in current.bondsMap)) continue;
+      if (Object.keys(current.bondsMap).length <= 2) continue;\n      if (!(validator in current.bondsMap)) continue;
 
       const candidateBonds = { ...current.bondsMap };
       delete candidateBonds[validator];
@@ -79,6 +79,6 @@ export function minimizeTensionObservation(
     original,
     minimized: traceCasperFinalizerObservation(current),
     removedValidators,
-    preservedPredicate: "SUPERMajority_AND_INCOMPLETE_COVERAGE",
+    preservedPredicate: "SUPERMAJORITY_AND_INCOMPLETE_COVERAGE",
   };
 }
