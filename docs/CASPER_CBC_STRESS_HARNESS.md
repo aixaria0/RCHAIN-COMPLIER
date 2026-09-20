@@ -126,3 +126,10 @@ The minimized two-validator tension is now checked against the control-flow orde
 Therefore an observation with strict supermajority stake but incomplete minimum-message coverage is a law-level tension, but it is blocked at the minimum-message gate before the Law-14 fringe calculation is reached. The new gate probe models this ordering without reimplementing consensus. This changes the research question from “does the stake threshold create a reachable contradiction?” to “can an actual upstream DAG/message construction produce the purported observation while satisfying the minimum-message gate, and if not, what upstream behavior should be treated as the invariant?”
 
 Runnable check: `npm run demo:casper-upstream-gate`.
+
+
+## M9 — observation-to-gate mapping
+
+The minimized M7 observation is now mapped directly into the M8 upstream gate probe. This closes the handoff between the synthetic law-level minimizer and the upstream-facing control-flow boundary without duplicating consensus execution. The two cases are explicit: incomplete coverage is blocked before the fringe stage; complete coverage crosses the gate and becomes eligible for the next upstream-stage experiment.
+
+This adapter is an instrumentation boundary, not a protocol implementation. The remaining research step is to replace the abstract validator/sender sets with a concrete DAG/message fixture whose delivery history generates those sets.
