@@ -70,3 +70,21 @@ That classification is a research hypothesis generator. The next bridge is to ob
 ## Next
 
 The next research step is to feed faithful upstream block/DAG observations into this same evidence path and then reproduce any candidate fragility against the upstream implementation or formal specification.
+
+
+## M5 — Upstream finalizer observation bridge
+
+The next bridge is now explicit: a concrete finalizer observation can provide the
+minimum-message sender set plus, for each candidate sender, the bonded validators
+that observed the complete next-fringe message set. The adapter derives support
+only when the observer set covers the complete bonded partition, matching the
+current upstream finalizer's calculate_fringe condition.
+
+That trace is then passed into the existing M3 law probe. The resulting record
+keeps the upstream-facing observation separate from the synthetic scenario
+engine and carries a canonical observation digest for deterministic replay.
+
+This still does not claim a protocol vulnerability. A STAKE_COVERAGE_TENSION
+observation is a concrete condition worth reproducing through the upstream
+execution path; it becomes a protocol finding only if an actual upstream
+execution demonstrates the relevant safety/liveness consequence.
