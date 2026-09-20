@@ -133,3 +133,8 @@ Runnable check: `npm run demo:casper-upstream-gate`.
 The minimized M7 observation is now mapped directly into the M8 upstream gate probe. This closes the handoff between the synthetic law-level minimizer and the upstream-facing control-flow boundary without duplicating consensus execution. The two cases are explicit: incomplete coverage is blocked before the fringe stage; complete coverage crosses the gate and becomes eligible for the next upstream-stage experiment.
 
 This adapter is an instrumentation boundary, not a protocol implementation. The remaining research step is to replace the abstract validator/sender sets with a concrete DAG/message fixture whose delivery history generates those sets.
+
+
+## M10 — concrete DAG/message construction
+
+A deterministic nine-message fixture now generates the validator/message sets from explicit sender sequence, parent, seen-set, and justification data. The fixture is intentionally a narrow data-flow model rather than a consensus implementation. It verifies that complete minimum-message coverage and a strict-supermajority stake condition can coexist in a concrete delivery history, making the next step an upstream semantic comparison rather than another synthetic matrix.
