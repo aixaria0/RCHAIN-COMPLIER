@@ -117,3 +117,12 @@ The harness now minimizes a concrete STAKE_COVERAGE_TENSION observation while pr
 For the existing 70/10/10/10 fixture, the minimized observation is 70/10 with support from the 70-stake validator and only one minimum-message sender. This is a smaller observation of the same law-level tension, not yet an upstream protocol finding. The runnable reproducer is npm run demo:casper-tension-minimizer.
 
 The next step is to map this minimized observation onto an actual upstream message/DAG construction and verify whether the upstream execution path can produce it, especially across check_min_messages and calculate_fringe.
+
+
+## M8 — upstream control-flow gate
+
+The minimized two-validator tension is now checked against the control-flow ordering visible in `rchain-community/rchain-rust` `Finalizer::next_fringe` at commit `9e667e203861c791aa9349b0351397ccc29f0fc8`. The upstream code calls `check_min_messages` before `calculate_next_layer`, `calculate_next_fringe_support_map`, and `calculate_fringe`; `check_min_messages` requires `min_msgs.len() == bonds_map.len()`.
+
+Therefore an observation with strict supermajority stake but incomplete minimum-message coverage is a law-level tension, but it is blocked at the minimum-message gate before the Law-14 fringe calculation is reached. The new gate probe models this ordering without reimplementing consensus. This changes the research question from “does the stake threshold create a reachable contradiction?” to “can an actual upstream DAG/message construction produce the purported observation while satisfying the minimum-message gate, and if not, what upstream behavior should be treated as the invariant?”
+
+Runnable check: `npm run demo:casper-upstream-gate`.
