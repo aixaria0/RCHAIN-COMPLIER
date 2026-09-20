@@ -8,15 +8,15 @@ const result = minimizeTensionObservation({
 
 console.log(JSON.stringify({
   original: {
-    validators: Object.keys(result.original.bonds).length,
+    validators: Object.keys(result.original.bondsMap).length,
     supportingStake: result.original.supportingStake,
     totalStake: result.original.totalStake,
     messageCoverage: result.original.messageCoverage,
     digest: result.original.observationDigest,
   },
   minimized: {
-    validators: Object.keys(result.minimized.bonds).length,
-    bonds: result.minimized.bonds,
+    validators: Object.keys(result.minimized.bondsMap).length,
+    bonds: result.minimized.bondsMap,
     support: result.minimized.support,
     minimumMessageSenders: result.minimized.minimumMessageSenders,
     supportingStake: result.minimized.supportingStake,
