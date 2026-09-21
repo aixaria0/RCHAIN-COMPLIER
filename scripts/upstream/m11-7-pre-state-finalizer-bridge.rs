@@ -236,7 +236,7 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
         &store,
         &runtime,
         &justifications,
-        &|_hash| async {
+        &|_hash| async move {
             Ok(BlockIndex {
                 block_hash: _hash,
                 deploy_chains: Vec::new(),
