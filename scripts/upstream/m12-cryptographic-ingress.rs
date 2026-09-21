@@ -254,7 +254,7 @@ mod m12_cryptographic_ingress_boundary {
 
     #[tokio::test]
     async fn m12_wire_valid_duplicate_sender_candidate_crosses_block_receiver() {
-        let (candidate, msg_map, mut parent_blocks) = duplicate_sender_fixture();
+        let (candidate, msg_map, parent_blocks) = duplicate_sender_fixture();
 
         assert_eq!(
             candidate
@@ -279,26 +279,6 @@ mod m12_cryptographic_ingress_boundary {
             LogSource::new("m12"),
         )
         .await);
-
-        let just_ids = candidate
-            .justifications
-            .iter()
-            .copied()
-            .collect::<BTreeSet<_>>();
-        let representation = DagRepresentation {
-            dag_set: just_ids,
-            child_map: BTreeMap::new(),
-            height_map: BTreeMap::new(),
-            dag_message_state: DagMessageState {
-                latest_msgs: BTreeMap::new(),
-                msg_map,
-            },
-            fringe_states: BTreeMap::new(),
-        };
-        let dag: Arc<dyn BlockDagStorage> = Arc::new(MockDag { representation });
-
-        parent_blocks.push(candidate.clone());
-        let store = block_store(parent_blocks).await;
 
         // Rebuild without the candidate so the receiver itself must store it.
         let (candidate, msg_map, parent_blocks) = duplicate_sender_fixture();
