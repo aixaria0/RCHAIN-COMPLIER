@@ -114,7 +114,7 @@ mod m15_persisted_finality_state {
                 Arc::new(BytesCodec),
                 Arc::new(SignedDeployDataCodec),
             ));
-        Ok::<_, String>(
+        Arc::new(
             BlockDagKeyValueStorage::create(
                 metadata_store,
                 fringe_store,
@@ -122,7 +122,7 @@ mod m15_persisted_finality_state {
                 deploy_store,
             )
             .await
-            .unwrap()
+            .unwrap(),
         )
     }
 
