@@ -1,0 +1,39 @@
+name: M11.7 Upstream Pre-State Finalizer Bridge
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m11-7-upstream-pre-state.yml"
+      - "scripts/upstream/m11-7-pre-state-finalizer-bridge.rs"
+  workflow_dispatch:
+
+jobs:
+  upstream-pre-state:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject deterministic M11.7 pre-state bridge
+        run: |
+          mkdir -p upstream-rchain/casper/tests
+          cp scripts/upstream/m11-7-pre-state-finalizer-bridge.rs \
+            upstream-rchain/casper/tests/m11_7_pre_state_finalizer_bridge.rs
+
+      - name: Execute get_pre_state_for_parents + Finalizer
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-casper --test m11_7_pre_state_finalizer_bridge -- --nocapture
