@@ -101,6 +101,7 @@ export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
   const layerTwoIds = ["a2", "b2", "c2", "d2"];
   const layerOneSeen = (id: string) => ["g", id];
   const layerTwoSeen = (id: string) => ["g", ...layerOneIds, id];
+  const layerThreeSeen = (id: string) => ["g", ...layerOneIds, ...layerTwoIds, id];
   const messages: DagMessage[] = [
     { id: "g", sender: "v4", senderSeq: 0, parents: [], seen: ["g"] },
 
@@ -114,9 +115,9 @@ export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
     { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("c2") },
     { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("d2") },
 
-    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("a3") },
-    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("b3") },
-    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("c3") },
+    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("a3") },
+    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("b3") },
+    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("c3") },
   ];
 
   return {
