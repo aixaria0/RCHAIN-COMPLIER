@@ -12,7 +12,7 @@ test("M11.3 finds a one-parent reachable finalization flip", () => {
     assert.equal(result.reachability.reachable, true);
     assert.equal(result.baseline.finalized, true);
     assert.equal(result.candidateTrace.checkMinMessagesPassed, true);
-    assert.equal(result.candidateTrace.messageCoverage, true);
+    assert.equal(result.candidateTrace.distinctMinimumMessageCoverage, true);
     assert.equal(result.candidateTrace.finalized, false);
     assert.equal(result.candidateTrace.supportingStake < 70, true);
   }
