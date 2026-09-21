@@ -27,7 +27,7 @@ Every upstream probe in this matrix checks out that exact revision before inject
 | M18 | Threshold boundary | Exact upstream Finalizer | 2/3 remains non-finalizing; 3/4 finalizes under the same cardinality shape |
 | M19 | Proposal propagation | Real `DagMessageState::create_message` | A subsequent proposal preserves the under-cardinality fringe instead of repairing it |
 | M20 | Fork-sensitive propagation | Real `DagMessageState::create_message` + finality closure | Two locally consistent under-cardinality views can propagate different finalized closures |
-| M21 | Exact invariant differential | Exact upstream `invalid_justification_follows` | The pinned SDK predicate rejects the duplicate-sender witness by sender identity even though the active summary path does not invoke it |
+| M21 | Exact invariant differential | Exact upstream `invalid_justification_follows` + active `block_summary` probe | The pinned SDK predicate rejects the duplicate-sender witness while the same four-entry shape is admitted by the active summary path |\n| M22 | Exact call-site audit | Exact pinned-source `git grep` + active path inspection | The sender-set predicate exists in the pinned SDK but has no external call/reference in the active source tree |
 
 ## Interpretation ladder
 
