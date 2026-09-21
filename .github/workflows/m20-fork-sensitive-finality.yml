@@ -1,0 +1,37 @@
+name: M20 Fork-Sensitive Finality Propagation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m20-fork-sensitive-finality.yml"
+      - "scripts/upstream/m20-fork-sensitive-finality.rs"
+  workflow_dispatch:
+
+jobs:
+  fork-sensitive-finality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject M20 fork-sensitive witness
+        run: |
+          cat scripts/upstream/m20-fork-sensitive-finality.rs >> upstream-rchain/block-storage/src/dag/message_state.rs
+
+      - name: Execute exact-revision fork-sensitive propagation probe
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-block-storage m20_fork_sensitive_finality -- --nocapture
