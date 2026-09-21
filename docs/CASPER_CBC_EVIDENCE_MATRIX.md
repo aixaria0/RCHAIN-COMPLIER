@@ -82,3 +82,12 @@ For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -
 The pinned repository's docs/src/formal/the-29-laws.md explicitly marks the Law-14 fringe antichain predicate and the Law-15 fringe_monotone / seen_monotone lemmas as **stated** in Lean. The table therefore distinguishes implementation behavior observed by the upstream probes, a reconstructed/model invariant, and formally *stated* Lean properties.
 
 This research does not describe the Law-15 fringe cardinality property as a formally proven deployed theorem.
+
+
+## Honest-proposer vs adversarial-input boundary
+
+The pinned Rust proposer normally derives block parents from `pre_state.justifications`, and that pre-state is built from the DAG fringe. The normal proposer path therefore follows the one-message-per-validator fringe shape.
+
+The research candidate is intentionally different: it is an adversarially constructed but correctly signed `BlockMessage` whose justification hashes are all valid DAG messages while two belong to the same sender. M11.6 and M12 show that the consensus/receiver path does not enforce distinct bonded-sender coverage for that input shape.
+
+This distinction matters. The current evidence is not "honest nodes naturally generate duplicate fringes"; it is "the checked consensus path accepts a malformed-but-signed justification shape that the normal proposer path would not emit."
