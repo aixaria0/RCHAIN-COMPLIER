@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
+use std::time::Duration;
 
 mod common;
 
@@ -294,7 +295,9 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
     assert_eq!(candidate_meta.fringe, expected_fringe);
     assert_eq!(candidate_meta.fringe_state_hash, StateHash::new(*root.as_bytes()));
 
-    let validated_meta = validate(
+    let validated_meta = tokio::time::timeout(
+        Duration::from_secs(30),
+        validate(
         &dag,
         &store,
         &runtime,
@@ -307,8 +310,10 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
                 deploy_chains: Vec::new(),
             })
         },
+        ),
     )
     .await
+    .expect("full MultiParentCasper::validate path exceeded 30s")
     .expect("full MultiParentCasper::validate path should complete");
 
     assert_eq!(validated_meta.block_hash, candidate.block_hash);
