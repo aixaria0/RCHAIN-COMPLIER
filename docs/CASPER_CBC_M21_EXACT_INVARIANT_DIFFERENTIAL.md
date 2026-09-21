@@ -8,6 +8,8 @@ At the exact pinned upstream revision:
 
 the SDK already contains the concrete predicate `invalid_justification_follows`. Its implementation loads the justification messages, projects them to sender identities, forms a set, and compares that set with the bonded-sender set.
 
+M21 now tests the exact four-entry witness against both sides of the differential. The active `casper::validate::block_summary` probe uses a bonded proposer (`v0`) with a self-justification, so the normal sequence-number check remains satisfiable; the four justifications are still `[v0, v0, v1, v2]` and `v3` is absent.
+
 The M21 witness has four justification entries:
 
 ```text
@@ -38,6 +40,8 @@ This matters because M11.6 and M12 already established, independently, that the 
 This is still deliberately not phrased as a patch recommendation or a deployed-network vulnerability. The remaining question is whether enforcing that predicate at a specific consensus boundary is compatible with all legitimate multi-parent proposer semantics and historical network behavior.
 
 ## Result
+
+The active-path result is now intended to be read together with the exact SDK predicate result. If both tests remain green at the pinned revision, the statement is stronger than M11.6: the exact four-entry Finalizer cardinality witness itself is admitted by `block_summary`, while the existing sender-set predicate rejects the same sender coverage.
 
 The discrepancy is now reduced to a concrete differential:
 
