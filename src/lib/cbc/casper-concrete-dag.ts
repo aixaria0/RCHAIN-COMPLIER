@@ -78,7 +78,7 @@ export function buildCausallyValidDAG(): ConcreteDagFixture {
   ];
   const byId = new Map(messages.map((message) => [message.id, message]));
 
-  for (const [id, sender, parent] of [
+  for (const [id, sender] of [
     ["a2", "v0", "a1"],
     ["b2", "v1", "b1"],
     ["c2", "v2", "c1"],
