@@ -12,6 +12,9 @@ use rchain_block_storage::dag::representation::DagRepresentation;
 use rchain_casper::merging::BlockIndex;
 use rchain_casper::multi_parent_casper::{get_pre_state_for_parents, validate};
 use rchain_casper::interpreter_util::validate_block_checkpoint;
+use rchain_rholang::native_state::PosGenesis;
+use rchain_rholang::system_processes::BlockData;
+use rchain_crypto::hash::blake2b512_random::Blake2b512Random;
 use rchain_models::block_hash::BlockHash;
 use rchain_models::block_metadata::BlockMetadata;
 use rchain_models::block::state_hash::StateHash;
@@ -200,8 +203,17 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
 
     let justifications: BTreeSet<BlockHash> = [a2, a3, b3, c3].into_iter().collect();
     let runtime = build_runtime_manager().await;
-    let root = runtime.get_history_repo().root();
-    let root_state = StateHash::new(*root.as_bytes());
+    let (_genesis_pre, genesis_post, _genesis_results) = runtime
+        .compute_genesis(
+            &[],
+            &Blake2b512Random::default_random(),
+            BlockData::empty(),
+            &PosGenesis::default(),
+            &[],
+        )
+        .await
+        .expect("native PoS genesis state");
+    let root = genesis_post;
 
     let blocks = messages
         .values()
