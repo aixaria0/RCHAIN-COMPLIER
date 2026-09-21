@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildConcreteDAG, buildCausallyValidDAG } from "./casper-concrete-dag.ts";
+import { buildConcreteDAG, buildCausallyValidDAG, buildDuplicateMinimumMessageDAG } from "./casper-concrete-dag.ts";
 import { traceCasperFinalizerSemantics } from "./casper-finalizer-semantics.ts";
 
 test("M11 reaches the upstream minimum-message gate on the concrete fixture", () => {
@@ -42,4 +42,26 @@ test("M11.2 causally valid three-layer DAG reaches Law-14 finalization", () => {
   assert.equal(trace.supportingStake, 100);
   assert.equal(trace.superMajority, true);
   assert.equal(trace.finalized, true);
+});
+
+test("M11.4 duplicate minimum messages expose the count-only gate boundary", () => {
+  const trace = traceCasperFinalizerSemantics(buildDuplicateMinimumMessageDAG());
+  assert.equal(trace.checkMinMessagesPassed, true);
+  assert.deepEqual(trace.minimumMessageSenders, ["v0", "v0", "v1", "v2"]);
+  assert.deepEqual(trace.uniqueMinimumMessageSenders, ["v0", "v1", "v2"]);
+  assert.equal(trace.distinctMinimumMessageCoverage, false);
+  assert.deepEqual(trace.nextLayer, {
+    v0: "a1",
+    v1: "b1",
+    v2: "c1",
+  });
+  assert.equal(trace.supportingStake, 90);
+  assert.equal(trace.superMajority, true);
+  assert.equal(trace.finalized, true);
+  assert.deepEqual(trace.justificationSupport, [
+    { justificationId: "a2", sender: "v0", fullPartition: false },
+    { justificationId: "a3", sender: "v0", fullPartition: true },
+    { justificationId: "b3", sender: "v1", fullPartition: true },
+    { justificationId: "c3", sender: "v2", fullPartition: true },
+  ]);
 });
