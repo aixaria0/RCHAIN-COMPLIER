@@ -73,9 +73,18 @@ export function searchFinalizingMutation(fixture: ConcreteDagFixture): CasperMut
     }
   }
 
+  const parentLowerBound = justificationMessages.reduce((count, justification) => {
+    const existing = new Set(justification.parents);
+    return count + bonded.filter((sender) => {
+      const representative = layerOne.find((message) => message.sender === sender);
+      return Boolean(representative && !existing.has(representative.id));
+    }).length;
+  }, 0);
+  const seenLowerBound = layerOne.length * nextLayerIds.length;
+  const lowerBound = parentLowerBound + seenLowerBound;
+
   const candidate = applyMutations(fixture, mutations);
   const candidateTrace = traceCasperFinalizerSemantics(candidate);
-  const lowerBound = mutations.length;
 
   if (!candidateTrace.checkMinMessagesPassed || !candidateTrace.finalized) {
     throw new Error("mutation model failed to produce a reachable finalized candidate");
@@ -94,7 +103,7 @@ export function searchFinalizingMutation(fixture: ConcreteDagFixture): CasperMut
     mutations,
     mutationCount: mutations.length,
     lowerBound,
-    minimalWithinMutationModel: essentialMutations.length === mutations.length,
+    minimalWithinMutationModel: essentialMutations.length === mutations.length && lowerBound === mutations.length,
     essentialMutations,
   };
 }
