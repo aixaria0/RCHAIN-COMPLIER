@@ -87,6 +87,45 @@ export function buildCausallyValidDAG(): ConcreteDagFixture {
   };
 }
 
+
+/**
+ * Duplicate-minimum-message stress fixture.
+ *
+ * The justification set contains two messages from v0, one from v1 and one from
+ * v2. The minimum-message list therefore has four entries and passes the current
+ * upstream count-only gate despite missing v3 by sender identity.
+ */
+export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
+  const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const layerOneIds = ["a1", "b1", "c1", "d1"];
+  const layerTwoIds = ["a2", "b2", "c2", "d2"];
+  const layerOneSeen = (id: string) => ["g", id];
+  const layerTwoSeen = (id: string) => ["g", ...layerOneIds, id];
+  const messages: DagMessage[] = [
+    { id: "g", sender: "v4", senderSeq: 0, parents: [], seen: ["g"] },
+
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g"], seen: layerOneSeen("a1") },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g"], seen: layerOneSeen("b1") },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g"], seen: layerOneSeen("c1") },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g"], seen: layerOneSeen("d1") },
+
+    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("a2") },
+    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("b2") },
+    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("c2") },
+    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("d2") },
+
+    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("a3") },
+    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("b3") },
+    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerTwoSeen("c3") },
+  ];
+
+  return {
+    bondsMap,
+    messages,
+    justifications: ["a2", "a3", "b3", "c3"],
+  };
+}
+
 function ancestors(id: string, byId: Map<string, DagMessage>): Set<string> {
   const out = new Set<string>();
   const queue = [id];
