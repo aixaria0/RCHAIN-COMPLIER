@@ -75,3 +75,10 @@ The repository contains one workflow per major upstream boundary under `.github/
 
 For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18.
 
+
+
+## Formal-status precision
+
+The pinned repository's docs/src/formal/the-29-laws.md explicitly marks the Law-14 fringe antichain predicate and the Law-15 fringe_monotone / seen_monotone lemmas as **stated** in Lean. The table therefore distinguishes implementation behavior observed by the upstream probes, a reconstructed/model invariant, and formally *stated* Lean properties.
+
+This research does not describe the Law-15 fringe cardinality property as a formally proven deployed theorem.
