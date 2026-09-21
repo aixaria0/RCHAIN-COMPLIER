@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildConcreteDAG } from "./casper-concrete-dag.ts";
+import { buildConcreteDAG, buildCausallyValidDAG } from "./casper-concrete-dag.ts";
 import { traceCasperFinalizerSemantics } from "./casper-finalizer-semantics.ts";
 
 test("M11 reaches the upstream minimum-message gate on the concrete fixture", () => {
@@ -27,4 +27,19 @@ test("M11 shows the current 9-message fixture does not produce Law-14 support", 
   assert.equal(trace.totalStake, 100);
   assert.equal(trace.superMajority, false);
   assert.equal(trace.finalized, false);
+});
+
+test("M11.2 causally valid three-layer DAG reaches Law-14 finalization", () => {
+  const trace = traceCasperFinalizerSemantics(buildCausallyValidDAG());
+  assert.equal(trace.checkMinMessagesPassed, true);
+  assert.deepEqual(trace.nextLayer, {
+    v0: "a1",
+    v1: "b1",
+    v2: "c1",
+    v3: "d1",
+  });
+  assert.deepEqual(trace.fullPartitionSupportSenders, ["v0", "v1", "v2", "v3"]);
+  assert.equal(trace.supportingStake, 100);
+  assert.equal(trace.superMajority, true);
+  assert.equal(trace.finalized, true);
 });
