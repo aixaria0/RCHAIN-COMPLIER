@@ -20,7 +20,7 @@ mod m23_admission_to_proposal_bridge {
     use rchain_shared::refined::{BlockHeight, SeqNum};
     use rchain_shared::store::InMemoryKeyValueStore;
     use rchain_shared::typed_store::KeyValueTypedStoreCodec;
-    use rchain_casper::validate::block_summary;
+    use crate::validate::block_summary;
 
     fn hash(byte: u8) -> BlockHash {
         BlockHash::new([byte; 32])
