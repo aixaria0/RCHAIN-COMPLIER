@@ -30,6 +30,8 @@ Every upstream probe in this matrix checks out that exact revision before inject
 | M21 | Exact invariant differential | Exact upstream `invalid_justification_follows` + active `block_summary` probe | The pinned SDK predicate rejects the duplicate-sender witness while the same four-entry shape is admitted by the active summary path |\n| M22 | Exact call-site audit | Exact pinned-source `git grep` + active path inspection | The sender-set predicate exists in the pinned SDK but has no external call/reference in the active source tree |\n| M23 | Admission-to-proposal bridge | Real `block_summary` + `BlockDagKeyValueStorage::insert` + `DagMessageState::create_message` | The admitted duplicate-sender candidate can cross active admission, persist as an under-cardinality fringe, and feed the next proposal state |\n| M24 | Causal-origin search | Real `create_msg_and_update_sender` over 5,460 clean proposer schedules | No 1–3-member fringe is spontaneously generated from a clean one-message-per-bonded-validator state within the bounded search |
 | M25 | Active gate counterfactual | Real `block_summary` + real DAG identities + shadow sender-set check | Duplicate/missing-sender and non-bonded replacement shapes are separated from the valid control at the active boundary without changing upstream source |
 | M26 | Upstream-anchored stress replay | Synthetic CBC stress engine + exact pinned boundary matrix | Partition+reordering and equivocation produce deterministic replay evidence, while the upstream count-vs-distinct-sender differential remains stable in the same machine-readable certificate |
+| M27 | Reachability-constrained adversarial search | Exact upstream-derived reachability screen over 256 justification replacements | From a reachability-valid four-validator message pool, a one-replacement mutation is sufficient to create a 4-entry / 3-sender witness; the bounded search also finds a one-replacement finalizing witness |
+| M28 | Minimal duplicate-sender cryptographic ingress | Real upstream signing/hash + BlockReceiver at the exact pinned revision | The minimum four-entry / three-sender witness has a wire-valid, signed/content-addressed representation that crosses the real ingress boundary |
 
 ## Interpretation ladder
 
@@ -87,7 +89,9 @@ M25 -> sender-set discriminator characterized
         |
 M26 -> partition/reorder + equivocation replay paired with the exact boundary matrix
         |
-next -> bounded adversarial-history search + upstream reachability screen
+M27 -> one-replacement minimal reachable witness
+        |
+M28 -> wire-valid signed ingress of the minimum witness
 ```
 
 M26 deliberately labels this as paired evidence, not causal proof that a synthetic network fault generated the exact upstream witness.
@@ -96,7 +100,7 @@ M26 deliberately labels this as paired evidence, not causal proof that a synthet
 
 The repository contains one workflow per major upstream boundary under `.github/workflows/`, with corresponding injected probes under `scripts/upstream/`.
 
-For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26.
+For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26 -> M27 -> M28.
 
 
 
@@ -114,3 +118,17 @@ The pinned Rust proposer normally derives block parents from `pre_state.justific
 The research candidate is intentionally different: it is an adversarially constructed but correctly signed `BlockMessage` whose justification hashes are all valid DAG messages while two belong to the same sender. M11.6 and M12 show that the consensus/receiver path does not enforce distinct bonded-sender coverage for that input shape.
 
 This distinction matters. The current evidence is not "honest nodes naturally generate duplicate fringes"; it is "the checked consensus path accepts a malformed-but-signed justification shape that the normal proposer path would not emit."
+## Deliverable view
+
+The current PR should be reviewed as a reusable research deliverable rather than as a sequence of isolated experiments.
+
+~~~~text
+stress scenario
+    -> deterministic replay/evidence
+    -> exact upstream anchor
+    -> minimal reachable witness
+    -> real signed ingress
+    -> explicit claim boundary
+~~~~
+
+The maintainer-facing benefit is a repeatable workflow for testing Casper CBC edge conditions without conflating synthetic observations, pinned implementation behavior, and protocol-level conclusions.
