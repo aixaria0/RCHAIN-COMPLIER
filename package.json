@@ -1,7 +1,7 @@
 {
   "name": "rchain-reality-compiler",
-  "version": "0.1.0",
-  "description": "Verification-oriented workbench for compiling execution claims into inspectable evidence.",
+  "version": "0.2.0",
+  "description": "Deterministic research harness for stress-testing Casper CBC finalization against the pinned RChain Rust implementation.",
   "private": true,
   "sideEffects": false,
   "type": "module",
