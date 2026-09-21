@@ -207,3 +207,22 @@ Result: **1 passed; 0 failed**.
 The test exercised the actual upstream `Finalizer` methods rather than the TypeScript mirror. The pinned implementation confirmed the candidate behavior: the four-entry minimum-message vector `v0, v0, v1, v2` passes `check_min_messages`; `calculate_next_layer` collapses the duplicate sender; `calculate_next_fringe_support_map` produces full-partition support for the three represented justification senders; `calculate_fringe` accepts 90/100 stake; and `calculate_finalization` advances the fringe.
 
 This establishes a real upstream implementation behavior. It does **not yet establish that an externally submitted block can traverse the entire production validation/ingress path with this duplicate-sender justification set**. That is the next boundary before calling it a protocol vulnerability.
+
+
+## M11.6 — active validation admission probe
+
+The next boundary is now exercised against the active upstream Casper validation path rather than only the Finalizer internals. The pinned upstream commit remains `d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b`.
+
+The injected M11.6 integration test constructs a real `BlockMessage` whose five distinct justification hashes represent only four distinct senders: `v0, v0, v1, v2, v3`. The current block uses `v3` as sender with the matching sequence/block-number relationships and supplies the referenced parent blocks through the real `BlockStore` interface.
+
+The test calls the production `casper::validate::block_summary` function. This is the active validation chain used by `MultiParentCasper::validate` before `validate_block_checkpoint`: justification regression, sequence number, block number, deploy checks, and repeat-deploy validation. The candidate block passes this path unchanged.
+
+The probe also locks down the limitation of the existing SDK helper: `invalid_justification_follows` compares a Set of justification senders with the bonded-sender Set. A duplicate sender therefore disappears during comparison; `v0,v0,v1,v2,v3` is treated as the same sender set as `v0,v1,v2,v3`. So the helper, even if called, does not enforce one-justification-per-bonded-sender cardinality.
+
+Combined with M11.5, this establishes a stronger boundary: the pinned Finalizer demonstrably processes the duplicate-minimum-message shape, while the active block-summary validation path does not reject the corresponding duplicate-sender justification shape. This is still described as a **confirmed implementation discrepancy / admission boundary**, not yet as a protocol vulnerability, because the complete production `validate_block_checkpoint` replay path and network ingress must still be exercised with the same block.
+
+Runnable upstream probe:
+
+`cargo test -p rchain-casper --test m11_6_duplicate_sender_admission -- --nocapture`
+
+The next decisive experiment is the end-to-end bridge from this admitted `BlockMessage` into `validate_block_checkpoint -> get_pre_state_for_parents -> Finalizer::calculate_finalization`, using a minimal real upstream DAG/state cache rather than a semantic mirror.
