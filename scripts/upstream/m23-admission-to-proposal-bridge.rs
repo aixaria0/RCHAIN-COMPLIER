@@ -202,7 +202,7 @@ mod m23_admission_to_proposal_bridge {
 
         let repr = storage.get_representation().await;
         let latest_fringe_ids: BTreeSet<_> = repr.latest_fringe().iter().map(|m| m.id).collect();
-        assert_eq!(latest_fringe_ids, under_cardinality_fringe.into_iter().collect());
+        assert_eq!(latest_fringe_ids, under_cardinality_fringe.iter().copied().collect());
         assert_eq!(repr.latest_fringe().len(), 3);
 
         // Stage 3: the real proposal-state constructor consumes that persisted view.
@@ -216,7 +216,7 @@ mod m23_admission_to_proposal_bridge {
             &justifications,
         );
 
-        assert_eq!(proposal.fringe, under_cardinality_fringe.into_iter().collect());
+        assert_eq!(proposal.fringe, under_cardinality_fringe.iter().copied().collect());
         assert_eq!(repr.dag_message_state.latest_msgs.len(), 4);
 
         // The missing v3 sender is not repaired by DAG insertion or proposal construction.
