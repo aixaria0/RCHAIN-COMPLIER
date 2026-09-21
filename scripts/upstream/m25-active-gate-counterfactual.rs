@@ -243,23 +243,23 @@ mod m25_active_gate_counterfactual {
 
         let duplicate_missing = block(
             hash(20),
-            v0,
-            3,
-            vec![j0, j1, j2, j3],
+            v3,
+            2,
+            vec![j0, j1, j2, j4],
         );
 
         let valid_control = block(
             hash(21),
-            v0,
-            3,
+            v3,
+            2,
             vec![j0, j2, j3, j4],
         );
 
         let nonbonded_replacement = block(
             hash(22),
-            v0,
-            3,
-            vec![j0, j2, j3, jx],
+            v3,
+            2,
+            vec![j0, j2, j4, jx],
         );
 
         let current_duplicate = block_summary(&dag, &store, &duplicate_missing, "root", 50, 0)
