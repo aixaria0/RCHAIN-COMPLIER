@@ -121,6 +121,12 @@ M20 supplies two locally consistent views with complete four-sender justificatio
 
 This is the first concrete downstream state-selection consequence in the chain. It remains deliberately narrower than a live-network safety claim: the two views are supplied as different local histories, and the probe does not yet prove that an adversary can connect them into a causally valid conflicting-finality execution.
 
+## M21 — exact invariant differential
+
+M21 executes the exact pinned SDK predicate `invalid_justification_follows` against the duplicate witness and a one-per-sender control. The duplicate shape has four entries but only three distinct bonded senders, so the upstream predicate returns `true` (invalid); the control has four distinct bonded senders, so it returns `false`.
+
+This sharpens the earlier M11.6/M12 result: the same witness that crosses the tested active summary/ingress boundaries is explicitly rejected by an existing upstream sender-set invariant predicate. M21 does not claim that this predicate is necessarily the correct consensus fix; it establishes the wiring differential at the pinned revision.
+
 ## What this establishes
 
 The strongest defensible statement at this stage is:
