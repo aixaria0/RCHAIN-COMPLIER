@@ -170,9 +170,63 @@ adversarial duplicate-sender candidate
         +--> subsequent proposal propagation
 ```
 
+## M25 — active gate counterfactual
+
+M25 closes the active admission-boundary characterization without modifying the pinned upstream source.
+
+The same real DAG identities were evaluated at the active `block_summary` boundary against a shadow distinct-bonded-sender predicate. Three controlled cases were checked:
+
+~~~text
+duplicate / missing bonded sender
+    current count gate  = accepted
+    shadow sender gate  = rejected
+
+valid one-message-per-bonded-sender
+    current count gate  = accepted
+    shadow sender gate  = accepted
+
+non-bonded replacement
+    current count gate  = accepted
+    shadow sender gate  = rejected
+~~~
+
+This is deliberately a compatibility characterization for the observed witness, not a claim that sender-set equality is the complete Casper specification or the only valid remediation.
+
+## M26 — upstream-anchored CBC replay
+
+M26 reconnects the original synthetic-first CBC stress harness to the now-characterized upstream boundary.
+
+The exact pinned revision remains:
+
+~~~text
+rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+~~~
+
+The green M26 workflow runs three deterministic stress cases:
+
+- baseline control: `CONVERGED`, 32 events, replay digest `9b66cf036e60a5449080ff04168b6063a4ad549179048f0154b0e55dc46cb7`;
+- partition + reordering: `DIVERGENT`, 320 events, replay digest `339aeee9cd91cd2091bbce82a4cbb1faaef83844f8e5ac29d8151d82f0c6286c`;
+- equivocation-4: `DIVERGENT`, 4 equivocations detected, 72 events, replay digest `253162794f58fa9d8924dbed81eadb5e2d345547f4ce9b19a2847a8272abc320`.
+
+The same run verifies that the upstream boundary matrix remains:
+
+~~~text
+duplicate-missing-sender  -> count=true, shadow-sender=false
+valid-control             -> count=true, shadow-sender=true
+non-bonded-replacement    -> count=true, shadow-sender=false
+~~~
+
+M26 also emits a stable combined report digest:
+
+~~~text
+68754e9de6e75451d6ae05ff412b4bb9fa64fc570c2451029a8dc4d7884445cc
+~~~
+
+The key precision is causal scope: M26 pairs synthetic stress evidence with the exact upstream boundary; it does not claim that partition or equivocation alone causally generates the exact duplicate-sender witness.
+
 ## Next boundary
 
-The next experiment is an active-path counterfactual gate at `block_summary`: use the real DAG sender identities to evaluate a distinct bonded-sender coverage predicate immediately at admission, without changing upstream source. The goal is to characterize the smallest additional discriminator that rejects the witness while preserving the valid one-message-per-sender control.
+The next meaningful experiment is a bounded adversarial-history search. Candidate histories should be generated from the stress model, then screened with the existing upstream-derived reachability checks (parent existence, DAG acyclicity, sequence progression, and seen-set derivation). Only histories that satisfy those constraints should be promoted into the upstream evidence set.
 
 ## What this establishes
 
@@ -226,6 +280,8 @@ That is an impact-characterization question, not a patch recommendation.
 - src/lib/cbc/casper-upstream-adapter.ts
 - src/lib/cbc/casper-upstream-reachability.ts
 - src/lib/cbc/casper-reachable-perturbation-search.test.ts
+- src/lib/cbc/casper-cbc-upstream-replay.ts
+- src/lib/cbc/casper-cbc-upstream-replay.test.ts
 
 ## Publication boundary
 
