@@ -8,6 +8,8 @@ test("incomplete minimum-message coverage is blocked before calculate_fringe", (
     minimumMessageSenders: ["v0"],
   });
 
+  assert.equal(trace.minimumMessageCount, 1);
+  assert.equal(trace.distinctMinimumMessageCount, 1);
   assert.equal(trace.checkMinMessagesPassed, false);
   assert.equal(trace.calculateFringeReachable, false);
   assert.equal(trace.gate, "CHECK_MIN_MESSAGES");
@@ -20,18 +22,24 @@ test("complete minimum-message coverage reaches calculate_fringe", () => {
     minimumMessageSenders: ["v0", "v1"],
   });
 
+  assert.equal(trace.minimumMessageCount, 2);
+  assert.equal(trace.distinctMinimumMessageCount, 2);
   assert.equal(trace.checkMinMessagesPassed, true);
   assert.equal(trace.calculateFringeReachable, true);
   assert.equal(trace.gate, "CALCULATE_FRINGE");
   assert.equal(trace.conclusion, "FRINGE_STAGE_REACHABLE");
 });
 
-test("duplicate senders do not manufacture coverage", () => {
+test("duplicate entries remain count-valid even when sender coverage is incomplete", () => {
   const trace = traceUpstreamFinalizerGate({
-    bondedValidators: ["v0", "v1", "v2"],
-    minimumMessageSenders: ["v0", "v0"],
+    bondedValidators: ["v0", "v1", "v2", "v3"],
+    minimumMessageSenders: ["v0", "v0", "v1", "v2"],
   });
 
-  assert.equal(trace.minimumMessageCount, 1);
-  assert.equal(trace.checkMinMessagesPassed, false);
+  assert.equal(trace.minimumMessageCount, 4);
+  assert.equal(trace.distinctMinimumMessageCount, 3);
+  assert.equal(trace.checkMinMessagesPassed, true);
+  assert.equal(trace.calculateFringeReachable, true);
+  assert.equal(trace.gate, "CALCULATE_FRINGE");
+  assert.equal(trace.conclusion, "FRINGE_STAGE_REACHABLE");
 });
