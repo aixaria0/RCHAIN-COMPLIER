@@ -45,6 +45,48 @@ export function buildConcreteDAG(): ConcreteDagFixture {
   return { bondsMap, messages, justifications: ["a2", "b2", "c2", "d2"] };
 }
 
+
+/**
+ * Causally valid positive-control DAG.
+ *
+ * Four bonded validators build three message layers after a non-bonded genesis:
+ * seq=1 establishes the minimum layer, seq=2 sees the full minimum layer, and
+ * seq=3 justifies the seq=2 layer. The fixture is constructed so the derived
+ * seen sets match upstream message_from_block_metadata semantics.
+ */
+export function buildCausallyValidDAG(): ConcreteDagFixture {
+  const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const layerOneIds = ["a1", "b1", "c1", "d1"];
+  const layerTwoIds = ["a2", "b2", "c2", "d2"];
+  const layerOneSeen = (id: string) => ["g", id];
+  const layerTwoSeen = (id: string) => ["g", ...layerOneIds, id];
+  const layerThreeSeen = (id: string) => ["g", ...layerOneIds, ...layerTwoIds, id];
+  const messages: DagMessage[] = [
+    { id: "g", sender: "v4", senderSeq: 0, parents: [], seen: ["g"] },
+
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g"], seen: layerOneSeen("a1") },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g"], seen: layerOneSeen("b1") },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g"], seen: layerOneSeen("c1") },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g"], seen: layerOneSeen("d1") },
+
+    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("a2") },
+    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("b2") },
+    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("c2") },
+    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("d2") },
+
+    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("a3") },
+    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("b3") },
+    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("c3") },
+    { id: "d3", sender: "v3", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("d3") },
+  ];
+
+  return {
+    bondsMap,
+    messages,
+    justifications: ["a3", "b3", "c3", "d3"],
+  };
+}
+
 function ancestors(id: string, byId: Map<string, DagMessage>): Set<string> {
   const out = new Set<string>();
   const queue = [id];
