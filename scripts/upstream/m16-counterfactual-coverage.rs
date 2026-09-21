@@ -8,7 +8,7 @@
 mod m16_counterfactual_coverage_invariant {
     use std::collections::{BTreeMap, BTreeSet};
 
-    use rchain_block_storage::dag::finalizer::{Finalizer, Message};
+    use super::{Finalizer, Message};
     use rchain_shared::refined::{BlockHeight, NonNegI64, SeqNum};
 
     fn msg(id: &str, sender: &str) -> Message<String, String> {
