@@ -31,7 +31,10 @@ jobs:
       - name: Inject M21 exact invariant differential
         run: |
           cat scripts/upstream/m21-exact-invariant-differential.rs >> upstream-rchain/sdk/src/casper_syntax.rs
+          cat scripts/upstream/m21-active-four-entry-admission.rs >> upstream-rchain/casper/src/validate.rs
 
       - name: Execute exact-revision invariant differential
         working-directory: upstream-rchain
-        run: cargo test -p rchain-sdk exact_invariant_differential -- --nocapture
+        run: |
+          cargo test -p rchain-sdk exact_invariant_differential -- --nocapture
+          cargo test -p rchain-casper exact_four_entry_duplicate_sender_shape_is_admitted -- --nocapture
