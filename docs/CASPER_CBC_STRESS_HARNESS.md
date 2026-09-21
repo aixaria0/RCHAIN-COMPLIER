@@ -225,4 +225,6 @@ Runnable upstream probe:
 
 `cargo test -p rchain-casper --test m11_6_duplicate_sender_admission -- --nocapture`
 
+**M11.6 result — confirmed in upstream Casper validation:** the workflow checked out `rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b`, injected the test into `casper/tests`, and executed `cargo test -p rchain-casper --test m11_6_duplicate_sender_admission -- --nocapture`. Result: **1 passed; 0 failed**. The active `block_summary` path therefore admits the duplicate-sender justification shape used by the probe. This is an implementation/admission finding, not yet a protocol-vulnerability claim.
+
 The next decisive experiment is the end-to-end bridge from this admitted `BlockMessage` into `validate_block_checkpoint -> get_pre_state_for_parents -> Finalizer::calculate_finalization`, using a minimal real upstream DAG/state cache rather than a semantic mirror.
