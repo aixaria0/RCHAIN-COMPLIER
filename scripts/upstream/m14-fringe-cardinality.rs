@@ -9,7 +9,7 @@
 mod m14_fringe_cardinality_invariant {
     use std::collections::{BTreeMap, BTreeSet};
 
-    use rchain_block_storage::dag::finalizer::{Finalizer, Message};
+    use super::{Finalizer, Message};
     use rchain_shared::refined::{BlockHeight, NonNegI64, SeqNum};
 
     fn msg(
