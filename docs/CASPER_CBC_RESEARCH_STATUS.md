@@ -137,6 +137,43 @@ This closes an important ambiguity: at the pinned revision, the sender-set discr
 
 The corresponding M22 workflow must remain green before this repository treats the call-site statement as verified CI evidence.
 
+
+## M23 — admission-to-proposal bridge
+
+M23 closes the continuity gap between active admission and downstream state. On the exact pinned revision, the controlled duplicate-sender candidate first passes `casper::validate::block_summary`, is then inserted through the real `BlockDagKeyValueStorage`, and finally becomes input to the real `DagMessageState::create_message` path.
+
+The persisted/latest fringe remains three-member, and the subsequent proposal preserves that fringe. This is a single continuous upstream storage/proposal test rather than separate isolated semantic fixtures.
+
+## M24 — causal-origin search
+
+M24 answers the opposite-direction question: can the normal proposer itself generate a one-to-three-member fringe from a clean sender-complete state?
+
+The exact pinned `create_msg_and_update_sender()` path was exhaustively explored across all `4^1 + ... + 4^6 = 5,460` proposer schedules, starting from one latest message for each of four equal-stake validators.
+
+The workflow passed with no under-cardinality witness.
+
+This is a bounded causal-origin result, not a universal theorem. Its practical meaning is narrower and useful: within this clean proposer model and horizon, the observed under-cardinality shape is not spontaneously produced by ordinary proposal scheduling. It therefore enters the currently characterized system through the adversarial/input-validation boundary rather than through the normal proposer constructor itself.
+
+The combined boundary is now:
+
+```text
+clean proposer schedules (5,460 searched)
+        |
+        +--> no 1..3 fringe produced
+        |
+adversarial duplicate-sender candidate
+        |
+        +--> active admission
+        |
+        +--> persisted under-cardinality fringe
+        |
+        +--> subsequent proposal propagation
+```
+
+## Next boundary
+
+The next experiment is an active-path counterfactual gate at `block_summary`: use the real DAG sender identities to evaluate a distinct bonded-sender coverage predicate immediately at admission, without changing upstream source. The goal is to characterize the smallest additional discriminator that rejects the witness while preserving the valid one-message-per-sender control.
+
 ## What this establishes
 
 The strongest defensible statement at this stage is:
