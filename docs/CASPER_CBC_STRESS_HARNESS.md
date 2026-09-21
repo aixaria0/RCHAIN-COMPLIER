@@ -147,3 +147,14 @@ The semantic lock is now followed by a deterministic mutation search over the co
 The search retains the upstream minimum-message gate and looks for a Law-14 finalizing candidate. It finds one with **29 additions**: 13 parent-edge additions and 16 seen-set additions. Each individual addition is essential within this constrained mutation model; removing any one prevents finalization.
 
 The candidate therefore acts as a positive control for the semantic pipeline: the model can reach a fully supported fringe when the delivery history actually contains the required fan-in and visibility structure. This is **not** evidence of a production fragility by itself. The next research step is to minimize the mutation family against the real upstream DAG/message construction and determine whether the same support transition is reachable under the protocol's actual block/message invariants.
+
+
+## M11.2 — upstream reachability gate
+
+The next screen checks invariants that can be derived directly from the current upstream implementation before a candidate is treated as an upstream-reachable history.
+
+The original nine-message fixture now has an explicit result: it fails the sender-sequence invariant for all four seq=2 messages because the upstream validation requires the creator's latest justified sequence plus one. This fixture therefore remains a semantic/data-flow fixture, not an upstream-valid block history.
+
+A second 13-message positive-control fixture was added with three causal layers after a non-bonded genesis: seq=1 minimum messages, seq=2 observers, and seq=3 justifications. Its seen sets are derived exactly as upstream constructs them from parent seen-sets plus the current message. The reachability screen passes, and the semantic finalizer trace reaches Law-14 with full 100/100 stake support.
+
+This gives the investigation a clean separation between two cases: a semantic probe that is useful for isolating finalizer logic, and a causally admissible positive control that demonstrates the support transition can arise in a message history satisfying the currently checked DAG invariants.
