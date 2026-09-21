@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildConcreteDAG, buildCausallyValidDAG } from "./casper-concrete-dag.ts";
+import { buildConcreteDAG, buildCausallyValidDAG, buildDuplicateMinimumMessageDAG } from "./casper-concrete-dag.ts";
 import { analyzeUpstreamReachability } from "./casper-upstream-reachability.ts";
 
 test("the original nine-message fixture is correctly rejected by upstream reachability screening", () => {
@@ -11,6 +11,12 @@ test("the original nine-message fixture is correctly rejected by upstream reacha
 
 test("the causally valid multi-layer fixture passes upstream reachability screening", () => {
   const report = analyzeUpstreamReachability(buildCausallyValidDAG());
+  assert.equal(report.reachable, true);
+  assert.deepEqual(report.violations, []);
+});
+
+test("the duplicate-minimum fixture still satisfies the currently checked DAG invariants", () => {
+  const report = analyzeUpstreamReachability(buildDuplicateMinimumMessageDAG());
   assert.equal(report.reachable, true);
   assert.deepEqual(report.violations, []);
 });
