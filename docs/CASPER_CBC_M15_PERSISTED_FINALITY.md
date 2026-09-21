@@ -37,3 +37,12 @@ The observation has crossed another architectural boundary:
 This is still not sufficient to label the network unsafe. It does establish that the under-cardinality result is representable and consumable by the persistent DAG state machinery, rather than disappearing as a transient calculator artifact.
 
 The next question is the protocol effect of carrying this state forward across subsequent validator proposals and conflicting histories.
+
+
+## Formal-invariant alignment
+
+The pinned upstream repository also contains legacy/casper/src/main/resources/CasperFinality.tla, a reconstructed CBC-Casper finality model. Its Law-15 section defines FringeWellFormed with one latest message for every bonded validator.
+
+M15's persisted runtime witness is therefore stronger than a cosmetic cardinality check: the actual DagRepresentation.latest_fringe() result contains three sender identities for a four-validator bond set, while the same repository's reconstructed Law-15 invariant requires one latest message per validator.
+
+The TLA+ file is explicitly described as a reconstruction from the Scala finalizer and message-map logic. This evidence therefore establishes an implementation-vs-reconstructed-invariant discrepancy at the pinned revision; it does not, by itself, prove that a deployed network violates a formally verified theorem.
