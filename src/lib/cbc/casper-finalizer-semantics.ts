@@ -17,9 +17,12 @@ export interface CasperFinalizerSemanticsTrace {
   bondedSenders: string[];
   minimumMessageIds: string[];
   minimumMessageSenders: string[];
+  uniqueMinimumMessageSenders: string[];
+  distinctMinimumMessageCoverage: boolean;
   checkMinMessagesPassed: boolean;
   nextLayer: Record<string, string>;
   supportMap: Record<string, Record<string, string[]>>;
+  justificationSupport: Array<{ justificationId: string; sender: string; fullPartition: boolean }>;
   fullPartitionSupportSenders: string[];
   supportingStake: number;
   totalStake: number;
@@ -77,6 +80,8 @@ export function traceCasperFinalizerSemantics(
     });
 
   const minimumMessageSenders = minimumMessages.map((message) => message.sender).sort();
+  const uniqueMinimumMessageSenders = [...new Set(minimumMessageSenders)].sort();
+  const distinctMinimumMessageCoverage = bondedSenders.every((sender) => uniqueMinimumMessageSenders.includes(sender));
   const checkMinMessagesPassed = minimumMessages.length === bondedSenders.length;
 
   const nextLayer: Record<string, SemanticDagMessage> = {};
@@ -96,9 +101,10 @@ export function traceCasperFinalizerSemantics(
 
   const nextLayerIds = new Set(Object.values(nextLayer).map((message) => message.id));
   const supportMap: Record<string, Record<string, string[]>> = {};
+  const justificationSupport: Array<{ justificationId: string; sender: string; fullPartition: boolean }> = [];
 
   if (checkMinMessagesPassed) {
-    for (const justificationId of input.justifications) {
+    for (const justificationId of [...input.justifications].sort()) {
       const justification = byId.get(justificationId);
       if (!justification) continue;
 
@@ -119,6 +125,10 @@ export function traceCasperFinalizerSemantics(
         if (observers.size > 0) seenBy[sender] = [...observers].sort();
       }
 
+      const fullPartition = Object.keys(seenBy).length > 0 && Object.values(seenBy).every((observers) =>
+        observers.length === bondedSenders.length && observers.every((observer) => bondedSenders.includes(observer)),
+      );
+      justificationSupport.push({ justificationId, sender: justification.sender, fullPartition });
       if (Object.keys(seenBy).length > 0) supportMap[justification.sender] = seenBy;
     }
   }
@@ -143,6 +153,8 @@ export function traceCasperFinalizerSemantics(
     bondedSenders,
     minimumMessageIds: minimumMessages.map((message) => message.id),
     minimumMessageSenders,
+    uniqueMinimumMessageSenders,
+    distinctMinimumMessageCoverage,
     checkMinMessagesPassed,
     nextLayer: Object.fromEntries(
       Object.entries(nextLayer).sort(([a], [b]) => a.localeCompare(b)).map(([sender, message]) => [sender, message.id]),
@@ -153,6 +165,7 @@ export function traceCasperFinalizerSemantics(
         Object.fromEntries(Object.entries(seenBy).sort(([a], [b]) => a.localeCompare(b))),
       ]),
     ),
+    justificationSupport: justificationSupport.sort((a, b) => a.justificationId.localeCompare(b.justificationId)),
     fullPartitionSupportSenders,
     supportingStake,
     totalStake,
