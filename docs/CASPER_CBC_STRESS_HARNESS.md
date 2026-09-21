@@ -158,3 +158,12 @@ The original nine-message fixture now has an explicit result: it fails the sende
 A second 13-message positive-control fixture was added with three causal layers after a non-bonded genesis: seq=1 minimum messages, seq=2 observers, and seq=3 justifications. Its seen sets are derived exactly as upstream constructs them from parent seen-sets plus the current message. The reachability screen passes, and the semantic finalizer trace reaches Law-14 with full 100/100 stake support.
 
 This gives the investigation a clean separation between two cases: a semantic probe that is useful for isolating finalizer logic, and a causally admissible positive control that demonstrates the support transition can arise in a message history satisfying the currently checked DAG invariants.
+
+
+## M11.3 — reachability-preserving finalization flip
+
+Starting from the causally valid three-layer positive control, the harness now searches one-parent deletions and re-derives every affected seen-set from the resulting parent graph.
+
+It finds three equivalent one-change cases. Removing exactly one non-self layer-2 parent from the high-stake validator's justification (a3 -> b2, a3 -> c2, or a3 -> d2) keeps the history upstream-admissible and keeps minimum-message coverage intact, but removes full-partition support for the 70-stake sender. Finalization therefore flips from true to false with a single parent-edge change.
+
+This is an important reachable liveness boundary, not yet a protocol fragility finding. The observed transition is consistent with the finalizer's support rule: the high-stake justification no longer has a complete observer partition. The next step is to determine whether an equivalent one-edge boundary is merely the expected CBC liveness condition or exposes an implementation-specific mismatch when exercised through the actual upstream Rust DAG construction.
