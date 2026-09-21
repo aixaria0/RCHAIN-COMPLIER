@@ -1,0 +1,41 @@
+name: M28 Minimal Duplicate-Sender Cryptographic Ingress
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m28-minimal-duplicate-sender-ingress.yml"
+      - "scripts/upstream/m28-minimal-duplicate-sender-ingress.rs"
+  workflow_dispatch:
+
+jobs:
+  minimal-duplicate-sender-ingress:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Verify exact upstream pin
+        working-directory: upstream-rchain
+        run: test "$(git rev-parse HEAD)" = "d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b"
+
+      - name: Inject M28 ingress probe into BlockReceiver
+        run: |
+          cat scripts/upstream/m28-minimal-duplicate-sender-ingress.rs >> upstream-rchain/casper/src/blocks/block_receiver.rs
+
+      - name: Execute exact-revision minimal witness ingress probe
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-casper block_receiver::m28_minimal_duplicate_sender_ingress -- --nocapture
