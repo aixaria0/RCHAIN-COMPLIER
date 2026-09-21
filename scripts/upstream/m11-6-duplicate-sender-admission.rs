@@ -255,6 +255,6 @@ fn m11_6_sender_set_helper_does_not_detect_duplicate_senders() {
 
     assert!(
         !invalid_justification_follows(&View, &Data, &msg, &bonded),
-        "the helper sees {v0,v1,v2,v3} after deduplication and therefore does not flag the duplicate"
+        "the helper sees the sender set [v0, v1, v2, v3] after deduplication and therefore does not flag the duplicate"
     );
 }
