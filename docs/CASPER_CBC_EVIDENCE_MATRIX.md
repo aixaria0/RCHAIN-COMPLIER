@@ -28,6 +28,8 @@ Every upstream probe in this matrix checks out that exact revision before inject
 | M19 | Proposal propagation | Real `DagMessageState::create_message` | A subsequent proposal preserves the under-cardinality fringe instead of repairing it |
 | M20 | Fork-sensitive propagation | Real `DagMessageState::create_message` + finality closure | Two locally consistent under-cardinality views can propagate different finalized closures |
 | M21 | Exact invariant differential | Exact upstream `invalid_justification_follows` + active `block_summary` probe | The pinned SDK predicate rejects the duplicate-sender witness while the same four-entry shape is admitted by the active summary path |\n| M22 | Exact call-site audit | Exact pinned-source `git grep` + active path inspection | The sender-set predicate exists in the pinned SDK but has no external call/reference in the active source tree |\n| M23 | Admission-to-proposal bridge | Real `block_summary` + `BlockDagKeyValueStorage::insert` + `DagMessageState::create_message` | The admitted duplicate-sender candidate can cross active admission, persist as an under-cardinality fringe, and feed the next proposal state |\n| M24 | Causal-origin search | Real `create_msg_and_update_sender` over 5,460 clean proposer schedules | No 1–3-member fringe is spontaneously generated from a clean one-message-per-bonded-validator state within the bounded search |
+| M25 | Active gate counterfactual | Real `block_summary` + real DAG identities + shadow sender-set check | Duplicate/missing-sender and non-bonded replacement shapes are separated from the valid control at the active boundary without changing upstream source |
+| M26 | Upstream-anchored stress replay | Synthetic CBC stress engine + exact pinned boundary matrix | Partition+reordering and equivocation produce deterministic replay evidence, while the upstream count-vs-distinct-sender differential remains stable in the same machine-readable certificate |
 
 ## Interpretation ladder
 
@@ -74,11 +76,27 @@ no  -> retain the current state-selection / invariant boundary
 
 The research should not skip this step merely because the implementation mismatch is reproducible.
 
+M24–M26 now connect the causal and stress dimensions without collapsing their evidence boundaries:
+
+```text
+clean proposer search -> no witness in bounded horizon
+        |
+active upstream boundary -> controlled duplicate admitted
+        |
+M25 -> sender-set discriminator characterized
+        |
+M26 -> partition/reorder + equivocation replay paired with the exact boundary matrix
+        |
+next -> bounded adversarial-history search + upstream reachability screen
+```
+
+M26 deliberately labels this as paired evidence, not causal proof that a synthetic network fault generated the exact upstream witness.
+
 ## Reproduction
 
 The repository contains one workflow per major upstream boundary under `.github/workflows/`, with corresponding injected probes under `scripts/upstream/`.
 
-For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20.
+For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20 -> M21 -> M22 -> M23 -> M24 -> M25 -> M26.
 
 
 
