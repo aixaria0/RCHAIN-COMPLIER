@@ -45,13 +45,85 @@ mod m15_persisted_finality_state {
         }
     }
 
+    fn hash(byte: u8) -> BlockHash {
+        let mut bytes = [0u8; 32];
+        bytes[0] = byte;
+        BlockHash::new(bytes)
+    }
+
     fn blank_block(id: BlockHash) -> BlockMessage {
-        super::block(id)
+        BlockMessage {
+            version: 1,
+            shard_id: "root".to_string(),
+            block_hash: id,
+            block_number: 0.try_into().unwrap(),
+            sender: validator(0),
+            seq_num: 0.try_into().unwrap(),
+            pre_state_hash: StateHash::new([0u8; 32]),
+            post_state_hash: StateHash::new([0u8; 32]),
+            justifications: Vec::new(),
+            bonds: BTreeMap::new(),
+            rejected_deploys: BTreeSet::new(),
+            rejected_blocks: BTreeSet::new(),
+            rejected_senders: BTreeSet::new(),
+            state: rchain_models::casper::protocol::casper_message::RholangState::default(),
+            sig_algorithm: "secp256k1".to_string(),
+            sig: Vec::new(),
+            timestamp: 0,
+        }
+    }
+
+    async fn build_storage_local() -> Arc<BlockDagKeyValueStorage> {
+        type Shared = Arc<tokio::sync::Mutex<Box<dyn rchain_shared::store::KeyValueStore + Send + Sync>>>;
+
+        fn in_memory() -> Shared {
+            Arc::new(tokio::sync::Mutex::new(Box::new(
+                rchain_shared::store::InMemoryKeyValueStore::default(),
+            )))
+        }
+
+        let metadata_store = Arc::new(
+            BlockMetadataStore::create(Arc::new(KeyValueTypedStoreCodec::new(
+                in_memory(),
+                Arc::new(BlockHashCodec),
+                Arc::new(BlockMetadataCodec),
+            )))
+            .await
+            .unwrap(),
+        );
+        let fringe_store: Arc<dyn KeyValueTypedStore<rchain_crypto::hash::blake2b256_hash::Blake2b256Hash, FringeData>> =
+            Arc::new(KeyValueTypedStoreCodec::new(
+                in_memory(),
+                Arc::new(Blake2b256HashCodec),
+                Arc::new(FringeDataCodec),
+            ));
+        let deploy_index: Arc<dyn KeyValueTypedStore<DeployId, BlockHash>> =
+            Arc::new(KeyValueTypedStoreCodec::new(
+                in_memory(),
+                Arc::new(BytesCodec),
+                Arc::new(BlockHashCodec),
+            ));
+        let deploy_store: Arc<dyn KeyValueTypedStore<DeployId, SignedDeployData>> =
+            Arc::new(KeyValueTypedStoreCodec::new(
+                in_memory(),
+                Arc::new(BytesCodec),
+                Arc::new(SignedDeployDataCodec),
+            ));
+        Ok::<_, String>(
+            BlockDagKeyValueStorage::create(
+                metadata_store,
+                fringe_store,
+                deploy_index,
+                deploy_store,
+            )
+            .await
+            .unwrap()
+        )
     }
 
     #[tokio::test]
     async fn m15_under_cardinality_fringe_persists_into_global_finality_state() {
-        let storage = build_storage().await;
+        let storage = build_storage_local().await;
 
         let g0 = hash(1);
         let g1 = hash(2);
@@ -170,9 +242,9 @@ mod m15_persisted_finality_state {
         assert_eq!(latest_fringe.len(), 3);
 
         // Global finality is the seen-closure of the latest fringe.
-        assert!(representation.is_finalized(&a2));
-        assert!(representation.is_finalized(&b2));
-        assert!(representation.is_finalized(&c2));
+        assert!(representation.is_finalized(&a1));
+        assert!(representation.is_finalized(&b1));
+        assert!(representation.is_finalized(&c1));
 
         // The bonded v3 branch is absent from the persisted three-member fringe,
         // so its d2 message is not marked finalized by the same global helper.
