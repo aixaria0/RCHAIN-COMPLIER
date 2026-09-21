@@ -127,6 +127,16 @@ M21 executes the exact pinned SDK predicate `invalid_justification_follows` agai
 
 This sharpens the earlier M11.6/M12 result: the same witness that crosses the tested active summary/ingress boundaries is explicitly rejected by an existing upstream sender-set invariant predicate. M21 does not claim that this predicate is necessarily the correct consensus fix; it establishes the wiring differential at the pinned revision.
 
+## M22 — exact call-site wiring audit
+
+M22 takes the M21 differential one step further by checking the entire exact pinned source tree rather than relying on a local call-path reading.
+
+The new workflow checks out the same revision and searches every source file outside `sdk/src/casper_syntax.rs` for `invalid_justification_follows`. The audit is designed to fail if the predicate is referenced by another module.
+
+This closes an important ambiguity: at the pinned revision, the sender-set discriminator exists as an SDK predicate, but it is not wired into the active Casper validation source tree.
+
+The corresponding M22 workflow must remain green before this repository treats the call-site statement as verified CI evidence.
+
 ## What this establishes
 
 The strongest defensible statement at this stage is:
