@@ -1,0 +1,227 @@
+export interface DagMessage {
+  id: string;
+  sender: string;
+  senderSeq: number;
+  parents: string[];
+  seen: string[];
+}
+
+export interface ConcreteDagFixture {
+  bondsMap: Record<string, number>;
+  messages: DagMessage[];
+  justifications: string[];
+}
+
+export interface ConcreteDagTrace {
+  minimumMessages: string[];
+  minimumMessageSenders: string[];
+  supportObservers: Record<string, string[]>;
+  superMajority: boolean;
+  messageCoverage: boolean;
+  upstreamGate: "BLOCKED_BEFORE_FRINGE" | "FRINGE_STAGE_REACHABLE";
+}
+
+/**
+ * Small deterministic message/DAG generator.
+ *
+ * It intentionally models only the data-flow needed to answer the current
+ * research question: can a valid delivery history produce the observation
+ * consumed by the Casper law probe? It is not an upstream consensus clone.
+ */
+export function buildConcreteDAG(): ConcreteDagFixture {
+  const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const messages: DagMessage[] = [
+    { id: "g", sender: "v0", senderSeq: 0, parents: [], seen: ["g"] },
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g"], seen: ["g", "a1"] },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["a1"], seen: ["g", "a1", "b1"] },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["b1"], seen: ["g", "a1", "b1", "c1"] },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["c1"], seen: ["g", "a1", "b1", "c1", "d1"] },
+    { id: "a2", sender: "v0", senderSeq: 2, parents: ["b1", "c1", "d1"], seen: ["g", "a1", "b1", "c1", "d1", "a2"] },
+    { id: "b2", sender: "v1", senderSeq: 2, parents: ["a2"], seen: ["g", "a1", "b1", "c1", "d1", "a2", "b2"] },
+    { id: "c2", sender: "v2", senderSeq: 2, parents: ["a2"], seen: ["g", "a1", "b1", "c1", "d1", "a2", "c2"] },
+    { id: "d2", sender: "v3", senderSeq: 2, parents: ["a2"], seen: ["g", "a1", "b1", "c1", "d1", "a2", "d2"] },
+  ];
+
+  return { bondsMap, messages, justifications: ["a2", "b2", "c2", "d2"] };
+}
+
+
+/**
+ * Causally valid positive-control DAG.
+ *
+ * Four bonded validators build three message layers after a non-bonded genesis:
+ * seq=1 establishes the minimum layer, seq=2 sees the full minimum layer, and
+ * seq=3 justifies the seq=2 layer. The fixture is constructed so the derived
+ * seen sets match upstream message_from_block_metadata semantics.
+ */
+export function buildCausallyValidDAG(): ConcreteDagFixture {
+  const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const layerOneIds = ["a1", "b1", "c1", "d1"];
+  const layerTwoIds = ["a2", "b2", "c2", "d2"];
+  const seenThrough = (parents: string[], id: string, allMessages: Map<string, DagMessage>): string[] => {
+    const seen = new Set<string>([id]);
+    for (const parentId of parents) {
+      for (const seenId of allMessages.get(parentId)?.seen ?? []) seen.add(seenId);
+    }
+    return [...seen].sort();
+  };
+
+  const messages: DagMessage[] = [
+    { id: "g0", sender: "v0", senderSeq: 0, parents: [], seen: ["g0"] },
+    { id: "g1", sender: "v1", senderSeq: 0, parents: [], seen: ["g1"] },
+    { id: "g2", sender: "v2", senderSeq: 0, parents: [], seen: ["g2"] },
+    { id: "g3", sender: "v3", senderSeq: 0, parents: [], seen: ["g3"] },
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g0"], seen: ["a1", "g0"] },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g1"], seen: ["b1", "g1"] },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g2"], seen: ["c1", "g2"] },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g3"], seen: ["d1", "g3"] },
+  ];
+  const byId = new Map(messages.map((message) => [message.id, message]));
+
+  for (const [id, sender] of [
+    ["a2", "v0", "a1"],
+    ["b2", "v1", "b1"],
+    ["c2", "v2", "c1"],
+    ["d2", "v3", "d1"],
+  ] as const) {
+    const parents = [...layerOneIds];
+    const message: DagMessage = {
+      id,
+      sender,
+      senderSeq: 2,
+      parents,
+      seen: [],
+    };
+    byId.set(id, message);
+    message.seen = seenThrough(parents, id, byId);
+    messages.push(message);
+  }
+
+  for (const [id, sender] of [
+    ["a3", "v0"],
+    ["b3", "v1"],
+    ["c3", "v2"],
+    ["d3", "v3"],
+  ] as const) {
+    const parents = [...layerTwoIds];
+    const message: DagMessage = {
+      id,
+      sender,
+      senderSeq: 3,
+      parents,
+      seen: [],
+    };
+    byId.set(id, message);
+    message.seen = seenThrough(parents, id, byId);
+    messages.push(message);
+  }
+
+  return {
+    bondsMap,
+    messages,
+    justifications: ["a3", "b3", "c3", "d3"],
+  };
+}
+
+
+/**
+ * Duplicate-minimum-message stress fixture.
+ *
+ * The justification set contains two messages from v0, one from v1 and one from
+ * v2. The minimum-message list therefore has four entries and passes the current
+ * upstream count-only gate despite missing v3 by sender identity.
+ */
+export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
+  const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const layerOneIds = ["a1", "b1", "c1", "d1"];
+  const layerTwoIds = ["a2", "b2", "c2", "d2"];
+  const messages: DagMessage[] = [
+    { id: "g0", sender: "v0", senderSeq: 0, parents: [], seen: ["g0"] },
+    { id: "g1", sender: "v1", senderSeq: 0, parents: [], seen: ["g1"] },
+    { id: "g2", sender: "v2", senderSeq: 0, parents: [], seen: ["g2"] },
+    { id: "g3", sender: "v3", senderSeq: 0, parents: [], seen: ["g3"] },
+
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g0"], seen: ["a1", "g0"] },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g1"], seen: ["b1", "g1"] },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g2"], seen: ["c1", "g2"] },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g3"], seen: ["d1", "g3"] },
+
+    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: [] },
+    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: [] },
+    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: [] },
+  ];
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  for (const id of [...layerTwoIds, "a3", "b3", "c3"]) {
+    const message = byId.get(id)!;
+    const seen = new Set<string>([id]);
+    for (const parentId of message.parents) {
+      for (const seenId of byId.get(parentId)?.seen ?? []) seen.add(seenId);
+    }
+    message.seen = [...seen].sort();
+  }
+
+  return {
+    bondsMap,
+    messages,
+    justifications: ["a2", "a3", "b3", "c3"],
+  };
+}
+
+
+function ancestors(id: string, byId: Map<string, DagMessage>): Set<string> {
+  const out = new Set<string>();
+  const queue = [id];
+  while (queue.length) {
+    const current = queue.pop()!;
+    if (out.has(current)) continue;
+    out.add(current);
+    for (const parent of byId.get(current)?.parents ?? []) queue.push(parent);
+  }
+  return out;
+}
+
+export function traceConcreteDAG(fixture: ConcreteDagFixture): ConcreteDagTrace {
+  const byId = new Map(fixture.messages.map((m) => [m.id, m]));
+  const bonded = Object.keys(fixture.bondsMap).sort();
+  const minimumMessages = bonded
+    .map((sender) => fixture.justifications
+      .map((id) => byId.get(id))
+      .filter((m): m is DagMessage => Boolean(m && m.sender === sender))
+      .sort((a, b) => a.senderSeq - b.senderSeq)[0])
+    .filter((m): m is DagMessage => Boolean(m));
+
+  const minimumMessageSenders = minimumMessages.map((m) => m.sender).sort();
+  const supportObservers: Record<string, string[]> = {};
+
+  for (const sender of bonded) {
+    const justification = fixture.justifications
+      .map((id) => byId.get(id))
+      .find((m) => m?.sender === sender);
+    if (!justification) continue;
+    const seen = ancestors(justification.id, byId);
+    const observers = fixture.messages
+      .filter((m) => bonded.includes(m.sender) && m.seen.some((id) => seen.has(id)))
+      .map((m) => m.sender);
+    supportObservers[sender] = [...new Set(observers)].sort();
+  }
+
+  const total = Object.values(fixture.bondsMap).reduce((a, b) => a + b, 0);
+  const supportingStake = bonded
+    .filter((sender) => (supportObservers[sender] ?? []).length === bonded.length)
+    .reduce((sum, sender) => sum + fixture.bondsMap[sender], 0);
+
+  return {
+    minimumMessages: minimumMessages.map((m) => m.id),
+    minimumMessageSenders,
+    supportObservers,
+    superMajority: supportingStake * 3 > total * 2,
+    messageCoverage: minimumMessageSenders.length === bonded.length,
+    upstreamGate: minimumMessageSenders.length === bonded.length
+      ? "FRINGE_STAGE_REACHABLE"
+      : "BLOCKED_BEFORE_FRINGE",
+  };
+}

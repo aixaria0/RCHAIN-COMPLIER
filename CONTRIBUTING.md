@@ -1,31 +1,54 @@
 # Contributing
 
-RChain Reality Compiler is a research-oriented engineering project. Contributions should make the verification model clearer, more reproducible, or easier to inspect.
+Contributions to the Casper CBC research track should be deterministic, inspectable, and narrowly scoped.
 
-## Principles
+## Evidence requirements
 
-- Prefer small, reviewable changes.
-- Keep deterministic logic independent from the UI.
-- Add tests for semantic or verification changes.
-- Document protocol assumptions and external dependencies.
-- Never commit credentials, tokens, private keys, local databases, or generated deployment output.
-- Preserve the distinction between synthetic fixtures and live network evidence.
+When upstream behavior is involved, include:
 
-## Pull requests
+- the exact upstream commit;
+- the relevant upstream function path;
+- a minimal deterministic reproducer;
+- the observed result;
+- the strongest claim actually supported by the result.
 
-A useful pull request explains:
+Do not turn a synthetic scenario into a protocol claim without an upstream reachability argument.
 
-1. What changed.
-2. Why the change is needed.
-3. Which invariant or boundary it affects.
-4. How it was tested.
-5. Whether it changes any externally visible behavior.
+## Preferred workflow
 
-Run the full local quality gate before requesting review:
+~~~text
+model
+  |
+minimize
+  |
+reachability screen
+  |
+upstream reproducer
+  |
+full-path validation
+  |
+documented result
+~~~
 
-```bash
+## Quality gates
+
+~~~bash
 npm run typecheck
 npm run lint
 npm test
 npm run build
-```
+~~~
+
+Keep consensus-specific experiments isolated under src/lib/cbc/ or scripts/upstream/ unless a broader architectural change is required.
+
+## Research language
+
+Prefer precise terms such as:
+
+- observation;
+- candidate discrepancy;
+- confirmed implementation behavior;
+- controlled integration result;
+- protocol hypothesis.
+
+Avoid calling something a vulnerability until the relevant protocol-level consequence is actually demonstrated.

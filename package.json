@@ -1,11 +1,13 @@
 {
   "name": "rchain-reality-compiler",
-  "version": "0.1.0",
-  "description": "Verification-oriented workbench for compiling execution claims into inspectable evidence.",
+  "version": "0.2.0",
+  "description": "Deterministic research harness for stress-testing Casper CBC finalization against the pinned RChain Rust implementation.",
   "private": true,
   "sideEffects": false,
   "type": "module",
-  "overrides": {"nf3": "0.3.17"},
+  "overrides": {
+    "nf3": "0.3.17"
+  },
   "scripts": {
     "dev": "vite dev --host 0.0.0.0 --port 8080",
     "build": "vite build && npm run db:migrate",
@@ -13,13 +15,23 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/compiler/reality-record.test.ts src/lib/compiler/reality-record-adapter.test.ts src/lib/compiler/sentinel-adapter.test.ts src/lib/compiler/reality-calculus.test.ts src/lib/compiler/proposition-calculus.test.ts src/lib/compiler/reality-engine.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/compiler/reality-record.test.ts src/lib/compiler/reality-record-adapter.test.ts src/lib/compiler/sentinel-adapter.test.ts src/lib/compiler/reality-calculus.test.ts src/lib/compiler/proposition-calculus.test.ts src/lib/compiler/reality-engine.test.ts src/lib/cbc/cbc-simulator.test.ts src/lib/cbc/casper-observation.test.ts src/lib/cbc/casper-finality.test.ts src/lib/cbc/casper-stake-matrix.test.ts src/lib/cbc/casper-finalizer-observation.test.ts src/lib/cbc/casper-finalizer-delivery-matrix.test.ts src/lib/cbc/casper-tension-minimizer.test.ts src/lib/cbc/casper-upstream-gate.test.ts src/lib/cbc/fragility-engine.test.ts src/lib/cbc/casper-upstream-adapter.test.ts src/lib/cbc/casper-concrete-dag.test.ts src/lib/cbc/casper-finalizer-semantics.test.ts src/lib/cbc/casper-adversarial-search.test.ts src/lib/cbc/casper-upstream-reachability.test.ts src/lib/cbc/casper-reachable-perturbation-search.test.ts",
     "demo:reality-record": "node --experimental-strip-types examples/reality-record.ts",
     "demo:reality-calculus": "node --experimental-strip-types examples/reality-calculus.ts",
     "demo:proposition-calculus": "node --experimental-strip-types examples/proposition-calculus.ts",
     "demo:reality-engine": "node --experimental-strip-types examples/reality-engine.ts",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "demo:cbc-stress": "node --experimental-strip-types examples/cbc-stress.ts",
+    "demo:casper-finalizer": "node --experimental-strip-types examples/casper-finalizer-trace.ts",
+    "demo:casper-tension-minimizer": "node --experimental-strip-types examples/casper-tension-minimizer.ts",
+    "demo:casper-upstream-gate": "node --experimental-strip-types examples/casper-upstream-gate.ts",
+    "demo:casper-concrete-dag": "node --experimental-strip-types examples/casper-concrete-dag.ts",
+    "demo:casper-finalizer-semantics": "node --experimental-strip-types examples/casper-finalizer-semantics.ts",
+    "demo:casper-adversarial-search": "node --experimental-strip-types examples/casper-adversarial-search.ts",
+    "demo:casper-upstream-reachability": "node --experimental-strip-types examples/casper-upstream-reachability.ts",
+    "demo:casper-reachable-flip": "node --experimental-strip-types examples/casper-reachable-perturbation-search.ts",
+    "demo:casper-duplicate-minimum": "node --experimental-strip-types examples/casper-duplicate-minimum-message.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

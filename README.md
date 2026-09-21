@@ -1,362 +1,254 @@
-# RChain Reality Compiler
+# RChain Casper CBC Stress Harness
 
-**A deterministic evidence compiler for turning distributed execution claims into inspectable, reproducible reality records.**
+**Deterministic, replayable research infrastructure for stress-testing Casper CBC finalization behavior against the real RChain Rust implementation.**
 
-> **Status:** Research prototype / executable Reality Layer
+[![CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/ci.yml)
+[![Reality Plane CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-plane.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-plane.yml)
+[![Upstream Finalizer](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-5-upstream-finalizer.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-5-upstream-finalizer.yml)
+[![Upstream Validation](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-6-upstream-admission.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-6-upstream-admission.yml)
+[![Upstream Pre-State Bridge](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-7-upstream-pre-state.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-7-upstream-pre-state.yml)
+
+> Research status: executable upstream reproduction complete for the current duplicate-minimum-message candidate under a controlled DAG/state fixture.
 >
-> This repository is **not** an RChain node, a replacement for RChain consensus, or a requirement for running RChain. The word *compiler* describes the verification boundary: it compiles observations, execution traces, propositions, and evidence into a deterministic certificate that can be inspected and replayed independently.
-
-## The core thesis
-
-Distributed networks do not only produce state. They produce observations, claims about state, supporting evidence, and sometimes conflicting accounts of what happened.
-
-The Reality Layer makes that boundary explicit:
-
-```text
-RChain / observer / fixture
-          ↓
-       Observe
-          ↓
-  canonical evidence
-          ↓
-       Measure
-          ↓
- claims + justification + replay + consistency
-          ↓
-       Verify
-          ↓
- Reality Certificate
-          ↓
- justified next transition
-```
-
-The governing question is not merely **“what is the current status?”** but **“what does the supplied evidence actually establish, and can another verifier reproduce that judgment?”**
-
-RChain does not need this repository to execute its protocol. The Reality Layer is an independent evidence and verification boundary around execution.
-
-## The problem
-
-Distributed systems do not only produce state. They produce claims about state.
-
-A block may claim an execution happened. An observer may report an event. A validator may justify a proposition. A replay may agree or diverge. A UI can display all of those things without establishing how they relate.
-
-Reality Compiler makes that relationship executable.
-
-```text
-Observation
-    ↓
-Normalization
-    ↓
-Evidence / RealityRecord
-    ↓
-Reality Calculus
-    ↓
-Proposition Calculus
-    ↓
-Verification predicates + justification graph
-    ↓
-Replay / consistency / equivocation
-    ↓
-Deterministic RealityCertificate
-    ↓
-Justified next transition
-```
+> Important scope: this repository is a research and verification harness. It is not an RChain node, not a replacement for Casper, and does not by itself establish a production-network vulnerability.
+
+## What this project does
+
+This repository started as the RChain Reality Compiler: an evidence-oriented workbench for turning distributed execution observations into deterministic, inspectable records.
+
+The current research track uses that architecture to answer a focused question:
+
+**What happens when adversarial-but-causally-valid Casper CBC message histories are pushed through the actual upstream Rust finalization and validation pipeline?**
+
+The harness keeps three layers separate:
+
+~~~text
+synthetic model
+     |
+upstream-facing observation
+     |
+real upstream Rust execution
+     |
+deterministic evidence
+~~~
 
-The result is not merely a status label. The certificate carries the reasoning material needed to inspect why that status was produced.
+The goal is not to manufacture a vulnerability claim. The goal is to make the smallest implementation claim that survives contact with the actual code.
 
-## Why a compiler?
+## Current verified result
 
-RChain itself does not need this repository in order to execute its protocol.
+Upstream pin:
 
-The compiler boundary exists for a different problem: **turning heterogeneous observations into a common, reproducible verification artifact.**
+~~~text
+rchain-community/rchain-rust
+d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+~~~
 
-A network can execute correctly while its surrounding evidence is fragmented, contradictory, difficult to replay, or impossible to audit after an observer disappears. Reality Compiler treats observation as input and verification as a separate, deterministic layer.
+The current candidate reproduces this chain:
 
-The architecture is therefore closer to an evidence compiler than to a conventional blockchain application:
+~~~text
+duplicate-sender justification shape
+          |
+active block_summary validation
+          |
+get_pre_state_for_parents
+          |
+real Finalizer::calculate_finalization
+          |
+validate_block_checkpoint
+          |
+MultiParentCasper::validate
+          |
+1 passed / 0 failed
+~~~
 
-```text
-provider / observer / fixture
-            ↓
-      canonical input
-            ↓
-     evidence compiler
-            ↓
-     evidence-carrying result
-```
+The concrete candidate contains a minimum-message multiset with duplicate sender coverage:
 
-A future observer can replace today's synthetic fixture without replacing the verification model.
+~~~text
+minimum-message senders = [v0, v0, v1, v2]
+bonded validators       = [v0, v1, v2, v3]
+supporting stake        = 90 / 100
+~~~
 
-## Reality Engine Core
+The key implementation boundary is that the minimum-message entry count equals the bond count while the distinct sender count does not. Later sender-keyed stages can therefore collapse duplicate entries.
 
-The first executable engine boundary is `src/lib/compiler/reality-engine.ts`.
+The full integration probe also creates a real native PoS genesis state through RuntimeManager::compute_genesis and exercises the candidate through the production Rust validation functions used by MultiParentCasper::validate.
 
-```text
-RealityEngineInput
-        ↓
-canonical normalization
-        ↓
-RealityRecord
-   ┌────┴─────────────────┐
-   ↓                      ↓
-Reality Calculus     Proposition Calculus
-   ↓                      ↓
-   └───────┬──────────────┘
-           ↓
- replay / consistency / equivocation
-           ↓
-     state resolution
-           ↓
-   RealityCertificate
-```
+This is a confirmed implementation behavior under a deterministic integration fixture. It is deliberately not labelled a network-level vulnerability until the remaining ingress, signature, storage, and deployment assumptions are independently demonstrated.
 
-The engine is deliberately conservative:
+See the full evidence log in docs/CASPER_CBC_RESEARCH_STATUS.md.
 
-- `DIVERGENT` takes precedence when replay diverges, propositions conflict, or equivocation is detected.
-- `INCOMPLETE` is emitted when required evidence or proposition prerequisites are missing.
-- `VERIFIED` requires successful verification, proposition consistency, and a fixed point.
-- weaker states such as `OBSERVED`, `CONSISTENT`, and `REPRODUCED` remain explicit instead of being promoted to `VERIFIED`.
+## Research progression
 
-Run it directly:
+~~~text
+law-level stake tension
+        |
+upstream minimum-message gate
+        |
+concrete DAG/message fixture
+        |
+causal reachability screen
+        |
+finalizer semantic lock
+        |
+real upstream Finalizer
+        |
+active validation admission
+        |
+real pre-state reconstruction
+        |
+full MultiParentCasper validation
+~~~
 
-```bash
-npm run demo:reality-engine
-```
+| Milestone | Boundary | Result |
+|---|---|---|
+| M7 | deterministic tension minimization | 70/10 minimal law-level tension |
+| M8 | upstream minimum-message gate | incomplete coverage blocked before fringe |
+| M10 | concrete DAG/message construction | explicit sender/seq/parent/seen history |
+| M11.4 | duplicate minimum-message candidate | candidate discrepancy isolated |
+| M11.5 | real upstream Finalizer | confirmed |
+| M11.6 | active block_summary validation | confirmed |
+| M11.7–M11.9 | pre-state + checkpoint + full validation bridge | confirmed |
 
-## Reality Certificate
+## Why the duplicate-message case matters
 
-The certificate is the portable output of the verification boundary. It is an **evidence-backed, deterministic artifact**, not a blanket claim of protocol finality or mathematical theorem proving.
+The candidate is intentionally narrow.
 
-A certificate contains:
+A protocol interpretation may expect one minimum message per bonded validator. The pinned implementation gate checks message count against bond count, while later processing is keyed by sender.
 
-- the schema and engine version;
-- the normalized `RealityRecord`;
-- Reality Calculus judgement;
-- proposition judgement and convergence state;
-- detected equivocation;
-- proof/diagnostic artifacts derived from the supplied inputs;
-- the Observe → Measure → Project loop result;
-- source lineage;
-- a deterministic certificate digest.
+That creates the measurable boundary:
 
-The dedicated contract is documented in [`docs/REALITY_CERTIFICATE.md`](docs/REALITY_CERTIFICATE.md).
+~~~text
+count(minimumMessages) = count(bonds)
+but
+count(distinct senders) < count(bonds)
+~~~
 
-## Proof and formal verification boundary
-
-The project can produce deterministic proof/diagnostic artifacts and can consume explicit formal predicates, but the word **proof** is scoped carefully:
+The harness does not assume that this is exploitable. It measures what the actual implementation does with that shape.
 
-- a proof artifact is a machine-inspectable explanation of what the engine derived from supplied evidence;
-- a formal proof is a separately machine-checked mathematical result, such as a Lean theorem, when such a predicate is explicitly connected;
-- `VERIFIED` in this repository is the result of configured predicates over the supplied evidence, not an assertion that every property of the underlying network has been formally proven.
+## What is real vs. synthetic
 
-This distinction keeps the current executable system honest while leaving a clean integration point for QLF / Lean verification later.
+The synthetic layer provides deterministic stake-aware scenarios, delivery perturbations, equivocation, DAG/message construction, invariant checks, shrinking, and replay digests.
 
-## Reality Loop
+The upstream layer is separate. It injects focused integration tests into a clean checkout of the pinned upstream commit and compiles the relevant RChain crate against that exact revision.
 
-The current Reality Layer closes an executable loop:
+No upstream source code is vendored into this repository.
 
-```text
-OBSERVE → MEASURE → PROJECT → OBSERVE
-```
+## Reproduce the local research layer
 
-`OBSERVE` captures provider-neutral evidence.
+Install dependencies:
 
-`MEASURE` derives verification state, proposition consistency, replay state, proof obligations, and conflicts.
-
-`PROJECT` does not pretend to be an ML oracle. It derives the next justified transition from the current proof state. If the evidence is insufficient or contradictory, the engine can project **collect more evidence**, **isolate a conflict**, **replay**, or **hold state** rather than inventing certainty.
-
-This separation leaves room for future predictive or ML systems without making prediction the source of truth for verification.
-
-## Failure containment is a first-class concern
-
-The architecture treats infrastructure failure and epistemic failure as different problems.
-
-A node can disappear. A process can exhaust memory. An observer can disagree with another observer. A replay can diverge. None of those should silently become `VERIFIED` merely because the UI or service is still running.
-
-Reality Compiler therefore keeps:
-
-```text
-execution
-observation
-verification
-replay
-presentation
-```
-
-as separate boundaries.
-
-The current implementation provides deterministic evidence artifacts and conservative state resolution. Resource budgeting, streaming ingestion, checkpointing, and durable multi-observer aggregation are intentionally future integration points rather than claims about the current prototype.
-
-## Architecture
-
-```text
-                   RChain / execution source
-                              │
-                              ▼
-                       Observer Adapter
-                              │
-                              ▼
-                     Canonical Event Model
-                              │
-                              ▼
-                       RealityRecord
-                 ┌────────────┼────────────┐
-                 ▼            ▼            ▼
-             Evidence      Claims      Causality
-                 │            │            │
-                 └────────────┼────────────┘
-                              ▼
-                     Reality / Proposition
-                         Calculi + replay
-                              │
-                              ▼
-                   Deterministic Certificate
-                              │
-                 ┌────────────┼─────────────┐
-                 ▼            ▼             ▼
-             Workbench     Adversarial     Next
-               / UI           checks      transition
-```
-
-Repository layers:
-
-```text
-src/
-├── components/wb/       Workbench presentation
-├── routes/              Interactive verification views
-└── lib/
-    ├── compiler/        Reality Engine, calculi, evidence, hashing, adapters
-    └── multiplayer/     Peer-to-peer transport boundary
-
-server/                  Optional runtime integration
-scripts/                 Build, migration, and verification tooling
-docs/                    Architecture and evidence contracts
-examples/                Small executable verification demonstrations
-```
-
-Important documents:
-
-- [`docs/REALITY_CERTIFICATE.md`](docs/REALITY_CERTIFICATE.md)
-- [`docs/REALITY_ENGINE_CORE.md`](docs/REALITY_ENGINE_CORE.md)
-- [`docs/REALITY_EVIDENCE_PLANE.md`](docs/REALITY_EVIDENCE_PLANE.md)
-- [`docs/REALITY_RECORD.md`](docs/REALITY_RECORD.md)
-- [`docs/WHY_THIS_IS_A_COMPILER.md`](docs/WHY_THIS_IS_A_COMPILER.md)
-- [`docs/FAILURE_CONTAINMENT.md`](docs/FAILURE_CONTAINMENT.md)
-
-## RChain / QLF boundary
-
-This repository is an independent research and engineering implementation. It is designed to provide verification-oriented tooling around RChain-shaped execution and Quantum Logical Framework concepts.
-
-It does not claim to be an official RChain implementation, reproduce historical RChain consensus, or require changes to the underlying protocol.
-
-The intended integration boundary is:
-
-```text
-RChain / observer / Sentinel / future provider
-                    ↓
-             Reality Adapter
-                    ↓
-             Reality Compiler
-                    ↓
-          auditable certificate
-```
-
-The provider-specific observer is replaceable. Today that includes synthetic fixtures and a Sentinel adapter; future adapters can target a local node, testnet observer, archive, or another evidence source without changing the deterministic core.
-
-## What this is not
-
-- Not a new blockchain.
-- Not a token or Web3 consumer application.
-- Not an RChain fork.
-- Not a replacement for consensus.
-- Not a claim of live mainnet evidence.
-- Not an AI oracle that invents missing facts.
-- Not a claim that every certificate constitutes a formal mathematical proof.
-
-It is infrastructure for **evidence, reasoning, replay, and provenance** around distributed execution.
-
-## Verification model
-
-A useful result should expose:
-
-1. The claim being evaluated.
-2. The source execution or fixture.
-3. The transformation and compilation path.
-4. The evidence attached to the claim.
-5. The predicates evaluated against that evidence.
-6. Any adversarial mutation or replay divergence.
-7. The proof obligations and justification graph.
-8. The final deterministic result and its provenance.
-
-`VERIFIED` means the configured predicates passed over the supplied evidence. It does **not** mean protocol finality, economic truth, or live network consensus.
-
-## 🧠 ARIA CORE
-
-A completely unnecessary, absolutely non-production, mildly over-engineered Easter egg.
-
-**This page is a joke. The architecture is not.**
-
-ARIA CORE is a small interactive personal artifact inspired by the same ideas explored throughout the Reality Layer work: observation, evidence, verification, replay, causality, and deterministic certification.
-
-It is **not** an RChain protocol component, protocol specification, production verifier, or claim about the underlying network.
-
-It exists because sometimes an engineer needs to stop building serious infrastructure for five minutes and build something unnecessarily animated.
-
-> Built from a tablet. Because apparently laptops are optional. 😂
-
-### Enter ARIA CORE
-
-🧠 **[RUN THE ABSOLUTELY UNNECESSARY CORE →](https://aixaria0.github.io/RCHAIN-COMPLIER/)**
-
-## Development
-
-Requirements:
-
-- Node.js with npm
-- A modern browser for the workbench
-
-```bash
+~~~bash
 npm install
-npm run dev
-```
+~~~
 
-Quality gates:
+Run the TypeScript research suite:
 
-```bash
+~~~bash
+npm test
+~~~
+
+Run the repository quality gates:
+
+~~~bash
 npm run typecheck
 npm run lint
-npm test
 npm run build
-```
+~~~
 
-Executable demonstrations:
+Run focused Casper demonstrations:
 
-```bash
-npm run demo:reality-record
-npm run demo:reality-calculus
-npm run demo:proposition-calculus
-npm run demo:reality-engine
-```
+~~~bash
+npm run demo:casper-upstream-gate
+npm run demo:casper-concrete-dag
+npm run demo:casper-finalizer-semantics
+npm run demo:casper-adversarial-search
+npm run demo:casper-upstream-reachability
+npm run demo:casper-reachable-flip
+npm run demo:casper-duplicate-minimum
+~~~
 
-## Design principles
+The upstream Rust reproductions run in GitHub Actions so the exact upstream source revision is controlled and visible.
 
-**Determinism.** Equivalent normalized inputs should produce reproducible verification artifacts.
+## Repository map
 
-**Evidence over assertion.** The system exposes the material behind a result rather than hiding it behind a status badge.
+~~~text
+src/lib/cbc/
+    deterministic Casper stress model
+    observation adapters
+    DAG fixtures
+    finalizer semantics
+    reachability / perturbation searches
 
-**Provenance.** Every meaningful result should retain its origin and transformation path.
+scripts/upstream/
+    exact upstream integration reproducers
 
-**Fail closed.** Missing or contradictory evidence should reduce certainty, not manufacture it.
+.github/workflows/
+    repository CI
+    Reality Plane CI
+    pinned upstream Finalizer / validation bridges
 
-**Adversarial by design.** Contradiction, replay divergence, equivocation, malformed evidence, and incomplete inputs are first-class cases.
+docs/
+    research status
+    evidence / Reality Compiler architecture
+~~~
 
-**Explicit boundaries.** Live state, synthetic fixtures, transport, verification, and presentation remain separable.
+Key upstream probes:
 
-**Replaceable observers.** The verification core should not care whether evidence originated from a fixture, Sentinel, an RChain node, or another observer implementation.
+- scripts/upstream/m11-5-duplicate-minimum-messages.rs
+- scripts/upstream/m11-6-duplicate-sender-admission.rs
+- scripts/upstream/m11-7-pre-state-finalizer-bridge.rs
+
+## Evidence discipline
+
+**Observation** — a concrete result produced by the harness or upstream implementation.
+
+**Reachability** — an observation that satisfies the currently checked upstream structural invariants.
+
+**Implementation behavior** — the same shape exercised against real upstream Rust code.
+
+**Protocol finding** — a stronger claim requiring protocol-level impact to be demonstrated.
+
+The current milestone is in the third category.
+
+## Non-goals
+
+This repository does not claim to:
+
+- replace the RChain node;
+- implement a second Casper consensus engine;
+- provide live mainnet evidence;
+- prove all Casper safety or liveness properties;
+- declare a vulnerability solely from a synthetic scenario;
+- silently turn missing evidence into certainty.
+
+## Research-facing architecture
+
+The original Reality Compiler architecture remains useful because it provides an evidence boundary around the stress harness:
+
+~~~text
+execution / fixture
+      |
+canonical observation
+      |
+evidence + provenance
+      |
+deterministic analysis
+      |
+replay / contradiction checks
+      |
+upstream confirmation
+      |
+inspectable research result
+~~~
 
 ## License
 
-No license is declared in this repository yet. Until a license is added, assume the repository contents remain under the copyright of their respective rights holders and are not automatically licensed for reuse.
+No license is currently declared for this repository. Public visibility should not be interpreted as a grant of reuse rights.
 
-## Validation
+## Security
 
-The main branch is expected to pass the repository quality gates before release: typecheck, lint, test, and production build.
+Consensus-sensitive findings should be handled carefully. See SECURITY.md.
+
+## Contributing
+
+Research contributions should include the exact upstream commit, a deterministic reproducer, the relevant implementation path, the observed result, and the smallest claim actually supported by the evidence. See CONTRIBUTING.md.

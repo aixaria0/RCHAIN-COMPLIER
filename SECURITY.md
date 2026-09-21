@@ -1,23 +1,16 @@
 # Security Policy
 
-## Scope
+This repository explores consensus-sensitive implementation behavior.
 
-Security issues affecting verification integrity, evidence provenance, authentication/session boundaries, server-side request handling, or sensitive data handling are in scope.
+Do not use a public issue to publish an actionable network exploit, private key material, credentials, unpublished testnet access, or other operationally sensitive information.
 
-Do not include secrets, private keys, credentials, personal data, or exploit payloads in public issues.
+For a suspected security-sensitive finding:
 
-## Reporting
+1. preserve the exact upstream revision;
+2. preserve the smallest deterministic reproducer;
+3. separate confirmed implementation behavior from inferred impact;
+4. prefer a private GitHub Security Advisory or direct maintainer coordination for sensitive details.
 
-For a vulnerability that could expose credentials, compromise a deployment, or corrupt verification evidence, contact the repository maintainer privately through the GitHub account associated with this project rather than publishing operational details in a public issue.
+Research results that are non-sensitive and already reproducible in a controlled fixture can be discussed publicly with the same evidence-first boundaries used by this project.
 
-Please include:
-
-- affected component or path;
-- impact;
-- reproducible steps or a minimal proof of concept;
-- affected version/commit;
-- any suggested mitigation.
-
-## Security design goals
-
-The project aims to keep authentication, external integrations, and presentation separate from deterministic verification logic. Verification artifacts should be inspectable and reproducible without requiring trust in the UI layer.
+This repository is not an official RChain security-response channel.
