@@ -57,3 +57,12 @@ This is a concrete implementation invariant mismatch, not yet a statement that d
 The remaining question is downstream impact: what exact node behavior consumes this under-cardinality fringe, and can it produce divergent finality, incorrect state selection, or only a recoverable liveness or estimation condition?
 
 No network or economic-exploit claim is made here.
+
+
+## Historical parity
+
+This is not currently identified as a Rust-only regression. The same pinned repository also contains the legacy Scala Finalizer, whose checkMinMessages implementation uses the same count-only predicate:
+
+    minMsgs.size == bondsMap.size
+
+Its calculateNextLayer implementation is likewise sender-keyed. The repository therefore supports a narrower historical interpretation: the observed behavior is inherited across the Scala-to-Rust implementation lineage at this revision. Determining whether the behavior is compatible with the intended protocol specification remains a separate question.
