@@ -25,3 +25,8 @@ This establishes a concrete remediation hypothesis:
       sender_set(min_msgs) == bonded_sender_set
 
 The project does not treat this as a completed upstream fix. It is a compatibility-oriented hypothesis that should next be evaluated against epoch changes, existing finalization tests, and any protocol assumptions around duplicated justifications.
+
+
+## Historical parity
+
+The counterfactual is deliberately framed as an invariant-strengthening hypothesis, not a Rust regression fix. The pinned repository's legacy Scala Finalizer contains the same count-only minimum-message predicate. Any upstream remediation would therefore need to be evaluated as a protocol-behavior change against historical compatibility, not merely as a local Rust refactor.
