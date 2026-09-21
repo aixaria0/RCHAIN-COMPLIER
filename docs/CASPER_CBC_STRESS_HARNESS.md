@@ -1,3 +1,5 @@
+> **Publication note (September 21, 2026):** The historical milestone log below documents the evolving research path. The current authoritative status is [CASPER_CBC_RESEARCH_STATUS.md](CASPER_CBC_RESEARCH_STATUS.md), which records the verified M11.5–M11.9 upstream results and the current evidence boundary.
+
 # Casper CBC Stress Harness
 
 ## Scope
