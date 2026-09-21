@@ -167,3 +167,12 @@ Starting from the causally valid three-layer positive control, the harness now s
 It finds three equivalent one-change cases. Removing exactly one non-self layer-2 parent from the high-stake validator's justification (a3 -> b2, a3 -> c2, or a3 -> d2) keeps the history upstream-admissible and keeps minimum-message coverage intact, but removes full-partition support for the 70-stake sender. Finalization therefore flips from true to false with a single parent-edge change.
 
 This is an important reachable liveness boundary, not yet a protocol fragility finding. The observed transition is consistent with the finalizer's support rule: the high-stake justification no longer has a complete observer partition. The next step is to determine whether an equivalent one-edge boundary is merely the expected CBC liveness condition or exposes an implementation-specific mismatch when exercised through the actual upstream Rust DAG construction.
+
+
+## M11.4 — duplicate minimum-message candidate
+
+A new deterministic fixture explores a sharper boundary in the upstream finalizer gate. It contains four minimum-message entries but only three distinct bonded senders: the justification set includes two messages from v0 and one each from v1 and v2, while v3 has no minimum message.
+
+The reachability screen still passes the currently checked DAG invariants. The finalizer semantic trace nevertheless shows the count-only gate passing (`min_msgs.len() == bonds_map.len()`), a distinct-sender coverage failure, and a Law-14 finalization outcome with 90/100 supporting stake. The duplicate v0 justifications also demonstrate sender-keyed support-map overwrite: one v0 justification has full partition support while the other does not, and the sender-keyed map retains the later processed witness.
+
+This is now the most interesting implementation-level candidate in the investigation, but it remains a **candidate discrepancy**, not a vulnerability claim. The required next step is an actual upstream Rust execution/reproducer using the same concrete Message set to determine whether the production Finalizer exhibits the same behavior. If reproduced, the smallest fix hypothesis is to validate distinct bonded sender coverage rather than message count alone before entering fringe calculation.
