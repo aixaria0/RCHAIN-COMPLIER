@@ -25,6 +25,8 @@ Every upstream probe in this matrix checks out that exact revision before inject
 | M16 | Counterfactual gate | Exact upstream code + local invariant | Sender-set equality is a narrow remediation hypothesis; no upstream code is changed |
 | M17 | Stake distribution | Exact upstream Finalizer | The under-cardinality witness survives equal 25/25/25/25 stake |
 | M18 | Threshold boundary | Exact upstream Finalizer | 2/3 remains non-finalizing; 3/4 finalizes under the same cardinality shape |
+| M19 | Proposal propagation | Real `DagMessageState::create_message` | A subsequent proposal preserves the under-cardinality fringe instead of repairing it |
+| M20 | Fork-sensitive propagation | Real `DagMessageState::create_message` + finality closure | Two locally consistent under-cardinality views can propagate different finalized closures |
 
 ## Interpretation ladder
 
@@ -52,19 +54,19 @@ Those claims require additional protocol-impact, deployment-version, and compati
 
 ## Research boundary
 
-The next decisive test is downstream impact:
+The M19/M20 downstream probes now establish the first concrete impact boundary:
 
 ```text
 under-cardinality fringe
         |
 subsequent validator proposals
         |
-merge / pre-state evolution
+fork-sensitive finality-state propagation
         |
-fork-sensitive or safety-relevant consequence?
+causally valid adversarial history through full validation?
         |
 yes -> characterize precisely
-no  -> characterize as liveness / estimation / invariant divergence
+no  -> retain the current state-selection / invariant boundary
 ```
 
 The research should not skip this step merely because the implementation mismatch is reproducible.
@@ -73,7 +75,7 @@ The research should not skip this step merely because the implementation mismatc
 
 The repository contains one workflow per major upstream boundary under `.github/workflows/`, with corresponding injected probes under `scripts/upstream/`.
 
-For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18.
+For a review, the most informative sequence is M11.5 -> M11.6 -> M11.7–M11.9 -> M12 -> M13 -> M14 -> M15 -> M16 -> M17 -> M18 -> M19 -> M20.
 
 
 
