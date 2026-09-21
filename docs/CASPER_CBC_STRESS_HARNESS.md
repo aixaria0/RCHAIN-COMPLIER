@@ -193,4 +193,17 @@ The reproducer injects a temporary integration test into upstream `block-storage
 
 A second source-level observation is now explicit: the pinned SDK contains `invalid_justification_follows`, which compares the distinct sender set of justifications against the bonded sender set, but the current `casper/src/validate.rs::block_summary` path does not call that predicate. The active validation chain is justification regression, sequence number, block number, pure deploy checks, and repeat-deploy validation.
 
-This does **not** by itself prove a protocol vulnerability. The decisive evidence is the result of the real upstream integration test. Until that test passes on the pinned source, the duplicate-sender case remains a candidate discrepancy.
+This does **not** by itself prove a protocol vulnerability. The decisive evidence is the result of the real upstream integration test. The pinned upstream test has now passed. The real Rust Finalizer reproduced the duplicate-sender case exactly: four minimum-message entries (`v0, v0, v1, v2`) pass the count-only gate, the sender-keyed next layer collapses to three senders, the support map yields 90/100 supporting stake, and the public finalization loop advances the fringe. This is therefore a **confirmed implementation behavior of the pinned Finalizer**, not merely a semantic-mirror artifact.
+
+
+### M11.5 result — confirmed in upstream Rust
+
+The M11.5 workflow checked out `rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b`, installed its pinned Rust toolchain, installed `protoc`, injected the deterministic test into `block-storage/tests`, and executed:
+
+`cargo test -p rchain-block-storage --test m11_5_duplicate_minimum_messages -- --nocapture`
+
+Result: **1 passed; 0 failed**.
+
+The test exercised the actual upstream `Finalizer` methods rather than the TypeScript mirror. The pinned implementation confirmed the candidate behavior: the four-entry minimum-message vector `v0, v0, v1, v2` passes `check_min_messages`; `calculate_next_layer` collapses the duplicate sender; `calculate_next_fringe_support_map` produces full-partition support for the three represented justification senders; `calculate_fringe` accepts 90/100 stake; and `calculate_finalization` advances the fringe.
+
+This establishes a real upstream implementation behavior. It does **not yet establish that an externally submitted block can traverse the entire production validation/ingress path with this duplicate-sender justification set**. That is the next boundary before calling it a protocol vulnerability.
