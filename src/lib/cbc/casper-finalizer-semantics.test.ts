@@ -33,10 +33,10 @@ test("M11.2 causally valid three-layer DAG reaches Law-14 finalization", () => {
   const trace = traceCasperFinalizerSemantics(buildCausallyValidDAG());
   assert.equal(trace.checkMinMessagesPassed, true);
   assert.deepEqual(trace.nextLayer, {
-    v0: "a1",
-    v1: "b1",
-    v2: "c1",
-    v3: "d1",
+    v0: "g0",
+    v1: "g1",
+    v2: "g2",
+    v3: "g3",
   });
   assert.deepEqual(trace.fullPartitionSupportSenders, ["v0", "v1", "v2", "v3"]);
   assert.equal(trace.supportingStake, 100);
@@ -51,9 +51,9 @@ test("M11.4 duplicate minimum messages expose the count-only gate boundary", () 
   assert.deepEqual(trace.uniqueMinimumMessageSenders, ["v0", "v1", "v2"]);
   assert.equal(trace.distinctMinimumMessageCoverage, false);
   assert.deepEqual(trace.nextLayer, {
-    v0: "a1",
-    v1: "b1",
-    v2: "c1",
+    v0: "g0",
+    v1: "g1",
+    v2: "g2",
   });
   assert.equal(trace.supportingStake, 90);
   assert.equal(trace.superMajority, true);
