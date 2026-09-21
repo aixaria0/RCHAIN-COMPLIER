@@ -10,7 +10,7 @@ use rchain_block_storage::dag::finalizer::Message;
 use rchain_block_storage::dag::message_state::DagMessageState;
 use rchain_block_storage::dag::representation::DagRepresentation;
 use rchain_casper::merging::BlockIndex;
-use rchain_casper::multi_parent_casper::get_pre_state_for_parents;
+use rchain_casper::multi_parent_casper::{get_pre_state_for_parents, validate};
 use rchain_casper::interpreter_util::validate_block_checkpoint;
 use rchain_models::block_hash::BlockHash;
 use rchain_models::block_metadata::BlockMetadata;
@@ -281,4 +281,24 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
     assert!(!candidate_meta.validation_failed);
     assert_eq!(candidate_meta.fringe, expected_fringe);
     assert_eq!(candidate_meta.fringe_state_hash, StateHash::new(*root.as_bytes()));
+
+    let validated_meta = validate(
+        &dag,
+        &store,
+        &runtime,
+        &candidate,
+        "root",
+        0,
+        &|block_hash| async move {
+            Ok(BlockIndex {
+                block_hash,
+                deploy_chains: Vec::new(),
+            })
+        },
+    )
+    .await
+    .expect("full MultiParentCasper::validate path should complete");
+
+    assert_eq!(validated_meta.block_hash, candidate.block_hash);
+    assert!(!validated_meta.validation_failed);
 }
