@@ -221,8 +221,6 @@ mod m25_active_gate_counterfactual {
             metadata: metadata_map,
         };
 
-        let store = block_store(parent_blocks).await;
-
         let j4 = hash(14);
 
         let j4_message = parent_message(j4, v3);
@@ -241,6 +239,7 @@ mod m25_active_gate_counterfactual {
             block(j4, v3, 1, vec![]),
             block(jx, vx, 1, vec![]),
         ];
+        let store = block_store(parent_blocks).await;
 
         let duplicate_missing = block(
             hash(20),
