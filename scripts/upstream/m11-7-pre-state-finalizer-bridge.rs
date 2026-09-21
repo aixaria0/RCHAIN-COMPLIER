@@ -215,6 +215,7 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
         .await
         .expect("native PoS genesis state");
     let root = genesis_post;
+    let root_state = StateHash::from_slice(root.as_bytes());
 
     let blocks = messages
         .values()
