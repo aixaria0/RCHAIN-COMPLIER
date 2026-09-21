@@ -1,0 +1,59 @@
+name: M22 Exact Call-Site Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m22-exact-callsite-audit.yml"
+      - "docs/CASPER_CBC_M22_EXACT_CALLSITE_AUDIT.md"
+  workflow_dispatch:
+
+jobs:
+  exact-callsite-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Audit exact predicate ownership and active call sites
+        working-directory: upstream-rchain
+        run: |
+          set -euo pipefail
+
+          echo "Pinned revision:"
+          git rev-parse HEAD
+
+          echo
+          echo "Predicate occurrences inside its defining SDK module:"
+          git grep -n "invalid_justification_follows" -- sdk/src/casper_syntax.rs
+
+          echo
+          echo "Searching all other source files for active references..."
+          external_matches="$(git grep -n "invalid_justification_follows" -- ':!sdk/src/casper_syntax.rs' || true)"
+
+          if [[ -n "$external_matches" ]]; then
+            echo "Unexpected external call/reference detected:"
+            printf '%s\n' "$external_matches"
+            exit 1
+          fi
+
+          echo "No external call/reference exists at the pinned revision."
+
+          echo
+          echo "Active Casper block_summary boundary:"
+          sed -n '/pub async fn block_summary(/,/^}/p' casper/src/validate.rs
+
+          if git grep -n "invalid_justification_follows" -- casper/src block-storage/src comm/src sdk/src/lib.rs 2>/dev/null; then
+            echo "Unexpected active-path reference detected."
+            exit 1
+          fi
+
+          echo
+          echo "M22 call-site audit passed."
