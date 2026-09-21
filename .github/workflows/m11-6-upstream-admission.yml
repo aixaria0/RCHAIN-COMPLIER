@@ -1,0 +1,40 @@
+name: M11.6 Upstream Duplicate-Sender Admission Probe
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m11-6-upstream-admission.yml"
+      - "scripts/upstream/m11-6-duplicate-sender-admission.rs"
+      - "src/lib/cbc/**"
+  workflow_dispatch:
+
+jobs:
+  upstream-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject deterministic M11.6 admission probe
+        run: |
+          mkdir -p upstream-rchain/casper/tests
+          cp scripts/upstream/m11-6-duplicate-sender-admission.rs \
+            upstream-rchain/casper/tests/m11_6_duplicate_sender_admission.rs
+
+      - name: Execute active Casper validation path
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-casper --test m11_6_duplicate_sender_admission -- --nocapture
