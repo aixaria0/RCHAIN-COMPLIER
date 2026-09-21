@@ -1,0 +1,36 @@
+name: M27 Reachability-Constrained Adversarial History Search
+
+on:
+  push:
+    branches:
+      - research/m12-cryptographic-ingress-boundary
+    paths:
+      - "src/lib/cbc/**"
+      - "examples/casper-reachable-adversarial-history-search.ts"
+      - ".github/workflows/m27-reachability-constrained-search.yml"
+  pull_request:
+    branches:
+      - main
+      - research/m12-cryptographic-ingress-boundary
+
+jobs:
+  m27-reachability-constrained-search:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run M27 constrained search
+        run: npm test -- --test-name-pattern="M27 exhaustively|M27 finds a one-replacement|M27 search is deterministic"
+
+      - name: Emit M27 evidence report
+        run: npm run demo:casper-reachable-adversarial-history-search
