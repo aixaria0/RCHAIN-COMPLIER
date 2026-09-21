@@ -224,9 +224,72 @@ M26 also emits a stable combined report digest:
 
 The key precision is causal scope: M26 pairs synthetic stress evidence with the exact upstream boundary; it does not claim that partition or equivocation alone causally generates the exact duplicate-sender witness.
 
+## M27 — reachability-constrained adversarial search
+
+M27 exhaustively enumerates all 256 four-entry justification selections from the reachability-valid top-layer pool [a3,b3,c3,d3].
+
+~~~~text
+candidates                       256
+reachability-valid               256
+count-gate accepted              256
+sender-complete                   24
+under-cardinality                232
+exactly three senders            144
+minimum mutation distance         1
+minimum finalizing distance       1
+~~~~
+
+This gives the investigation a bounded minimality result: one justification replacement is enough to produce an under-cardinality witness from a message pool already satisfying the currently checked upstream DAG constraints.
+
+M27 report digest:
+
+~~~~text
+f69415f0214605192c92a490027331e0a567b1d28eaed3dc5e4542d9d3ce0c6f
+~~~~
+
+## M28 — minimal duplicate-sender cryptographic ingress
+
+M28 connects the M27 minimum witness to the exact upstream wire/receiver boundary.
+
+At the same pinned revision, the witness is content-addressed and signed through the real upstream identity path. The injected BlockReceiver probe verifies that the four-entry / three-sender justification shape crosses the receiver boundary and reaches the validation queue.
+
+Result:
+
+~~~~text
+exact upstream pin: verified
+M28 probe: 1 passed, 0 failed
+~~~~
+
+This closes a practical evidence gap between minimum reachable witness and wire-valid ingress representation.
+
+## Deliverable value
+
+The research branch now provides a reusable Casper CBC stress/evidence workflow rather than a collection of standalone probes.
+
+~~~~text
+synthetic stress
+      |
+      v
+deterministic evidence
+      |
+      v
+exact upstream revision
+      |
+      v
+minimal reachable witness
+      |
+      v
+real signed ingress
+      |
+      v
+explicit protocol-claim boundary
+~~~~
+
+The resulting value is reproducibility, inspectability, and a clear path for extending the same harness to additional fault modes, validator histories, or upstream revisions without rebuilding the investigation from scratch.
+
 ## Next boundary
 
-The next meaningful experiment is a bounded adversarial-history search. Candidate histories should be generated from the stress model, then screened with the existing upstream-derived reachability checks (parent existence, DAG acyclicity, sequence progression, and seen-set derivation). Only histories that satisfy those constraints should be promoted into the upstream evidence set.
+The next research step is optional protocol-impact characterization, not required for the core deliverable. The current PR can be reviewed and consumed as a deterministic stress/evidence harness with an exact upstream reproduction chain.
 
 ## What this establishes
 
