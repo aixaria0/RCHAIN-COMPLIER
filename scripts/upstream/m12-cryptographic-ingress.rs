@@ -254,7 +254,7 @@ mod m12_cryptographic_ingress_boundary {
 
     #[tokio::test]
     async fn m12_wire_valid_duplicate_sender_candidate_crosses_block_receiver() {
-        let (candidate, msg_map, parent_blocks) = duplicate_sender_fixture();
+        let (candidate, msg_map, _parent_blocks) = duplicate_sender_fixture();
 
         assert_eq!(
             candidate
@@ -323,7 +323,7 @@ mod m12_cryptographic_ingress_boundary {
             tokio::sync::mpsc::channel(super::MAX_PENDING_BLOCKS);
         let (_finished_tx, finished_rx) = tokio::sync::mpsc::unbounded_channel();
 
-        let validation_rx = super::apply(
+        let mut validation_rx = super::apply(
             state,
             incoming_rx,
             finished_rx,
