@@ -176,3 +176,21 @@ A new deterministic fixture explores a sharper boundary in the upstream finalize
 The reachability screen still passes the currently checked DAG invariants. The finalizer semantic trace nevertheless shows the count-only gate passing (`min_msgs.len() == bonds_map.len()`), a distinct-sender coverage failure, and a Law-14 finalization outcome with 90/100 supporting stake. The duplicate v0 justifications also demonstrate sender-keyed support-map overwrite: one v0 justification has full partition support while the other does not, and the sender-keyed map retains the later processed witness.
 
 This is now the most interesting implementation-level candidate in the investigation, but it remains a **candidate discrepancy**, not a vulnerability claim. The required next step is an actual upstream Rust execution/reproducer using the same concrete Message set to determine whether the production Finalizer exhibits the same behavior. If reproduced, the smallest fix hypothesis is to validate distinct bonded sender coverage rather than message count alone before entering fringe calculation.
+
+
+## M11.5 — pinned upstream Finalizer reproducer
+
+The investigation now contains an executable reproduction against the exact upstream commit used for the semantic lock: `rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b`.
+
+The reproducer injects a temporary integration test into upstream `block-storage/tests` and runs `cargo test -p rchain-block-storage` against the real Rust `Finalizer`, covering:
+
+- the exact four-entry minimum-message multiset `v0, v0, v1, v2`
+- the production `check_min_messages` predicate
+- production `calculate_next_layer` sender-key collapse
+- production `calculate_next_fringe_support_map`
+- production `calculate_fringe` Law-14 evaluation
+- the full public `calculate_finalization` loop
+
+A second source-level observation is now explicit: the pinned SDK contains `invalid_justification_follows`, which compares the distinct sender set of justifications against the bonded sender set, but the current `casper/src/validate.rs::block_summary` path does not call that predicate. The active validation chain is justification regression, sequence number, block number, pure deploy checks, and repeat-deploy validation.
+
+This does **not** by itself prove a protocol vulnerability. The decisive evidence is the result of the real upstream integration test. Until that test passes on the pinned source, the duplicate-sender case remains a candidate discrepancy.
