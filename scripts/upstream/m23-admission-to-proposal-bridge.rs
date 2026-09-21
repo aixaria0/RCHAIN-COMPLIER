@@ -136,7 +136,7 @@ mod m23_admission_to_proposal_bridge {
             type Shared = Arc<tokio::sync::Mutex<Box<dyn rchain_shared::store::KeyValueStore + Send + Sync>>>;
             let mem = || -> Shared { Arc::new(tokio::sync::Mutex::new(Box::new(InMemoryKeyValueStore::default()))) };
             let metadata_store = Arc::new(
-                rchain_casper::block_metadata_store::BlockMetadataStore::create(
+                super::BlockMetadataStore::create(
                     Arc::new(KeyValueTypedStoreCodec::new(mem(), Arc::new(BlockHashCodec), Arc::new(BlockMetadataCodec)))
                 ).await.unwrap(),
             );
