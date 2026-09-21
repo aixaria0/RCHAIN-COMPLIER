@@ -35,6 +35,6 @@ jobs:
           cp scripts/upstream/m11-6-duplicate-sender-admission.rs \
             upstream-rchain/casper/tests/m11_6_duplicate_sender_admission.rs
 
-      - name: Execute active Casper validation path
+      - name: Execute active Casper validation path (M11.6)
         working-directory: upstream-rchain
         run: cargo test -p rchain-casper --test m11_6_duplicate_sender_admission -- --nocapture
