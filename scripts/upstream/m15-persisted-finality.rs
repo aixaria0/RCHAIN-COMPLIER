@@ -6,6 +6,11 @@
 #[cfg(test)]
 mod m15_persisted_finality_state {
     use super::*;
+    use rchain_block_storage::dag::codecs::{
+        Blake2b256HashCodec, BlockHashCodec, BlockMetadataCodec, FringeDataCodec,
+        SignedDeployDataCodec,
+    };
+    use rchain_shared::typed_store::{BytesCodec, KeyValueTypedStoreCodec};
     use rchain_models::block::state_hash::StateHash;
     use rchain_shared::refined::{BlockHeight, NonNegI64, SeqNum};
 
