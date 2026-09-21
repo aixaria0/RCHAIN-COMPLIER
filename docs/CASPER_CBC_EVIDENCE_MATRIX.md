@@ -27,6 +27,7 @@ Every upstream probe in this matrix checks out that exact revision before inject
 | M18 | Threshold boundary | Exact upstream Finalizer | 2/3 remains non-finalizing; 3/4 finalizes under the same cardinality shape |
 | M19 | Proposal propagation | Real `DagMessageState::create_message` | A subsequent proposal preserves the under-cardinality fringe instead of repairing it |
 | M20 | Fork-sensitive propagation | Real `DagMessageState::create_message` + finality closure | Two locally consistent under-cardinality views can propagate different finalized closures |
+| M21 | Exact invariant differential | Exact upstream `invalid_justification_follows` | The pinned SDK predicate rejects the duplicate-sender witness by sender identity even though the active summary path does not invoke it |
 
 ## Interpretation ladder
 
@@ -54,7 +55,7 @@ Those claims require additional protocol-impact, deployment-version, and compati
 
 ## Research boundary
 
-The M19/M20 downstream probes now establish the first concrete impact boundary:
+The M19/M20 downstream probes now establish the first concrete impact boundary, and M21 pins the missing discriminator to an existing upstream predicate:
 
 ```text
 under-cardinality fringe
@@ -62,6 +63,8 @@ under-cardinality fringe
 subsequent validator proposals
         |
 fork-sensitive finality-state propagation
+        |
+existing sender-set predicate differential
         |
 causally valid adversarial history through full validation?
         |
