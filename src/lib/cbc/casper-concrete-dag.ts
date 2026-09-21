@@ -56,7 +56,6 @@ export function buildConcreteDAG(): ConcreteDagFixture {
  */
 export function buildCausallyValidDAG(): ConcreteDagFixture {
   const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
-  const baseIds = ["g0", "g1", "g2", "g3"];
   const layerOneIds = ["a1", "b1", "c1", "d1"];
   const layerTwoIds = ["a2", "b2", "c2", "d2"];
   const seenThrough = (parents: string[], id: string, allMessages: Map<string, DagMessage>): string[] => {
@@ -95,7 +94,6 @@ export function buildCausallyValidDAG(): ConcreteDagFixture {
     };
     byId.set(id, message);
     message.seen = seenThrough(parents, id, byId);
-    void parent;
     messages.push(message);
   }
 
@@ -211,9 +209,6 @@ export function traceConcreteDAG(fixture: ConcreteDagFixture): ConcreteDagTrace 
     supportObservers[sender] = [...new Set(observers)].sort();
   }
 
-  const fullSupport = bonded.every((sender) =>
-    (supportObservers[sender] ?? []).length === bonded.length,
-  );
   const total = Object.values(fixture.bondsMap).reduce((a, b) => a + b, 0);
   const supportingStake = bonded
     .filter((sender) => (supportObservers[sender] ?? []).length === bonded.length)
