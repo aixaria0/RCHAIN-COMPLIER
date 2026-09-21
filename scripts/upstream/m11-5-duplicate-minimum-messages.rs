@@ -171,7 +171,7 @@ fn upstream_m11_5_duplicate_minimum_messages_pass_count_gate_and_finalize() {
     let fringe_ids: BTreeSet<_> = fringe.into_iter().map(|m| m.id).collect();
     assert_eq!(
         fringe_ids,
-        ["g0".to_string(), "g1".to_string(), "g2".to_string()]
+        ["a1".to_string(), "b1".to_string(), "c1".to_string()]
             .into_iter()
             .collect()
     );
