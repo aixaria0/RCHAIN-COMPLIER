@@ -83,7 +83,7 @@ fn metadata(
     }
 }
 
-fn block(id: BlockHash, sender: Validator, num: i64, seq: i64) -> BlockMessage {
+fn block(id: BlockHash, sender: Validator, num: i64, seq: i64, state_hash: StateHash) -> BlockMessage {
     BlockMessage {
         version: 1,
         shard_id: "root".to_string(),
@@ -91,8 +91,8 @@ fn block(id: BlockHash, sender: Validator, num: i64, seq: i64) -> BlockMessage {
         block_number: BlockHeight::try_from(num).unwrap(),
         sender,
         seq_num: SeqNum::try_from(seq).unwrap(),
-        pre_state_hash: StateHash::new([0u8; 32]),
-        post_state_hash: StateHash::new([0u8; 32]),
+        pre_state_hash: state_hash,
+        post_state_hash: state_hash,
         justifications: Vec::new(),
         bonds: BTreeMap::new(),
         rejected_deploys: BTreeSet::new(),
@@ -198,9 +198,13 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
         .collect::<BTreeMap<_, _>>();
 
     let justifications: BTreeSet<BlockHash> = [a2, a3, b3, c3].into_iter().collect();
+    let runtime = build_runtime_manager().await;
+    let root = runtime.get_history_repo().root();
+    let root_state = StateHash::new(*root.as_bytes());
+
     let blocks = messages
         .values()
-        .map(|m| block(m.id, m.sender, i64::from(m.height), i64::from(m.sender_seq)))
+        .map(|m| block(m.id, m.sender, i64::from(m.height), i64::from(m.sender_seq), root_state))
         .collect::<Vec<_>>();
 
     let empty_fringe = BTreeSet::new();
@@ -208,7 +212,7 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
         fringe_hash: Blake2b256Hash::from_bytes([0u8; 32]),
         fringe: empty_fringe.clone(),
         fringe_diff: BTreeSet::new(),
-        state_hash: Blake2b256Hash::from_bytes([0u8; 32]),
+        state_hash: root,
         rejected_deploys: BTreeSet::new(),
         rejected_blocks: BTreeSet::new(),
         rejected_senders: BTreeSet::new(),
@@ -229,7 +233,6 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
     };
 
     let store = block_store(blocks).await;
-    let runtime = build_runtime_manager().await;
 
     let result = get_pre_state_for_parents(
         &dag,
@@ -248,8 +251,8 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
 
     let expected_fringe: BTreeSet<BlockHash> = [a1, b1, c1].into_iter().collect();
     assert_eq!(result.fringe, expected_fringe);
-    assert_eq!(result.pre_state_hash, Blake2b256Hash::from_bytes([0u8; 32]));
-    assert_eq!(result.fringe_state, Blake2b256Hash::from_bytes([0u8; 32]));
+    assert_eq!(result.pre_state_hash, root);
+    assert_eq!(result.fringe_state, root);
     assert_eq!(result.max_seq_nums.get(&v0), Some(&3));
     assert_eq!(result.max_seq_nums.get(&v1), Some(&3));
     assert_eq!(result.max_seq_nums.get(&v2), Some(&3));
