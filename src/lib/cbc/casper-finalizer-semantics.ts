@@ -37,6 +37,7 @@ export interface CasperFinalizerSemanticsTrace {
  * check_min_messages -> calculate_next_layer ->
  * calculate_next_fringe_support_map -> calculate_fringe.
  *
+ * M11.6 keeps the admission probe separate from this semantic mirror.
  * It intentionally mirrors the observable control/data flow without importing
  * upstream code or pretending to be a consensus implementation.
  */
