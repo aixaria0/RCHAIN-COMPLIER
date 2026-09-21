@@ -14,6 +14,7 @@ export interface CasperMutationSearchResult {
   lowerBound: number;
   minimalWithinMutationModel: boolean;
   essentialMutations: CasperMutation[];
+  finalized: boolean;
 }
 
 /**
@@ -86,9 +87,7 @@ export function searchFinalizingMutation(fixture: ConcreteDagFixture): CasperMut
   const candidate = applyMutations(fixture, mutations);
   const candidateTrace = traceCasperFinalizerSemantics(candidate);
 
-  if (!candidateTrace.checkMinMessagesPassed || !candidateTrace.finalized) {
-    throw new Error("mutation model failed to produce a reachable finalized candidate");
-  }
+  const finalized = candidateTrace.checkMinMessagesPassed && candidateTrace.finalized;
 
   const essentialMutations = mutations.filter((mutation, index) => {
     const reduced = applyMutations(fixture, mutations.filter((_, i) => i !== index));
@@ -103,8 +102,9 @@ export function searchFinalizingMutation(fixture: ConcreteDagFixture): CasperMut
     mutations,
     mutationCount: mutations.length,
     lowerBound,
-    minimalWithinMutationModel: essentialMutations.length === mutations.length && lowerBound === mutations.length,
+    minimalWithinMutationModel: finalized && essentialMutations.length === mutations.length && lowerBound === mutations.length,
     essentialMutations,
+    finalized,
   };
 }
 
