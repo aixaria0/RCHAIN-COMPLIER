@@ -138,3 +138,12 @@ This adapter is an instrumentation boundary, not a protocol implementation. The 
 ## M10 — concrete DAG/message construction
 
 A deterministic nine-message fixture now generates the validator/message sets from explicit sender sequence, parent, seen-set, and justification data. The fixture is intentionally a narrow data-flow model rather than a consensus implementation. It verifies that complete minimum-message coverage and a strict-supermajority stake condition can coexist in a concrete delivery history, making the next step an upstream semantic comparison rather than another synthetic matrix.
+
+
+## M11.1 — constrained adversarial delivery-history search
+
+The semantic lock is now followed by a deterministic mutation search over the concrete nine-message DAG. The mutation model only adds first-layer parents to the four justification messages and adds first-layer visibility of the four next-layer minimum messages.
+
+The search retains the upstream minimum-message gate and looks for a Law-14 finalizing candidate. It finds one with **29 additions**: 13 parent-edge additions and 16 seen-set additions. Each individual addition is essential within this constrained mutation model; removing any one prevents finalization.
+
+The candidate therefore acts as a positive control for the semantic pipeline: the model can reach a fully supported fringe when the delivery history actually contains the required fan-in and visibility structure. This is **not** evidence of a production fragility by itself. The next research step is to minimize the mutation family against the real upstream DAG/message construction and determine whether the same support transition is reachable under the protocol's actual block/message invariants.
