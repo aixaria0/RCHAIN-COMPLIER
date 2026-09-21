@@ -130,7 +130,7 @@ mod m23_admission_to_proposal_bridge {
                 Blake2b256HashCodec, BlockMetadataCodec, FringeDataCodec, SignedDeployDataCodec,
             };
             use rchain_block_storage::dag::dag_storage::DeployId;
-            use rchain_block_storage::dag::BlockDagKeyValueStorage;
+            use super::BlockDagKeyValueStorage;
             use rchain_models::fringe_data::FringeData;
             use rchain_shared::typed_store::{BytesCodec, KeyValueTypedStoreCodec};
             type Shared = Arc<tokio::sync::Mutex<Box<dyn rchain_shared::store::KeyValueStore + Send + Sync>>>;
@@ -171,10 +171,21 @@ mod m23_admission_to_proposal_bridge {
         // Duplicate-sender witness: v0 occurs twice; v3 is absent.
         let duplicate_justifications = vec![a2, a3, b3, c3];
         let store = block_store(vec![
-            block(a2, v0, 2, 2, layer_one.to_vec()),
-            block(a3, v0, 3, 3, layer_two.to_vec()),
-            block(b3, v1, 3, 3, layer_two.to_vec()),
-            block(c3, v2, 3, 3, layer_two.to_vec()),
+            block(g0, v0, 0, 0, vec![]),
+            block(g1, v1, 0, 0, vec![]),
+            block(g2, v2, 0, 0, vec![]),
+            block(g3, v3, 0, 0, vec![]),
+            block(a1, v0, 1, 1, vec![]),
+            block(b1, v1, 1, 1, vec![]),
+            block(c1, v2, 1, 1, vec![]),
+            block(d1, v3, 1, 1, vec![]),
+            block(a2, v0, 2, 2, vec![]),
+            block(b2, v1, 2, 2, vec![]),
+            block(c2, v2, 2, 2, vec![]),
+            block(d2, v3, 2, 2, vec![]),
+            block(a3, v0, 3, 3, vec![]),
+            block(b3, v1, 3, 3, vec![]),
+            block(c3, v2, 3, 3, vec![]),
         ]).await;
         let candidate = block(candidate_id, v0, 4, 4, duplicate_justifications.clone());
 
