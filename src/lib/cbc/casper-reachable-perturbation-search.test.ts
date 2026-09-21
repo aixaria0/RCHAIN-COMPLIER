@@ -5,7 +5,7 @@ import { searchReachableFinalizationFlip } from "./casper-reachable-perturbation
 
 test("M11.3 finds a one-parent reachable finalization flip", () => {
   const results = searchReachableFinalizationFlip(buildCausallyValidDAG());
-  assert.equal(results.length, 3);
+  assert.equal(results.length, 15);
 
   for (const result of results) {
     assert.equal(result.mutationCount, 1);
@@ -23,9 +23,21 @@ test("M11.3 the smallest flips remove one of a3's non-self layer-2 parents", () 
   assert.deepEqual(
     results.map((result) => result.mutation),
     [
+      { messageId: "a2", removedParentId: "b1" },
+      { messageId: "a2", removedParentId: "c1" },
+      { messageId: "a2", removedParentId: "d1" },
       { messageId: "a3", removedParentId: "b2" },
       { messageId: "a3", removedParentId: "c2" },
       { messageId: "a3", removedParentId: "d2" },
+      { messageId: "b2", removedParentId: "a1" },
+      { messageId: "b2", removedParentId: "c1" },
+      { messageId: "b2", removedParentId: "d1" },
+      { messageId: "c2", removedParentId: "a1" },
+      { messageId: "c2", removedParentId: "b1" },
+      { messageId: "c2", removedParentId: "d1" },
+      { messageId: "d2", removedParentId: "a1" },
+      { messageId: "d2", removedParentId: "b1" },
+      { messageId: "d2", removedParentId: "c1" }
     ],
   );
 });
