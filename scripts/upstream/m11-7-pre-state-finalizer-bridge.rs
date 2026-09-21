@@ -11,6 +11,7 @@ use rchain_block_storage::dag::message_state::DagMessageState;
 use rchain_block_storage::dag::representation::DagRepresentation;
 use rchain_casper::merging::BlockIndex;
 use rchain_casper::multi_parent_casper::get_pre_state_for_parents;
+use rchain_casper::interpreter_util::validate_block_checkpoint;
 use rchain_models::block_hash::BlockHash;
 use rchain_models::block_metadata::BlockMetadata;
 use rchain_models::block::state_hash::StateHash;
@@ -257,4 +258,27 @@ async fn m11_7_real_pre_state_path_advances_the_upstream_finalizer() {
     assert_eq!(result.max_seq_nums.get(&v1), Some(&3));
     assert_eq!(result.max_seq_nums.get(&v2), Some(&3));
     assert!(result.justifications.len() == 4);
+
+    let mut candidate = block(hash(100), v0, 4, 4, root_state);
+    candidate.justifications = vec![a2, a3, b3, c3];
+
+    let (candidate_meta, validation) = validate_block_checkpoint(
+        &runtime,
+        &dag,
+        &store,
+        &candidate,
+        &|block_hash| async move {
+            Ok(BlockIndex {
+                block_hash,
+                deploy_chains: Vec::new(),
+            })
+        },
+    )
+    .await
+    .expect("real validate_block_checkpoint path should complete");
+
+    assert_eq!(validation, Ok(true));
+    assert!(!candidate_meta.validation_failed);
+    assert_eq!(candidate_meta.fringe, expected_fringe);
+    assert_eq!(candidate_meta.fringe_state_hash, StateHash::new(*root.as_bytes()));
 }
