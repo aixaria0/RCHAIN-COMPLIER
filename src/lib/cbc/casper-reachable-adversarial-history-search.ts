@@ -148,8 +148,8 @@ function computeReport(): M27SearchReport {
     .slice(0, 12);
 
   const reportBody = {
-    milestone: "M27",
-    upstreamRevision: "rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b",
+    milestone: "M27" as const,
+    upstreamRevision: "rchain-community/rchain-rust@d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b" as const,
     searchSpace: {
       sourceJustificationPool: [...TOP_LAYER],
       candidateCount: candidates.length,
