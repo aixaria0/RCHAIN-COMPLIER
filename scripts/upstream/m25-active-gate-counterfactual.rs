@@ -29,7 +29,6 @@ mod m25_active_gate_counterfactual {
     use rchain_shared::refined::{BlockHeight, NonNegI64, SeqNum};
     use rchain_shared::store::InMemoryKeyValueStore;
     use rchain_shared::typed_store::KeyValueTypedStoreCodec;
-    use std::sync::Arc as StdArc;
 
     struct MockDag {
         representation: DagRepresentation,
@@ -129,7 +128,7 @@ mod m25_active_gate_counterfactual {
             pre_state_hash: StateHash::new([1u8; 32]),
             post_state_hash: StateHash::new([2u8; 32]),
             justifications,
-            bonds: BTreeMap::new(),
+            bonds: bonds(),
             rejected_deploys: BTreeSet::new(),
             rejected_blocks: BTreeSet::new(),
             rejected_senders: BTreeSet::new(),
@@ -222,31 +221,46 @@ mod m25_active_gate_counterfactual {
             metadata: metadata_map,
         };
 
-        let parent_blocks = entries
-            .iter()
-            .map(|(id, sender, seq)| block(*id, *sender, *seq, vec![]))
-            .collect::<Vec<_>>();
         let store = block_store(parent_blocks).await;
+
+        let j4 = hash(14);
+
+        let j4_message = parent_message(j4, v3);
+        let j4_meta = metadata(j4, v3, 1);
+
+        let mut dag = dag;
+        dag.representation.dag_message_state.msg_map.insert(j4, j4_message);
+        dag.representation.dag_set.insert(j4);
+        dag.metadata.insert(j4, j4_meta);
+
+        let parent_blocks = vec![
+            block(j0, v0, 1, vec![]),
+            block(j1, v0, 2, vec![]),
+            block(j2, v1, 1, vec![]),
+            block(j3, v2, 1, vec![]),
+            block(j4, v3, 1, vec![]),
+            block(jx, vx, 1, vec![]),
+        ];
 
         let duplicate_missing = block(
             hash(20),
-            v3,
-            2,
+            v0,
+            3,
             vec![j0, j1, j2, j3],
         );
 
         let valid_control = block(
             hash(21),
-            v3,
-            2,
-            vec![j0, j2, j3, jx],
+            v0,
+            3,
+            vec![j0, j2, j3, j4],
         );
 
         let nonbonded_replacement = block(
             hash(22),
-            v3,
-            2,
-            vec![j0, j2, jx, j3],
+            v0,
+            3,
+            vec![j0, j2, j3, jx],
         );
 
         let current_duplicate = block_summary(&dag, &store, &duplicate_missing, "root", 50, 0)
@@ -278,8 +292,8 @@ mod m25_active_gate_counterfactual {
 
         // Reordering cannot change the sender set, so the same control remains valid.
         assert!(
-            sender_coverage_ok(&dag, &nonbonded_replacement).await.unwrap(),
-            "this control deliberately contains all four distinct bonded senders"
+            !sender_coverage_ok(&dag, &nonbonded_replacement).await.unwrap(),
+            "non-bonded replacement must fail sender-set coverage"
         );
     }
 }
