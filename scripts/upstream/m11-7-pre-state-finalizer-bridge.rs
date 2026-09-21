@@ -42,7 +42,7 @@ fn message(
 ) -> Message<BlockHash, Validator> {
     Message {
         id,
-        height: BlockHeight::zero(),
+        height: BlockHeight::try_from(seq).unwrap(),
         sender,
         sender_seq: SeqNum::try_from(seq).unwrap(),
         bonds_map: BTreeMap::from([
