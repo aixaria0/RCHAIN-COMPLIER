@@ -111,6 +111,16 @@ The resulting upstream workflow passed with:
 1 passed; 0 failed
 ~~~
 
+## M19 — downstream proposal propagation
+
+M19 executes the real `DagMessageState::create_message` path with four bonded justifications carrying a three-member persisted fringe. With no newer finalization detected, the normal proposer construction preserves the parent fringe unchanged. The under-cardinality state is therefore not repaired at proposal construction.
+
+## M20 — fork-sensitive propagation
+
+M20 supplies two locally consistent views with complete four-sender justification coverage but different three-member fringes. The real proposal path preserves each fringe, and the resulting seen-closures differ: one view finalizes branch `v2`, the other branch `v3`.
+
+This is the first concrete downstream state-selection consequence in the chain. It remains deliberately narrower than a live-network safety claim: the two views are supplied as different local histories, and the probe does not yet prove that an adversary can connect them into a causally valid conflicting-finality execution.
+
 ## What this establishes
 
 The strongest defensible statement at this stage is:
@@ -144,7 +154,7 @@ count(distinct senders in minimumMessages)
     == count(distinct bonded validators)
 ~~~
 
-That is a research hypothesis, not a patch recommendation.
+That is an impact-characterization question, not a patch recommendation.
 
 ## Primary reproduction artifacts
 
