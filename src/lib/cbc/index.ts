@@ -13,3 +13,4 @@ export * from "./casper-upstream-gate.ts";
 export * from "./casper-upstream-adapter.ts";
 export * from "./casper-concrete-dag.ts";
 export * from "./casper-finalizer-semantics.ts";
+export * from "./casper-adversarial-search.ts";
