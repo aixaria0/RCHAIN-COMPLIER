@@ -41,7 +41,7 @@ export function searchReachableFinalizationFlip(
       const candidateTrace = traceCasperFinalizerSemantics(candidate);
       if (
         candidateTrace.checkMinMessagesPassed &&
-        candidateTrace.messageCoverage &&
+        candidateTrace.distinctMinimumMessageCoverage &&
         !candidateTrace.finalized
       ) {
         candidates.push({
@@ -72,7 +72,7 @@ function removeParentAndRecomputeSeen(
     parents: message.id === messageId
       ? message.parents.filter((id) => id !== parentId)
       : [...message.parents],
-    seen: [],
+    seen: [] as string[],
   }));
 
   const byId = new Map(messages.map((message) => [message.id, message]));
