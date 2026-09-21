@@ -56,29 +56,67 @@ export function buildConcreteDAG(): ConcreteDagFixture {
  */
 export function buildCausallyValidDAG(): ConcreteDagFixture {
   const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
+  const baseIds = ["g0", "g1", "g2", "g3"];
   const layerOneIds = ["a1", "b1", "c1", "d1"];
   const layerTwoIds = ["a2", "b2", "c2", "d2"];
-  const layerOneSeen = (id: string) => ["g", id];
-  const layerTwoSeen = (id: string) => ["g", ...layerOneIds, id];
-  const layerThreeSeen = (id: string) => ["g", ...layerOneIds, ...layerTwoIds, id];
+  const seenThrough = (parents: string[], id: string, allMessages: Map<string, DagMessage>): string[] => {
+    const seen = new Set<string>([id]);
+    for (const parentId of parents) {
+      for (const seenId of allMessages.get(parentId)?.seen ?? []) seen.add(seenId);
+    }
+    return [...seen].sort();
+  };
+
   const messages: DagMessage[] = [
-    { id: "g", sender: "v4", senderSeq: 0, parents: [], seen: ["g"] },
-
-    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g"], seen: layerOneSeen("a1") },
-    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g"], seen: layerOneSeen("b1") },
-    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g"], seen: layerOneSeen("c1") },
-    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g"], seen: layerOneSeen("d1") },
-
-    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("a2") },
-    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("b2") },
-    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("c2") },
-    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("d2") },
-
-    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("a3") },
-    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("b3") },
-    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("c3") },
-    { id: "d3", sender: "v3", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("d3") },
+    { id: "g0", sender: "v0", senderSeq: 0, parents: [], seen: ["g0"] },
+    { id: "g1", sender: "v1", senderSeq: 0, parents: [], seen: ["g1"] },
+    { id: "g2", sender: "v2", senderSeq: 0, parents: [], seen: ["g2"] },
+    { id: "g3", sender: "v3", senderSeq: 0, parents: [], seen: ["g3"] },
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g0"], seen: ["a1", "g0"] },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g1"], seen: ["b1", "g1"] },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g2"], seen: ["c1", "g2"] },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g3"], seen: ["d1", "g3"] },
   ];
+  const byId = new Map(messages.map((message) => [message.id, message]));
+
+  for (const [id, sender, parent] of [
+    ["a2", "v0", "a1"],
+    ["b2", "v1", "b1"],
+    ["c2", "v2", "c1"],
+    ["d2", "v3", "d1"],
+  ] as const) {
+    const parents = [...layerOneIds];
+    const message: DagMessage = {
+      id,
+      sender,
+      senderSeq: 2,
+      parents,
+      seen: [],
+    };
+    byId.set(id, message);
+    message.seen = seenThrough(parents, id, byId);
+    void parent;
+    messages.push(message);
+  }
+
+  for (const [id, sender] of [
+    ["a3", "v0"],
+    ["b3", "v1"],
+    ["c3", "v2"],
+    ["d3", "v3"],
+  ] as const) {
+    const parents = [...layerTwoIds];
+    const message: DagMessage = {
+      id,
+      sender,
+      senderSeq: 3,
+      parents,
+      seen: [],
+    };
+    byId.set(id, message);
+    message.seen = seenThrough(parents, id, byId);
+    messages.push(message);
+  }
 
   return {
     bondsMap,
@@ -99,26 +137,34 @@ export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
   const bondsMap = { v0: 70, v1: 10, v2: 10, v3: 10 };
   const layerOneIds = ["a1", "b1", "c1", "d1"];
   const layerTwoIds = ["a2", "b2", "c2", "d2"];
-  const layerOneSeen = (id: string) => ["g", id];
-  const layerTwoSeen = (id: string) => ["g", ...layerOneIds, id];
-  const layerThreeSeen = (id: string) => ["g", ...layerOneIds, ...layerTwoIds, id];
   const messages: DagMessage[] = [
-    { id: "g", sender: "v4", senderSeq: 0, parents: [], seen: ["g"] },
+    { id: "g0", sender: "v0", senderSeq: 0, parents: [], seen: ["g0"] },
+    { id: "g1", sender: "v1", senderSeq: 0, parents: [], seen: ["g1"] },
+    { id: "g2", sender: "v2", senderSeq: 0, parents: [], seen: ["g2"] },
+    { id: "g3", sender: "v3", senderSeq: 0, parents: [], seen: ["g3"] },
 
-    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g"], seen: layerOneSeen("a1") },
-    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g"], seen: layerOneSeen("b1") },
-    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g"], seen: layerOneSeen("c1") },
-    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g"], seen: layerOneSeen("d1") },
+    { id: "a1", sender: "v0", senderSeq: 1, parents: ["g0"], seen: ["a1", "g0"] },
+    { id: "b1", sender: "v1", senderSeq: 1, parents: ["g1"], seen: ["b1", "g1"] },
+    { id: "c1", sender: "v2", senderSeq: 1, parents: ["g2"], seen: ["c1", "g2"] },
+    { id: "d1", sender: "v3", senderSeq: 1, parents: ["g3"], seen: ["d1", "g3"] },
 
-    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("a2") },
-    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("b2") },
-    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("c2") },
-    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: layerTwoSeen("d2") },
-
-    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("a3") },
-    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("b3") },
-    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: layerThreeSeen("c3") },
+    { id: "a2", sender: "v0", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "b2", sender: "v1", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "c2", sender: "v2", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "d2", sender: "v3", senderSeq: 2, parents: layerOneIds, seen: [] },
+    { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: [] },
+    { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: [] },
+    { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: [] },
   ];
+  const byId = new Map(messages.map((message) => [message.id, message]));
+  for (const id of [...layerTwoIds, "a3", "b3", "c3"]) {
+    const message = byId.get(id)!;
+    const seen = new Set<string>([id]);
+    for (const parentId of message.parents) {
+      for (const seenId of byId.get(parentId)?.seen ?? []) seen.add(seenId);
+    }
+    message.seen = [...seen].sort();
+  }
 
   return {
     bondsMap,
@@ -126,6 +172,7 @@ export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
     justifications: ["a2", "a3", "b3", "c3"],
   };
 }
+
 
 function ancestors(id: string, byId: Map<string, DagMessage>): Set<string> {
   const out = new Set<string>();
