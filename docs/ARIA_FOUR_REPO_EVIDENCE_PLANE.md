@@ -17,7 +17,7 @@ Each CI matrix worker checks out the **actual corresponding source repository** 
 
 The canonical SHA-256 identifies the bytes in each record; it is **not a digital signature** or a claim of trusted hardware attestation. GitHub Actions and GitHub-hosted artifact retention provide the run context. Pinned commits can become obsolete: update pins intentionally, then rerun all four.
 
-## Current architecture / next end-to-end integration
+## Open the actual evidence dashboard\n\nIn the completed GitHub Actions run **Aria four-repository source evidence**, download the `four-repo-bundle` artifact and open `four-repo-dashboard.html` locally (tablet browser supported). The HTML is generated **only after** all four pinned source tests and evidence integrity checks pass. It displays each source/test scope, exact SHA, output fingerprints and Cargo dependency-lock status. Keep `four-repo-bundle.json` and the four `component-*` artifacts with the dashboard to audit underlying logs. This is a static CI report, not a live network dashboard or cross-protocol compatibility result.\n\n## Current architecture / next end-to-end integration
 
 ```text
 RCHAIN-COMPLIER CBC scenario + upstream witness    [real code; synthetic fixture]
