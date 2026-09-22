@@ -26,7 +26,7 @@ class ComparisonDashboardTests(unittest.TestCase):
             self.assertIn(pin, page)
         self.assertIn("No differences in these six observed fields.", page)
         self.assertIn("does not establish block validation, finality, or an exploit", page)
-        self.assertIn("source-level CBC Finalizer", page.lower().replace("source-level cbc finalizer", "source-level CBC Finalizer"))
+        self.assertIn("The same temporary Rust test", page)
 
     def test_descriptive_differential_does_not_rank_forks(self):
         self.mock.write_target("nzpr", duplicate_gate=False)
