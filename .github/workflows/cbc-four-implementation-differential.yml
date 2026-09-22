@@ -319,6 +319,7 @@ jobs:
         run: |
           python tools/render_cbc_four_fork_comparison.py \
             --report cbc-four-implementation-differential.json \
+            --identity cbc-m27-first-semantic-divergence.json \
             --output cbc-four-implementation-differential.html
       - uses: actions/upload-artifact@v4
         with:
