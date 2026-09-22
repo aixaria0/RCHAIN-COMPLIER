@@ -72,6 +72,7 @@ jobs:
           python-version: '3.11'
       - run: python -m unittest discover -s tests/fork_drift -p 'test_*cbc_four_fork_comparison.py' -v
       - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_compare.py -v
+      - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_causal_compare.py -v
       - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/cbc_cross_fork_causal_probe.py tools/cbc_cross_fork_causal_compare.py tools/render_cbc_four_fork_comparison.py
 
   compare:
