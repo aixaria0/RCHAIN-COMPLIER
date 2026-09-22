@@ -25,11 +25,17 @@ class FourRepoEvidenceTests(unittest.TestCase):
 
     def record(self, component, exit_code=0):
         source = module.SOURCES[component]
+        if "lockfile" in source:
+            lock_path = self.source / source["lockfile"]
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            lock_path.write_bytes(b"source-lock")
         def fake_run(args, **kwargs):
             if args == ["git", "rev-parse", "HEAD"]:
                 return subprocess.CompletedProcess(args, 0, source["sha"] + "\n", "")
             self.assertEqual(args, source["command"])
             self.assertEqual(kwargs["cwd"], self.source.resolve())
+            if "lockfile" in source:
+                (self.source / source["lockfile"]).write_bytes(b"effective-lock")
             return subprocess.CompletedProcess(args, exit_code, b"real test output", b"")
         with patch.object(module.subprocess, "run", side_effect=fake_run):
             return module.capture(component, self.source,
@@ -71,6 +77,13 @@ class FourRepoEvidenceTests(unittest.TestCase):
         path.write_text(json.dumps(module.sealed({k: v for k, v in record.items()
                                                    if k != "record_sha256"})))
         with self.assertRaisesRegex(ValueError, "Wrong source_sha"):
+            module.combine(self.artifacts, self.root / "bundle.json")
+
+    def test_tampered_lockfile_fails_closed(self):
+        self.four_records()
+        path = self.artifacts / "component-lattice" / "effective-Cargo.lock"
+        path.write_bytes(b"substituted-lock")
+        with self.assertRaisesRegex(ValueError, "Tampered dependency lockfile"):
             module.combine(self.artifacts, self.root / "bundle.json")
 
     def test_failed_test_is_rejected(self):
