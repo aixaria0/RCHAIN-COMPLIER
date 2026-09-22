@@ -29,7 +29,7 @@ async function fixture() {
     payloadSha256: digest,
     report: {
       digest: "b".repeat(64),
-      minimalFinalizingWitnesses: [{ minimumMessageSenders: senderIds }],
+      minimalFinalizingWitnesses: [{ justifications: ["a3", "a3", "c3", "d3"], minimumMessageSenders: senderIds }],
     },
   };
   const three = {
@@ -98,6 +98,10 @@ test("four-source bound evidence passes only with all four sources and explicit 
     const result = await verifyFourRepoBundle(f.bundleFile, f.bridgeDir);
     assert.equal(result.sourceTestsPassed, 4);
     assert.equal(result.externalWitnessConsumers, 3);
+    assert.deepEqual(result.selectedM27MessageIds, ["a3", "a3", "c3", "d3"]);
+    assert.equal(result.selectedM27UniqueMessageIds, 3);
+    assert.equal(result.selectedM27FourDistinctIdsRepresentable, false);
+    assert.equal(result.selectedM27RealFinalizerFinalityIndependentlyReplayed, false);
     assert.equal(result.independentlyVerifiedCasperFinality, false);
     assert.equal(result.liveNetwork, false);
   } finally { await rm(f.dir, { recursive: true, force: true }); }
