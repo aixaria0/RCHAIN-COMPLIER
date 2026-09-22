@@ -14,7 +14,7 @@ from cbc_cross_fork_probe import TARGETS, canonical, sha
 from cbc_cross_fork_compare import RESULT_SCHEMA
 
 
-def render(report):
+def render(report, identity=None):
     if not isinstance(report, dict) or report.get("schema") != RESULT_SCHEMA:
         raise ValueError("Unknown comparative evidence schema")
     expected_digest = report.get("reportSha256")
@@ -87,6 +87,61 @@ def render(report):
     differences = report["observedDifferingFields"]
     comparison = ("No differences in these six observed fields." if not differences
                   else "Different observed fields: " + ", ".join(differences))
+    identity_html = ""
+    if identity is not None:
+        if not isinstance(identity, dict) or identity.get("schema") != "aria-cbc-m27-first-semantic-divergence/v1":
+            raise ValueError("Unknown identity-realizability report schema")
+        original = {key: value for key, value in identity.items() if key != "reportSha256"}
+        if identity.get("reportSha256") != sha(canonical(original)):
+            raise ValueError("Identity-realizability digest mismatch")
+        if identity.get("sourceReportFixtureSha256") != witness:
+            raise ValueError("Identity-realizability input differs from observed comparison")
+        identities = identity.get("firstSelectedSourceIds")
+        divergence = identity.get("firstDivergence")
+        if not isinstance(identities, list) or len(identities) != 4 or not isinstance(divergence, dict):
+            raise ValueError("Missing source-reported M27 identities")
+        per_implementation = identity.get("fourImplementations")
+        if not isinstance(per_implementation, list) or len(per_implementation) != len(TARGETS):
+            raise ValueError("Missing actual Rust identity audits")
+        by_target = {}
+        for item in per_implementation:
+            target = item.get("target")
+            if target not in TARGETS or target in by_target:
+                raise ValueError("Duplicate/unknown identity audit")
+            if item.get("source_sha") != TARGETS[target][1] or item.get("exit_code") != 0:
+                raise ValueError("Identity audit source mismatch or failed Rust test")
+            if item.get("fixture_sha256") != witness:
+                raise ValueError("Identity audit input mismatch")
+            by_target[target] = item.get("observation")
+        if set(by_target) != set(TARGETS):
+            raise ValueError("Not all four actual Rust identity audits present")
+        unique = len(set(identities))
+        if identity.get("actualUniqueMessageIds") != unique:
+            raise ValueError("Unmatched source-reported identity count")
+        representable = unique == 4
+        for obs in by_target.values():
+            if (not isinstance(obs, dict) or obs.get("unique_message_ids") != unique
+                    or obs.get("tuple_entries") != 4
+                    or obs.get("representable_as_four_unique_ids") is not representable
+                    or obs.get("post_set_count_gate") is not representable):
+                raise ValueError("Identity audit observation is inconsistent")
+        ids = escape(", ".join(identities))
+        evidence_label = ("SELECTED M27 TUPLE NOT DIRECTLY REPLAYABLE AS FOUR UNIQUE IDS"
+                          if not representable else "FOUR UNIQUE IDS; FURTHER REPLAY VALIDATION NEEDED")
+        identity_html = (
+            '<section class="card notice"><h2>First semantic divergence: M27 identity → Rust Finalizer set</h2>'
+            '<p><strong>' + evidence_label + '</strong></p>'
+            '<p>Original first witness IDs: <code>' + ids + '</code>. '
+            'Ordered research tuple: 4 entries; unique message IDs after the actual Rust '
+            'justification-set boundary: ' + str(unique) + '.</p>'
+            '<p>Every pinned implementation ran the same identity audit. This finding does '
+            'not invalidate the separately constructed M11.5 case, and it does not establish '
+            'a live-network exploit or finality violation.</p>'
+            '<p><strong>Next acceptance gate:</strong> construct and independently replay '
+            'a four-DISTINCT-ID, three-sender causally valid witness through real block ingress '
+            'before attributing the selected M27 tuple’s modeled finality result to deployed Rust.</p>'
+            '</section>'
+        )
     return """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Aria | CBC Four-Implementation Differential</title>
@@ -109,7 +164,7 @@ strong{color:#fff}.notice{border-left:4px solid #efc36f;padding-left:15px}
 <p>""" + escape(comparison) + """</p>
 <div class="tablewrap"><table><thead><tr><th scope="col">Measured field</th>""" + headers + """<th scope="col">Across sources</th></tr></thead><tbody>""" + "\n".join(rows) + """</tbody></table></div>
 <p class="muted">An accepted four-entry count gate with three distinct bonded senders is an observed admission-gate behavior; it does not establish block validation, finality, or an exploit.</p></section>
-<section class="card"><h2>Exact code snapshots</h2><ul>""" + "\n".join(source_cards) + """</ul>
+""" + identity_html + """<section class="card"><h2>Exact code snapshots</h2><ul>""" + "\n".join(source_cards) + """</ul>
 <p>Identical input transport SHA-256: <code>""" + escape(witness) + """</code><br>
 Identical injected test SHA-256: <code>""" + escape(report["identicalInjectedProbeSha256"]) + """</code><br>
 Report SHA-256: <code>""" + escape(expected_digest) + """</code></p></section>
@@ -123,9 +178,11 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--report", required=True)
     p.add_argument("--output", required=True)
+    p.add_argument("--identity", help="Verified four-implementation M27 ID-realizability JSON")
     a = p.parse_args()
     value = json.loads(Path(a.report).read_text(encoding="utf-8"))
-    page = render(value)
+    identity = json.loads(Path(a.identity).read_text(encoding="utf-8")) if a.identity else None
+    page = render(value, identity)
     target = Path(a.output)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(page, encoding="utf-8")
