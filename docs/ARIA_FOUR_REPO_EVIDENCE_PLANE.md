@@ -8,7 +8,7 @@ Turn four separate codebases into a **measurable, revision-pinned integration pl
 
 | Component | Pinned source | Executed code | Evidence scope |
 | --- | --- | --- | --- |
-| [RCHAIN-COMPLIER](https://github.com/aixaria0/RCHAIN-COMPLIER) | `db2421cc482bb05770e009d88e31524b287ed214` | `src/lib/cbc/cbc-simulator.test.ts` | Synthetic deterministic Casper CBC replay, partition/equivocation fixtures |
+| [RCHAIN-COMPLIER](https://github.com/aixaria0/RCHAIN-COMPLIER) | `2d2c3d879b1a078693c8551385efb54a811d7172` (read-only PR #16 HEAD) | CBC simulator + M26 upstream-anchored replay + M27 bounded witness search tests | Synthetic CBC scenarios, observed pinned-revision semantics, bounded minimal-witness regression; **not** live network evidence |
 | [rlsenti](https://github.com/aixaria0/rlsenti) | `00e1ed1b30a1779f72c59c0505467da60080a365` | `src/lib/compiler/compiler.test.ts` | Deterministic execution, provenance, adversarial mutation model |
 | [Sovereign-Lattice](https://github.com/aixaria0/Sovereign-Lattice) | `e141e89e5ff158c0eba375448b8839bf7859fef5` | `rust_engine/tests/adversarial_scheduler.rs` | Independent PBFT input and quorum bounds; **not** RChain Casper CBC |
 | [rchain-sentinel](https://github.com/aixaria0/rchain-sentinel) | `88250ff7ec2789a3c709c7e2991233e6dd244c4b` | `backend/src/casper_evidence.rs` tests | RNode-style Casper evidence inventory; **not** independent stake-weighted finality |
