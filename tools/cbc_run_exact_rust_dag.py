@@ -58,8 +58,8 @@ def execute(target, checkout, packet_path, test_source_path, out_dir):
     source = Path(test_source_path).read_bytes()
     if packet.get("rustReplayVerified") is not False or packet.get("wireIngressVerified") is not False:
         raise ValueError("Source-model packet elevates unverified claims")
-    if sha(source) not in [sha(source)] or not source:
-        raise ValueError("Empty source test")
+    if not source or b"fn aria_exact_source_dag_finalizer_observation()" not in source:
+        raise ValueError("Missing generated exact-DAG Rust integration test")
     sha_response = subprocess.run(["git", "rev-parse", "HEAD"], cwd=checkout,
                                   check=True, text=True, capture_output=True, timeout=20)
     if sha_response.stdout.strip() != pin:
