@@ -38,6 +38,16 @@ This is a shared **count-only gate behavior under the specific reduced local tes
 
 The workflow also publishes `cbc-four-implementation-differential.html` for offline, mobile-friendly inspection alongside the JSON, exact test source, raw logs and retained local source/lockfile snapshots.
 
+## Second independent same-source test: original M11.5 constructed causal DAG
+
+The successful four-way workflow run [#35792755741](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/35792755741) additionally checked out the **original read-only M11.5 Rust integration test** from `aixaria0/RCHAIN-COMPLIER@2d2c3d879b1a078693c8551385efb54a811d7172`, preserving its test-source SHA-256 `4f1a336988259a201940155fe28b067263cfd92743c491a4ed55635eae0faaa0`. The exact same source file, unmodified, ran on each of the four pinned Rust Finalizer implementations.
+
+All four actual Rust test invocations **passed the original constructed multi-layer DAG assertions**: four minimum-message entries with two distinct messages from v0, only three represented bonded senders, acceptance by the tested count gate, a three-sender next layer and an advancing locally computed fringe. The four outputs are independently retained as `causal-*` artifacts and checked by a fail-closed aggregator; `cbc-four-implementation-causal-m11.json` is published alongside the first reduced-fixture comparison and the offline dashboard.
+
+**Do not conflate the two experiments.** The first imports the first bounded M27 source-reported sender shape (`v0,v0,v2,v3`) into a *reduced four-message local DAG* and does **not** advance fringe. The second uses the separately authored **M11.5 multi-layer causal DAG** (two distinct v0 messages, v1 and v2 present, v3 absent) and its own fixture-specific fringe assertion. Passing M11.5 does **not** establish the exact first M27 candidate was replayed, that a live RNode accepted the constructed case, or that conflicting finality exists.
+
+This adds a source-backed, multi-layer differential regression to the research evidence: all four tested snapshots exhibit the original M11.5 behavior, **not** an observed quality or security ranking among their maintainers.
+
 ## What this does — and does not — establish
 
 The sender labels come from a source-reported **bounded M27 reachable/finalizing witness**, but the four-message, empty-parent **local DAG constructed for this comparison is not that causal DAG**. The imported sender *shape* can characterize an admission-gate behavior across four real codebases; it cannot transfer M27's finality conclusion, prove remote exploitability, or establish causality from partitions/equivocation. Even a positive `check_min_messages` result is not block-receiver ingress, full validation, finality, or protocol safety.
