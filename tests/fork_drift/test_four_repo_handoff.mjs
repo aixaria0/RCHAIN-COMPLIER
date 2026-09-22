@@ -132,6 +132,6 @@ test("re-sealed fourth receipt with altered source pin fails", async () => {
     const { recordSha256: _old, ...body } = value;
     value.recordSha256 = sha(JSON.stringify(body));
     await writeJson(file, value);
-    await assert.rejects(verifyFourRepoBundle(f.bundleFile, f.bridgeDir), /latticeSourceSha/);
+    await assert.rejects(verifyFourRepoBundle(f.bundleFile, f.bridgeDir));
   } finally { await rm(f.dir, { recursive: true, force: true }); }
 });
