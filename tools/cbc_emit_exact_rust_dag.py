@@ -37,7 +37,7 @@ def check(packet):
         raise ValueError("Source DAG integrity mismatch")
     if graph["justifications"] != packet["selectedJustificationIds"]:
         raise ValueError("Selected IDs do not match the source DAG")
-    if len(graph["justifications"]) != len(set(graph["justifications"])) != 4:
+    if len(graph["justifications"]) != 4 or len(set(graph["justifications"])) != 4:
         raise ValueError("Four distinct IDs required")
     messages = graph["messages"]
     ids = {x["id"] for x in messages}
