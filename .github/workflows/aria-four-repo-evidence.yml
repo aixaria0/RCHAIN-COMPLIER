@@ -6,6 +6,7 @@ on:
     paths:
       - tools/four_repo_evidence.py
       - tools/cbc_workbench_bridge.mjs
+      - tools/verify_cbc_sentinel_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
@@ -14,6 +15,7 @@ on:
     paths:
       - tools/four_repo_evidence.py
       - tools/cbc_workbench_bridge.mjs
+      - tools/verify_cbc_sentinel_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
@@ -54,7 +56,7 @@ jobs:
             sha: e141e89e5ff158c0eba375448b8839bf7859fef5
           - component: sentinel
             repository: aixaria0/rchain-sentinel
-            sha: 88250ff7ec2789a3c709c7e2991233e6dd244c4b
+            sha: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
     steps:
       - name: Checkout evidence orchestrator
         uses: actions/checkout@v4
@@ -128,7 +130,7 @@ jobs:
   cbc-workbench-bridge:
     name: Transfer real pinned M27 witness into RLSenti
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,6 +148,12 @@ jobs:
           ref: 46a38c443e5904d7d485519d8ea348a442c010c1
           path: workbench
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/rchain-sentinel
+          ref: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
+          path: sentinel
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -153,6 +161,21 @@ jobs:
         run: |
           node --experimental-strip-types orchestrator/tools/cbc_workbench_bridge.mjs \
             --cbc-dir cbc --workbench-dir workbench --out-dir bridge
+      - name: Configure Rust for independently compiled Sentinel inspector
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Preserve original and resolved Cargo dependency graph
+        run: cp sentinel/backend/Cargo.lock bridge/sentinel-source-Cargo.lock
+      - name: Inspect same real witness with pinned Sentinel Rust source
+        run: |
+          cargo run --manifest-path sentinel/backend/Cargo.toml --bin cbc_witness_inspect -- \
+            bridge/cbc-m27-witness.json > bridge/sentinel-witness-observation.json
+          cp sentinel/backend/Cargo.lock bridge/sentinel-effective-Cargo.lock
+      - name: Match CBC, Workbench and Sentinel revision-bound observation
+        run: |
+          node orchestrator/tools/verify_cbc_sentinel_bridge.mjs \
+            --sentinel-dir sentinel --evidence-dir bridge
       - uses: actions/upload-artifact@v4
         if: always()
         with:
