@@ -7,7 +7,8 @@
  */
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { runFromPinnedSource, SOURCE_SHA, SCHEMA, canonical, digest } from "./cbc_distinct_message_census.mjs";
 
 export const PACKET_SCHEMA = "aria-cbc-distinct-id-rust-replay-input/v1";
