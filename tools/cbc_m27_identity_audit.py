@@ -24,11 +24,13 @@ SENDER_BY_ID = {"a3": "v0", "b3": "v1", "c3": "v2", "d3": "v3"}
 
 
 def audit_fixture(fixture):
-    senders = validated_fixture(fixture)
     ids = fixture["justifications"]
-    if len(ids) != 4 or any(SENDER_BY_ID.get(key) != sender
-                            for key, sender in zip(ids, senders)):
+    claimed_senders = fixture["senderIds"]
+    if len(ids) != 4 or len(claimed_senders) != 4 or any(
+            SENDER_BY_ID.get(key) != sender
+            for key, sender in zip(ids, claimed_senders)):
         raise ValueError("M27 ID/sender mapping mismatch")
+    senders = validated_fixture(fixture)
     unique = len(set(ids))
     if unique != len(set(senders)):
         raise ValueError("M27 fixture maps identities inconsistently")
