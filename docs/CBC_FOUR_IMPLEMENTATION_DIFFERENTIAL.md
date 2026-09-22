@@ -21,6 +21,23 @@ Pins are historical snapshots, **not promises about current heads**. The upstrea
 4. The fan-in validates **all four exact commits**, the one fixture digest, one test-source digest, four actual Rust observation markers, test exit codes, original and effective source and Cargo locks, full stdout/stderr hashes and recorded command. Missing/failed/tampered/foreign evidence blocks publishing.
 5. The JSON report lists the actual output of every target per field, identifies observed identical or differing fields, and describes any count-vs-distinct sender mismatch **within each reduced fixture** without an overall score, ranking, exploit claim or presupposed winner.
 
+## First four-source measured result
+
+The successful four-target CI run [#35790959201](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/35790959201) executed the same generated input (`8bb58e8eb36af5f4b5c78e40dcfec0d27982f279b21bef461dea226b73decf79`) in the four pinned Rust checkout test targets. Its published comparison reported **zero observed differences among six bounded fields**:
+
+| Source-level observation | community | shplarggle | nzpr | bill_kunj |
+| --- | --- | --- | --- | --- |
+| Control: count gate (4 entries / 4 senders) | true | true | true | true |
+| Control: distinct next-layer senders | 4 | 4 | 4 | 4 |
+| Control: new fringe in reduced local DAG | false | false | false | false |
+| One-replacement case: count gate (4 entries / 3 senders) | true | true | true | true |
+| One-replacement case: distinct next-layer senders | 3 | 3 | 3 | 3 |
+| One-replacement case: new fringe in reduced local DAG | false | false | false | false |
+
+This is a shared **count-only gate behavior under the specific reduced local test**; it is not a claim that any of these four snapshots finalized a conflicting block or even a new fringe in this fixture. There is **no observed comparative winner or implementation difference in these six fields**. Our demonstrable engineering output is the repeatable four-way differential and evidence provenance; any proposed sender-set coverage check remains a separately reviewed counterfactual, with epoch-change semantics and the complete M27 DAG requiring independent validation.
+
+The workflow also publishes `cbc-four-implementation-differential.html` for offline, mobile-friendly inspection alongside the JSON, exact test source, raw logs and retained local source/lockfile snapshots.
+
 ## What this does — and does not — establish
 
 The sender labels come from a source-reported **bounded M27 reachable/finalizing witness**, but the four-message, empty-parent **local DAG constructed for this comparison is not that causal DAG**. The imported sender *shape* can characterize an admission-gate behavior across four real codebases; it cannot transfer M27's finality conclusion, prove remote exploitability, or establish causality from partitions/equivocation. Even a positive `check_min_messages` result is not block-receiver ingress, full validation, finality, or protocol safety.
@@ -29,7 +46,7 @@ The four identical source probes do not measure speed, throughput, latency, resi
 
 ## Review and reproduction
 
-See `.github/workflows/cbc-four-implementation-differential.yml`, triggered by changes to the comparator/probe or manually via Actions. Download `cbc-comparison-fixture`, all four `target-*` evidence artifacts, and `cbc-four-implementation-differential`. The final artifact includes the same original input JSON and a full machine-readable four-target report. Inspect raw logs and original/effective source snapshots for each target.
+See `.github/workflows/cbc-four-implementation-differential.yml`, triggered by changes to the comparator/probe or manually via Actions. Download `cbc-comparison-fixture`, all four `target-*` evidence artifacts, and `cbc-four-implementation-differential`. The final artifact includes the same original input JSON, a full machine-readable four-target report, and the standalone `cbc-four-implementation-differential.html` evidence dashboard. Inspect raw logs and original/effective source snapshots for each target.
 
 Offline integrity tests can be run without cloning four Rust repos:
 
