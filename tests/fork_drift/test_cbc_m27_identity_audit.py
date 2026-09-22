@@ -111,11 +111,10 @@ class IdentityAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Altered"):
             combine(self.evidence, self.input, self.probe)
 
-    def test_distinct_identity_shape_is_not_falsely_rejected(self):
+    def test_full_identity_control_is_not_misidentified_as_selected_three_sender_m27_case(self):
         value = fixture(["a3", "b3", "c3", "d3"])
-        ids, senders = audit_fixture(value)
-        self.assertEqual(len(set(ids)), 4)
-        self.assertEqual(len(set(senders)), 4)
+        with self.assertRaisesRegex(ValueError, "Expected one replacement"):
+            audit_fixture(value)
 
     def test_inconsistent_source_report_is_rejected(self):
         value = fixture()
