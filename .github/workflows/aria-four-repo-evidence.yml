@@ -39,7 +39,7 @@ jobs:
         include:
           - component: cbc
             repository: aixaria0/RCHAIN-COMPLIER
-            sha: db2421cc482bb05770e009d88e31524b287ed214
+            sha: 2d2c3d879b1a078693c8551385efb54a811d7172
           - component: workbench
             repository: aixaria0/rlsenti
             sha: 00e1ed1b30a1779f72c59c0505467da60080a365
