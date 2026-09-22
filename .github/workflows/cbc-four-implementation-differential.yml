@@ -7,6 +7,10 @@ on:
       - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
+      - tests/fork_drift/test_cbc_m27_identity_audit.py
+      - tools/cbc_m27_identity_compare.py
+      - tools/cbc_m27_identity_audit.py
+      - scripts/upstream/cbc-m27-unique-id-realizability-probe.rs
       - tests/fork_drift/test_cbc_cross_fork_causal_compare.py
       - tools/cbc_cross_fork_causal_compare.py
       - tools/cbc_cross_fork_causal_probe.py
@@ -20,6 +24,10 @@ on:
       - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
+      - tests/fork_drift/test_cbc_m27_identity_audit.py
+      - tools/cbc_m27_identity_compare.py
+      - tools/cbc_m27_identity_audit.py
+      - scripts/upstream/cbc-m27-unique-id-realizability-probe.rs
       - tests/fork_drift/test_cbc_cross_fork_causal_compare.py
       - tools/cbc_cross_fork_causal_compare.py
       - tools/cbc_cross_fork_causal_probe.py
@@ -73,7 +81,8 @@ jobs:
       - run: python -m unittest discover -s tests/fork_drift -p 'test_*cbc_four_fork_comparison.py' -v
       - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_compare.py -v
       - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_causal_compare.py -v
-      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/cbc_cross_fork_causal_probe.py tools/cbc_cross_fork_causal_compare.py tools/render_cbc_four_fork_comparison.py
+      - run: python -m unittest discover -s tests/fork_drift -p test_cbc_m27_identity_audit.py -v
+      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/cbc_cross_fork_causal_probe.py tools/cbc_cross_fork_causal_compare.py tools/cbc_m27_identity_audit.py tools/cbc_m27_identity_compare.py tools/render_cbc_four_fork_comparison.py
 
   compare:
     name: Run identical Finalizer probe on ${{ matrix.target }}
@@ -197,9 +206,67 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  identity:
+    name: Audit selected M27 tuple identity on ${{ matrix.target }}
+    needs: fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: community
+            repository: rchain-community/rchain-rust
+            sha: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          - target: shplarggle
+            repository: Shplarggle/rchain-rust
+            sha: 1470256ecd9d1ce3926754c321f5703ef8f95e1a
+          - target: nzpr
+            repository: nzpr/rchain-rust
+            sha: 0eabfc4a893bc42d1462f05ebb4bb477eabd0ee1
+          - target: bill_kunj
+            repository: Bill-Kunj/rchain-rust
+            sha: 9e667e203861c791aa9349b0351397ccc29f0fc8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cbc-comparison-fixture
+          path: fixture
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install native Rust upstream dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Execute identical Rust identity-realizability test on real pinned Finalizer
+        run: |
+          python orchestrator/tools/cbc_m27_identity_audit.py \
+            --target ${{ matrix.target }} \
+            --checkout implementation \
+            --fixture fixture/comparison-input.json \
+            --probe orchestrator/scripts/upstream/cbc-m27-unique-id-realizability-probe.rs \
+            --out-dir identity-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: identity-${{ matrix.target }}
+          path: identity-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
   report:
     name: Compare four measured Finalizer outputs without ranking
-    needs: [fixture, regressions, compare, causal]
+    needs: [fixture, regressions, compare, causal, identity]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -218,6 +285,10 @@ jobs:
         with:
           pattern: causal-*
           path: causal-evidence
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: identity-*
+          path: identity-evidence
       - uses: actions/checkout@v4
         with:
           repository: aixaria0/RCHAIN-COMPLIER
@@ -237,6 +308,13 @@ jobs:
             --input-dir causal-evidence \
             --test-source original-m11/scripts/upstream/m11-5-duplicate-minimum-messages.rs \
             --output cbc-four-implementation-causal-m11.json
+      - name: Locate first semantic divergence between M27 tuple identities and real Finalizer set
+        run: |
+          python tools/cbc_m27_identity_compare.py \
+            --input-dir identity-evidence \
+            --fixture fixture/comparison-input.json \
+            --probe scripts/upstream/cbc-m27-unique-id-realizability-probe.rs \
+            --output cbc-m27-first-semantic-divergence.json
       - name: Render four observed Rust results as offline mobile-friendly evidence dashboard
         run: |
           python tools/render_cbc_four_fork_comparison.py \
@@ -248,6 +326,7 @@ jobs:
           path: |
             cbc-four-implementation-differential.json
             cbc-four-implementation-causal-m11.json
+            cbc-m27-first-semantic-divergence.json
             cbc-four-implementation-differential.html
             fixture/comparison-input.json
           retention-days: 30
