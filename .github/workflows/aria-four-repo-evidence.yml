@@ -6,6 +6,8 @@ on:
     paths:
       - tools/four_repo_evidence.py
       - tools/cbc_workbench_bridge.mjs
+      - tools/verify_four_repo_handoff.mjs
+      - tools/run_pbft_evidence_control.mjs
       - tools/verify_cbc_sentinel_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
@@ -15,6 +17,8 @@ on:
     paths:
       - tools/four_repo_evidence.py
       - tools/cbc_workbench_bridge.mjs
+      - tools/verify_four_repo_handoff.mjs
+      - tools/run_pbft_evidence_control.mjs
       - tools/verify_cbc_sentinel_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
@@ -53,7 +57,7 @@ jobs:
             sha: 00e1ed1b30a1779f72c59c0505467da60080a365
           - component: lattice
             repository: aixaria0/Sovereign-Lattice
-            sha: e141e89e5ff158c0eba375448b8839bf7859fef5
+            sha: 03259325d33a89e523b0ba83d55dd32f42ae4101
           - component: sentinel
             repository: aixaria0/rchain-sentinel
             sha: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
@@ -118,13 +122,25 @@ jobs:
         with:
           name: cbc-workbench-bridge
           path: bridge-evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify four actual source test outcomes and evidence-bound PBFT receipt
+        run: |
+          node tools/verify_four_repo_handoff.mjs \
+            --bundle four-repo-bundle.json \
+            --bridge-dir bridge-evidence \
+            --output four-repo-integration.json
       - uses: actions/upload-artifact@v4
         with:
           name: four-repo-bundle
           path: |
             four-repo-bundle.json
+            four-repo-integration.json
             four-repo-dashboard.html
             bridge-evidence/bridge-manifest.json
+            bridge-evidence/cbc-four-repo-handoff.json
+            bridge-evidence/lattice-pbft-control.json
           retention-days: 30
 
   cbc-workbench-bridge:
@@ -154,6 +170,12 @@ jobs:
           ref: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
           path: sentinel
           persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/Sovereign-Lattice
+          ref: 03259325d33a89e523b0ba83d55dd32f42ae4101
+          path: lattice
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -176,6 +198,10 @@ jobs:
         run: |
           node orchestrator/tools/verify_cbc_sentinel_bridge.mjs \
             --sentinel-dir sentinel --evidence-dir bridge
+      - name: Execute real PBFT control correlated with validated external CBC witness
+        run: |
+          node orchestrator/tools/run_pbft_evidence_control.mjs \
+            --lattice-dir lattice --evidence-dir bridge
       - uses: actions/upload-artifact@v4
         if: always()
         with:
