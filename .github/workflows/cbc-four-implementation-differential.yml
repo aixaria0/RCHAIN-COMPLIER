@@ -1,0 +1,160 @@
+name: CBC same-fixture four-implementation differential
+
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
+      - tools/make_cbc_four_fork_fixture.mjs
+      - tools/cbc_cross_fork_probe.py
+      - tools/cbc_cross_fork_compare.py
+      - tests/fork_drift/test_cbc_cross_fork_compare.py
+      - .github/workflows/cbc-four-implementation-differential.yml
+  pull_request:
+    paths:
+      - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
+      - tools/make_cbc_four_fork_fixture.mjs
+      - tools/cbc_cross_fork_probe.py
+      - tools/cbc_cross_fork_compare.py
+      - tests/fork_drift/test_cbc_cross_fork_compare.py
+      - .github/workflows/cbc-four-implementation-differential.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    name: Export source-reported M27 sender fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: pinned-m27
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Export the actual bounded M27 research input, not a hand-written mock
+        run: |
+          node --experimental-strip-types orchestrator/tools/make_cbc_four_fork_fixture.mjs \
+            --source-dir pinned-m27 --output fixture/comparison-input.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbc-comparison-fixture
+          path: fixture/comparison-input.json
+          retention-days: 30
+
+  regressions:
+    name: Differential evidence negative tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_compare.py -v
+      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py
+
+  compare:
+    name: Run identical Finalizer probe on ${{ matrix.target }}
+    needs: fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: community
+            repository: rchain-community/rchain-rust
+            sha: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          - target: shplarggle
+            repository: Shplarggle/rchain-rust
+            sha: 1470256ecd9d1ce3926754c321f5703ef8f95e1a
+          - target: nzpr
+            repository: nzpr/rchain-rust
+            sha: 0eabfc4a893bc42d1462f05ebb4bb477eabd0ee1
+          - target: bill_kunj
+            repository: Bill-Kunj/rchain-rust
+            sha: 9e667e203861c791aa9349b0351397ccc29f0fc8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: cbc-comparison-fixture
+          path: fixture
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Record runner/toolchain identity
+        run: |
+          mkdir -p evidence
+          rustc --version > evidence/rustc-version.txt
+          cargo --version > evidence/cargo-version.txt
+          uname -a > evidence/runner-platform.txt
+      - name: Run one identical temporary probe against real pinned Rust Finalizer
+        run: |
+          python orchestrator/tools/cbc_cross_fork_probe.py \
+            --target ${{ matrix.target }} \
+            --checkout implementation \
+            --fixture fixture/comparison-input.json \
+            --probe orchestrator/scripts/upstream/cbc-four-fork-minimum-sender-probe.rs \
+            --out-dir evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: target-${{ matrix.target }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  report:
+    name: Compare four measured Finalizer outputs without ranking
+    needs: [fixture, regressions, compare]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: cbc-comparison-fixture
+          path: fixture
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: target-*
+          path: evidence
+      - name: Require all four exact revisions, identical probe, same fixture and real Rust observations
+        run: |
+          python tools/cbc_cross_fork_compare.py \
+            --input-dir evidence \
+            --fixture fixture/comparison-input.json \
+            --probe scripts/upstream/cbc-four-fork-minimum-sender-probe.rs \
+            --output cbc-four-implementation-differential.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbc-four-implementation-differential
+          path: |
+            cbc-four-implementation-differential.json
+            fixture/comparison-input.json
+          retention-days: 30
