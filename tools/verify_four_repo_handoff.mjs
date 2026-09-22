@@ -105,7 +105,7 @@ export async function verifyFourRepoBundle(bundleFile, bridgeDir) {
     externalWitnessConsumers: 3,
     selectedM27MessageIds: [...selected.justifications],
     selectedM27UniqueMessageIds: uniqueSelectedIds,
-    selectedM27FourDistinctIdsRepresentable,
+    selectedM27FourDistinctIdsRepresentable: selectedFourDistinctIdsRepresentable,
     selectedM27RealFinalizerFinalityIndependentlyReplayed: false,
     firstSemanticDivergence: selectedFourDistinctIdsRepresentable
       ? "No identical-ID collapse observed; real full-DAG replay remains unverified."
