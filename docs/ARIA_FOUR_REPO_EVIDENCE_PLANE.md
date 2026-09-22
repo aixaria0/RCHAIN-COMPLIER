@@ -17,22 +17,51 @@ Each CI matrix worker checks out the **actual corresponding source repository** 
 
 The canonical SHA-256 identifies the bytes in each record; it is **not a digital signature** or a claim of trusted hardware attestation. GitHub Actions and GitHub-hosted artifact retention provide the run context. Pinned commits can become obsolete: update pins intentionally, then rerun all four.
 
-## Open the actual evidence dashboard\n\nIn the completed GitHub Actions run **Aria four-repository source evidence**, download the `four-repo-bundle` artifact and open `four-repo-dashboard.html` locally (tablet browser supported). The HTML is generated **only after** all four pinned source tests and evidence integrity checks pass. It displays each source/test scope, exact SHA, output fingerprints and Cargo dependency-lock status. Keep `four-repo-bundle.json` and the four `component-*` artifacts with the dashboard to audit underlying logs. This is a static CI report, not a live network dashboard or cross-protocol compatibility result.\n\n## Current architecture / next end-to-end integration
+## Open the actual evidence dashboard\n\nIn the completed GitHub Actions run **Aria four-repository source evidence**, download the `four-repo-bundle` artifact and open `four-repo-dashboard.html` locally (tablet browser supported). The HTML is generated **only after** all four pinned source tests and evidence integrity checks pass. It displays each source/test scope, exact SHA, output fingerprints and Cargo dependency-lock status. Keep `four-repo-bundle.json` and the four `component-*` artifacts with the dashboard to audit underlying logs. This is a static CI report, not a live network dashboard or cross-protocol compatibility result.\n\n## Proven three-source transport on actual source code
+
+The `cbc-workbench-bridge` CI job checks out three independent source trees at **exact commit SHAs** and runs an actual data transfer:
+
+```text
+RCHAIN-COMPLIER @ 2d2c3d879b1a078693c8551385efb54a811d7172
+  runM27ReachabilityConstrainedSearch() -> source-reported M27 report
+                                    |
+                          canonical SHA-256 envelope
+                                    |
+             +----------------------+-------------------+
+             |                                          |
+rlsenti @ 46a38c443e5904d7d485519d8ea348a442c010c1
+receiveCbcWitness() -> provenance receipt       rchain-sentinel @
+             |                                   7823bac56f8dd845d9b9f9e7c50982b49decdcc2
+             |                                 Rust cbc_witness_inspect CLI
+             +----------------------+-------------------+
+                                    |
+           verify_cbc_sentinel_bridge.mjs compares
+           transport digest, source pin, report digest,
+           exact four-entry witness and explicit claim flags.
+```
+
+This job **passes the same actual M27 JSON bytes** to both independent consumers. It fails on a missing or mismatched revision, mutated witness, mismatched receipt, inconsistent sender mapping, or elevated finality claim. The Rust dependency-lockfile source and effective bytes are preserved alongside the transport artifacts.
+
+From Actions, download the `cbc-workbench-bridge` artifact to inspect `cbc-m27-witness.json`, `rlsenti-witness-receipt.json`, `sentinel-witness-observation.json`, `cbc-three-source-transport.json`, and the two Sentinel Cargo lockfile snapshots. The `four-repo-bundle` artifact includes the three-source manifest along with its separate four-component source-test record and offline dashboard.
+
+**This is actual external-data interoperability among CBC / RLSenti / Sentinel on an offline source-reported witness.** It is not authentication of the report producer, proof that a deployed network generated the witness, independent finality verification, or a live RNode adapter. Sovereign-Lattice is the fourth source under a separate PBFT control test; no CBC witness is incorrectly interpreted as a PBFT certificate.
+
+## Current architecture / next end-to-end integration
 
 ```text
 RCHAIN-COMPLIER CBC scenario + upstream witness    [real code; synthetic fixture]
           |
           v
-typed, revision-pinned witness envelope             [NEXT: schema and transport]
+typed, revision-pinned witness envelope             [DONE: offline v1 transport]
           |
-          +----> RLSenti provenance + replay        [NEXT: real ingest adapter]
+          +----> RLSenti receipt from real witness  [DONE: integrity-only adapter]
           |
-          +----> Sentinel RNode observation         [NEXT: actual node-backed adapter]
+          +----> Sentinel offline witness inspector [DONE: integrity-only adapter; live RNode NEXT]
           |
           +----> Sovereign-Lattice PBFT analysis     [NEXT: separate BFT control experiment]
           |
           v
-source-level evidence, provenance, claim boundary    [first four-test CI slice COMPLETE]
+four-source CI + three-source witness handoff        [COMPLETE; same-protocol conformance NEXT]
 ```
 
 Sovereign-Lattice operates a different PBFT protocol. Its role is an independent, clearly labelled BFT *control experiment*, never a Casper finality oracle. RLSenti's demo/compiler output must be labelled synthetic unless real adapter data is supplied. Sentinel reports node-provided claims and evidence; its 2/3 node-count agreement must not be confused with Casper's stake-weighted finality.
@@ -57,7 +86,7 @@ Use the published Actions run for the exact source checkouts and execution; do n
 ## Acceptance gates before any comparative performance or implementation claims
 
 1. **Four-source CI:** all four actual test scopes run at pinned commits; bundle checks missing/failed/forged log and wrong-SHA conditions. Current slice.
-2. **Typed interoperability:** define versioned CBC witness and provenance schemas; consume actual compiled witness data in RLSenti, and attach independently fetched Sentinel node observation where available. No fabricated live endpoints.
+2. **Typed interoperability:** versioned v1 M27 witness transport is executed by RLSenti and Sentinel's **offline** inspector; the next boundary is a deployed, authenticated source and an independently fetched real Sentinel node observation. No fabricated live endpoints.
 3. **Identical CBC scenario:** pin supported RChain forks and run the *same* reachable fixture through their real relevant implementation paths, with failures and limitations captured; compare semantics only between actually equivalent protocol paths. The existing PBFT engine is not part of a same-protocol correctness ranking.
 4. **Independent verification:** emit replay trace, smallest witness, revision-aware differential, error localization, and cross-node observation; explicitly separate established upstream behavior from synthetic projections.
 5. **Measured engineering advantage:** predeclare workload, hardware, samples and baseline for each measurable target (replay reproducibility, CI diagnosis time, detection precision, throughput/latency/resource use). Publish full raw measurements including regressions and no-result runs before claiming an improvement. An independent test or maintainer review must validate any proposed upstream fix.
