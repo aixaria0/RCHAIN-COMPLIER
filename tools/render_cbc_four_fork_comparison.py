@@ -102,7 +102,7 @@ th,td{padding:12px;border-bottom:1px solid #4b5872;vertical-align:top}
 th{font-weight:650}td{font-variant-numeric:tabular-nums}
 strong{color:#fff}.notice{border-left:4px solid #efc36f;padding-left:15px}
 </style></head><body>
-<p class="muted">ARI A / SOURCE-LEVEL CBC FINALIZER DIFFERENTIAL</p>
+<p class="muted">ARIA / SOURCE-LEVEL CBC FINALIZER DIFFERENTIAL</p>
 <h1>Four pinned Rust implementations. One reduced CBC fixture.</h1>
 <p class="muted">The same temporary Rust test was compiled and executed in four independent checkouts. The input sender shape comes from the read-only M27 research report; the local four-message DAG is intentionally smaller than M27's complete causal graph.</p>
 <section class="card"><h2>Observed source-level results</h2>
