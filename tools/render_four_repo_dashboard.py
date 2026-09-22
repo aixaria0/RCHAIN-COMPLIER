@@ -73,6 +73,19 @@ def render(bundle, integration=None):
         if not isinstance(witness_digest, str) or len(witness_digest) != 64 or not all(
                 char in "0123456789abcdef" for char in witness_digest):
             raise ValueError("Invalid witness transport digest")
+        ids = integration.get("selectedM27MessageIds")
+        if not isinstance(ids, list) or len(ids) != 4 or any(
+                item not in ("a3", "b3", "c3", "d3") for item in ids):
+            raise ValueError("Missing selected source-reported M27 message identities")
+        unique = len(set(ids))
+        if (integration.get("selectedM27UniqueMessageIds") != unique
+                or integration.get("selectedM27FourDistinctIdsRepresentable") is not (unique == 4)
+                or integration.get("selectedM27RealFinalizerFinalityIndependentlyReplayed") is not False):
+            raise ValueError("M27 identity gap or independent-finality boundary mismatched")
+        identity_note = (
+            "SELECTED M27 MODEL TUPLE NOT DIRECTLY REPLAYABLE AS FOUR UNIQUE MESSAGE IDS"
+            if unique < 4 else "M27 has four unique IDs; full replay still unverified"
+        )
         boundary = escape(integration["claimBoundary"])
         integration_html = (
             '<section class="card"><h2>Verified four-source evidence handoff</h2>'
@@ -82,6 +95,9 @@ def render(bundle, integration=None):
             'labelled PBFT control correlated by the same witness digest.</p>'
             '<p><strong>Witness SHA-256:</strong><br><code>'
             + escape(witness_digest) + '</code></p>'
+            '<p><strong>First identity boundary:</strong> ' + escape(identity_note) +
+            ' — original tuple: <code>' + escape(", ".join(ids)) +
+            '</code>; unique message IDs: ' + str(unique) + '.</p>' +
             '<p><strong>Claim boundary:</strong> ' + boundary + '</p></section>'
         )
     return ("""<!doctype html><html lang="en"><head><meta charset="utf-8">
