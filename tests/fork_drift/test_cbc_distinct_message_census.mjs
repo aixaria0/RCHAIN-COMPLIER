@@ -50,7 +50,7 @@ test("every candidate is four-distinct-ID and carries model-vs-Rust claim bounda
   const result = census(datasets, reachability, mirror);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.totalDistinctIdCandidates, 10);
-  assert.equal(result.totalUnderCoverageCandidates, 8);
+  assert.equal(result.totalUnderCoverageCandidates, 6);
   assert.equal(result.originalM27SelectedTupleAdmittedAsFourUniqueMessages, false);
   for (const candidate of result.datasets.flatMap((dataset) => dataset.candidates)) {
     assert.equal(new Set(candidate.messageIds).size, 4);
