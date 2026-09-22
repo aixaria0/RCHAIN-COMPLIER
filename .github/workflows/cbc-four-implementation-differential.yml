@@ -7,6 +7,9 @@ on:
       - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
+      - tests/fork_drift/test_cbc_cross_fork_causal_compare.py
+      - tools/cbc_cross_fork_causal_compare.py
+      - tools/cbc_cross_fork_causal_probe.py
       - tools/cbc_cross_fork_compare.py
       - tools/render_cbc_four_fork_comparison.py
       - tests/fork_drift/test_render_cbc_four_fork_comparison.py
@@ -17,6 +20,9 @@ on:
       - scripts/upstream/cbc-four-fork-minimum-sender-probe.rs
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
+      - tests/fork_drift/test_cbc_cross_fork_causal_compare.py
+      - tools/cbc_cross_fork_causal_compare.py
+      - tools/cbc_cross_fork_causal_probe.py
       - tools/cbc_cross_fork_compare.py
       - tools/render_cbc_four_fork_comparison.py
       - tests/fork_drift/test_render_cbc_four_fork_comparison.py
@@ -66,7 +72,7 @@ jobs:
           python-version: '3.11'
       - run: python -m unittest discover -s tests/fork_drift -p 'test_*cbc_four_fork_comparison.py' -v
       - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_compare.py -v
-      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/render_cbc_four_fork_comparison.py
+      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/cbc_cross_fork_causal_probe.py tools/cbc_cross_fork_causal_compare.py tools/render_cbc_four_fork_comparison.py
 
   compare:
     name: Run identical Finalizer probe on ${{ matrix.target }}
@@ -132,9 +138,67 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  causal:
+    name: Execute identical M11.5 constructed causal DAG on ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: community
+            repository: rchain-community/rchain-rust
+            sha: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          - target: shplarggle
+            repository: Shplarggle/rchain-rust
+            sha: 1470256ecd9d1ce3926754c321f5703ef8f95e1a
+          - target: nzpr
+            repository: nzpr/rchain-rust
+            sha: 0eabfc4a893bc42d1462f05ebb4bb477eabd0ee1
+          - target: bill_kunj
+            repository: Bill-Kunj/rchain-rust
+            sha: 9e667e203861c791aa9349b0351397ccc29f0fc8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: implementation
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: original-m11
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Run unmodified original source-level M11.5 causal-DAG test at pinned implementation
+        run: |
+          python orchestrator/tools/cbc_cross_fork_causal_probe.py \
+            --target ${{ matrix.target }} \
+            --checkout implementation \
+            --pinned-harness original-m11 \
+            --out-dir causal-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: causal-${{ matrix.target }}
+          path: causal-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
   report:
     name: Compare four measured Finalizer outputs without ranking
-    needs: [fixture, regressions, compare]
+    needs: [fixture, regressions, compare, causal]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -149,6 +213,16 @@ jobs:
         with:
           pattern: target-*
           path: evidence
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: causal-*
+          path: causal-evidence
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: original-m11
+          persist-credentials: false
       - name: Require all four exact revisions, identical probe, same fixture and real Rust observations
         run: |
           python tools/cbc_cross_fork_compare.py \
@@ -156,6 +230,12 @@ jobs:
             --fixture fixture/comparison-input.json \
             --probe scripts/upstream/cbc-four-fork-minimum-sender-probe.rs \
             --output cbc-four-implementation-differential.json
+      - name: Verify original, full, hand-constructed M11.5 causal DAG on all four actual Finalizers
+        run: |
+          python tools/cbc_cross_fork_causal_compare.py \
+            --input-dir causal-evidence \
+            --test-source original-m11/scripts/upstream/m11-5-duplicate-minimum-messages.rs \
+            --output cbc-four-implementation-causal-m11.json
       - name: Render four observed Rust results as offline mobile-friendly evidence dashboard
         run: |
           python tools/render_cbc_four_fork_comparison.py \
@@ -166,6 +246,7 @@ jobs:
           name: cbc-four-implementation-differential
           path: |
             cbc-four-implementation-differential.json
+            cbc-four-implementation-causal-m11.json
             cbc-four-implementation-differential.html
             fixture/comparison-input.json
           retention-days: 30
