@@ -1,0 +1,111 @@
+name: Aria four-repository source evidence
+
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/four_repo_evidence.py
+      - tests/fork_drift/test_four_repo_evidence.py
+      - .github/workflows/aria-four-repo-evidence.yml
+  pull_request:
+    paths:
+      - tools/four_repo_evidence.py
+      - tests/fork_drift/test_four_repo_evidence.py
+      - .github/workflows/aria-four-repo-evidence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-contract:
+    name: Offline evidence contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s tests/fork_drift -p 'test_*.py' -v
+      - run: python -m py_compile tools/four_repo_evidence.py
+
+  execute-four-sources:
+    name: Execute ${{ matrix.component }} at pinned source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: cbc
+            repository: aixaria0/RCHAIN-COMPLIER
+            sha: db2421cc482bb05770e009d88e31524b287ed214
+          - component: workbench
+            repository: aixaria0/rlsenti
+            sha: 00e1ed1b30a1779f72c59c0505467da60080a365
+          - component: lattice
+            repository: aixaria0/Sovereign-Lattice
+            sha: e141e89e5ff158c0eba375448b8839bf7859fef5
+          - component: sentinel
+            repository: aixaria0/rchain-sentinel
+            sha: 88250ff7ec2789a3c709c7e2991233e6dd244c4b
+    steps:
+      - name: Checkout evidence orchestrator
+        uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        if: ${{ matrix.component == 'cbc' || matrix.component == 'workbench' }}
+        with:
+          node-version: '24'
+      - name: Set up Rust toolchain
+        if: ${{ matrix.component == 'lattice' || matrix.component == 'sentinel' }}
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Execute actual source test and capture revision evidence
+        run: |
+          python orchestrator/tools/four_repo_evidence.py capture \
+            --component ${{ matrix.component }} \
+            --source-dir source \
+            --out-dir evidence
+      - name: Publish code execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-${{ matrix.component }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  bundle:
+    name: Verify four evidence outputs
+    needs: [evidence-contract, execute-four-sources]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: component-*
+          path: evidence
+      - name: Reject absent, failed, tampered or wrong-revision evidence
+        run: python tools/four_repo_evidence.py combine --input-dir evidence --output four-repo-bundle.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: four-repo-bundle
+          path: four-repo-bundle.json
+          retention-days: 30
