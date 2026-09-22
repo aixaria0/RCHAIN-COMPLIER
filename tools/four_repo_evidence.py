@@ -31,10 +31,10 @@ SOURCES = {
     },
     "lattice": {
         "repository": "aixaria0/Sovereign-Lattice",
-        "sha": "e141e89e5ff158c0eba375448b8839bf7859fef5",
-        "scope": "independent PBFT adversarial-scheduler test, not Casper CBC",
+        "sha": "03259325d33a89e523b0ba83d55dd32f42ae4101",
+        "scope": "all independent PBFT tests including bounded external witness-correlated control; never Casper CBC finality",
         "command": ["cargo", "test", "--manifest-path",
-                    "rust_engine/Cargo.toml", "--test", "adversarial_scheduler"],
+                    "rust_engine/Cargo.toml"],
         "lockfile": "rust_engine/Cargo.lock",
     },
     "sentinel": {
