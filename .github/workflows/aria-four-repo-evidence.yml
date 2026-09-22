@@ -5,6 +5,7 @@ on:
     branches: [feat/cbc-fork-drift-evidence]
     paths:
       - tools/four_repo_evidence.py
+      - tools/cbc_workbench_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
@@ -12,6 +13,7 @@ on:
   pull_request:
     paths:
       - tools/four_repo_evidence.py
+      - tools/cbc_workbench_bridge.mjs
       - tools/render_four_repo_dashboard.py
       - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
@@ -95,7 +97,7 @@ jobs:
 
   bundle:
     name: Verify four evidence outputs
-    needs: [evidence-contract, execute-four-sources]
+    needs: [evidence-contract, execute-four-sources, cbc-workbench-bridge]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -110,10 +112,51 @@ jobs:
         run: python tools/four_repo_evidence.py combine --input-dir evidence --output four-repo-bundle.json
       - name: Render offline four-source dashboard from real CI evidence
         run: python tools/render_four_repo_dashboard.py --bundle four-repo-bundle.json --output four-repo-dashboard.html
+      - uses: actions/download-artifact@v4
+        with:
+          name: cbc-workbench-bridge
+          path: bridge-evidence
       - uses: actions/upload-artifact@v4
         with:
           name: four-repo-bundle
           path: |
             four-repo-bundle.json
             four-repo-dashboard.html
+            bridge-evidence/bridge-manifest.json
+          retention-days: 30
+
+  cbc-workbench-bridge:
+    name: Transfer real pinned M27 witness into RLSenti
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: cbc
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/rlsenti
+          ref: 46a38c443e5904d7d485519d8ea348a442c010c1
+          path: workbench
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Execute pinned M27 source and import report through actual RLSenti adapter
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_workbench_bridge.mjs \
+            --cbc-dir cbc --workbench-dir workbench --out-dir bridge
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbc-workbench-bridge
+          path: bridge/
+          if-no-files-found: error
           retention-days: 30
