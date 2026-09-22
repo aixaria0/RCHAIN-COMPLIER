@@ -6,6 +6,8 @@ on:
     paths:
       - tools/cbc_distinct_message_census.mjs
       - tools/cbc_distinct_message_packet.mjs
+      - tools/verify_cbc_distinct_message_packet.mjs
+      - tests/fork_drift/test_verify_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_census.mjs
       - .github/workflows/cbc-distinct-message-census.yml
@@ -13,6 +15,8 @@ on:
     paths:
       - tools/cbc_distinct_message_census.mjs
       - tools/cbc_distinct_message_packet.mjs
+      - tools/verify_cbc_distinct_message_packet.mjs
+      - tests/fork_drift/test_verify_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_census.mjs
       - .github/workflows/cbc-distinct-message-census.yml
@@ -44,6 +48,7 @@ jobs:
         run: |
           node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_census.mjs
           node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_packet.mjs
+          node --test orchestrator/tests/fork_drift/test_verify_cbc_distinct_message_packet.mjs
       - name: Execute exhaustive distinct-ID census on actual read-only research DAG sources
         run: |
           node --experimental-strip-types orchestrator/tools/cbc_distinct_message_census.mjs \
@@ -54,6 +59,11 @@ jobs:
           node --experimental-strip-types orchestrator/tools/cbc_distinct_message_packet.mjs \
             --source-dir pinned-research \
             --output evidence/cbc-distinct-id-rust-replay-input.json
+      - name: Independently verify the selected full graph and content hashes
+        run: |
+          node orchestrator/tools/verify_cbc_distinct_message_packet.mjs \
+            --census evidence/cbc-distinct-message-census.json \
+            --packet evidence/cbc-distinct-id-rust-replay-input.json
       - name: Check selected candidate carries the exact graph but makes no Rust claim
         run: |
           python3 - <<'PY'
