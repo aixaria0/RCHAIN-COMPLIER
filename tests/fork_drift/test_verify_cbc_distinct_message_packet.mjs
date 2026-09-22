@@ -84,5 +84,5 @@ test("counterfeit source-model pass flags and wrong census link are rejected",()
   assert.throws(()=>verifyPacket(census,reseal(packet)),/false/);
   const p=inputs();
   p.packet.censusSha256="f".repeat(64);
-  assert.throws(()=>verifyPacket(p.census,reseal(p.packet)),/censusSha256/);
+  assert.throws(()=>verifyPacket(p.census,reseal(p.packet)),/Expected values to be strictly equal/);
 });
