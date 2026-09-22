@@ -39,10 +39,10 @@ SOURCES = {
     },
     "sentinel": {
         "repository": "aixaria0/rchain-sentinel",
-        "sha": "88250ff7ec2789a3c709c7e2991233e6dd244c4b",
-        "scope": "Casper evidence inventory unit tests, not independent finality proof",
+        "sha": "7823bac56f8dd845d9b9f9e7c50982b49decdcc2",
+        "scope": "Sentinel evidence inventory and external M27 offline inspector unit tests; neither independently proves finality",
         "command": ["cargo", "test", "--manifest-path",
-                    "backend/Cargo.toml", "casper_evidence::tests"],
+                    "backend/Cargo.toml"],
         "lockfile": "backend/Cargo.lock",
     },
 }
