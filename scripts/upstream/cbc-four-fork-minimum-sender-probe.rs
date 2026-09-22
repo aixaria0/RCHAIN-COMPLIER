@@ -11,7 +11,7 @@ mod aria_cbc_differential_v1 {
             id,
             height: BlockHeight::zero(),
             sender,
-            sender_seq: SeqNum::try_from(3).expect("valid sequence"),
+            sender_seq: SeqNum::try_from(3i64).expect("valid sequence"),
             bonds_map: BTreeMap::new(),
             parents: BTreeSet::new(),
             fringe: BTreeSet::new(),
