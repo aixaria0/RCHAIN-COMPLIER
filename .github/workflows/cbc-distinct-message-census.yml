@@ -5,11 +5,15 @@ on:
     branches: [feat/cbc-fork-drift-evidence]
     paths:
       - tools/cbc_distinct_message_census.mjs
+      - tools/cbc_distinct_message_packet.mjs
+      - tests/fork_drift/test_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_census.mjs
       - .github/workflows/cbc-distinct-message-census.yml
   pull_request:
     paths:
       - tools/cbc_distinct_message_census.mjs
+      - tools/cbc_distinct_message_packet.mjs
+      - tests/fork_drift/test_cbc_distinct_message_packet.mjs
       - tests/fork_drift/test_cbc_distinct_message_census.mjs
       - .github/workflows/cbc-distinct-message-census.yml
   workflow_dispatch:
@@ -37,12 +41,34 @@ jobs:
         with:
           node-version: '24'
       - name: Verify no duplicate-ID or fictitious-Rust-proof regressions
-        run: node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_census.mjs
+        run: |
+          node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_census.mjs
+          node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_packet.mjs
       - name: Execute exhaustive distinct-ID census on actual read-only research DAG sources
         run: |
           node --experimental-strip-types orchestrator/tools/cbc_distinct_message_census.mjs \
             --source-dir pinned-research \
             --output evidence/cbc-distinct-message-census.json
+      - name: Export exact original source graph for one eligible bounded candidate
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_distinct_message_packet.mjs \
+            --source-dir pinned-research \
+            --output evidence/cbc-distinct-id-rust-replay-input.json
+      - name: Check selected candidate carries the exact graph but makes no Rust claim
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          packet=json.loads(Path('evidence/cbc-distinct-id-rust-replay-input.json').read_text())
+          assert packet['schema']=='aria-cbc-distinct-id-rust-replay-input/v1'
+          assert packet['selection']=='MODEL_CANDIDATE_READY_FOR_INDEPENDENT_RUST_REPLAY'
+          assert len(packet['selectedJustificationIds'])==len(set(packet['selectedJustificationIds']))==4
+          assert packet['sourceGraph']['justifications']==packet['selectedJustificationIds']
+          assert packet['sourceDAGMessageCount']==len(packet['sourceGraph']['messages'])
+          assert packet['rustReplayVerified'] is False
+          assert packet['wireIngressVerified'] is False
+          print('PASS: complete source-model DAG packaged; exact-candidate Rust replay still pending')
+          PY
       - name: Check actual generated report has identity-safe candidates and transparent evidence scope
         run: |
           python3 - <<'PY'
@@ -65,5 +91,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: cbc-distinct-message-census
-          path: evidence/cbc-distinct-message-census.json
+          path: |
+            evidence/cbc-distinct-message-census.json
+            evidence/cbc-distinct-id-rust-replay-input.json
           retention-days: 30
