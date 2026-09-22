@@ -1,0 +1,88 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { SCHEMA, canonical, digest } from "../../tools/cbc_distinct_message_census.mjs";
+import { makePacket, bindSourceGraph } from "../../tools/cbc_distinct_message_packet.mjs";
+import { verifyPacket } from "../../tools/verify_cbc_distinct_message_packet.mjs";
+
+const ids=["a2","a3","b3","c3"];
+function originalGraph(){
+  return {bondsMap:{v0:70,v1:10,v2:10,v3:10},messages:[
+    {id:"g0",sender:"v0",senderSeq:0,parents:[],seen:["g0"]},
+    {id:"g1",sender:"v1",senderSeq:0,parents:[],seen:["g1"]},
+    {id:"g2",sender:"v2",senderSeq:0,parents:[],seen:["g2"]},
+    {id:"a2",sender:"v0",senderSeq:1,parents:["g0"],seen:["g0","a2"]},
+    {id:"a3",sender:"v0",senderSeq:2,parents:["a2"],seen:["g0","a2","a3"]},
+    {id:"b3",sender:"v1",senderSeq:1,parents:["g1"],seen:["g1","b3"]},
+    {id:"c3",sender:"v2",senderSeq:1,parents:["g2"],seen:["g2","c3"]},
+  ]};
+}
+function inputs(){
+  const graph=originalGraph();
+  const candidate={
+    messageIds:ids,messageIdsUnique:true,
+    justificationSenders:["v0","v0","v1","v2"],
+    missingBondedMinimumSenders:["v3"],traceDistinctMinimumSenders:3,
+    modelCountGatePassed:true,modelReportedFinalized:true,
+    sourceDAGReachabilityChecked:true,actualRustFinalizerExecutedForThisExactCandidate:false,
+    wireIngressVerified:false,
+  };
+  const body={schema:SCHEMA,datasets:[
+    {name:"distinct-v0-message-stress",sourceMessageCount:graph.messages.length,candidates:[candidate]},
+    {name:"causally-valid-control",sourceMessageCount:graph.messages.length,candidates:[]},
+  ]};
+  const census={...body,recordSha256:digest(canonical(body))};
+  const packet=bindSourceGraph(makePacket(census),graph,
+    ()=>({reachable:true,violations:[]}));
+  return {census,packet};
+}
+function reseal(packet){
+  const {packetSha256:_old,...body}=packet;
+  return {...body,packetSha256:digest(canonical(body))};
+}
+
+test("independent verifier accepts four unique ID and exact parent-derived source graph only",()=>{
+  const {census,packet}=inputs();
+  const receipt=verifyPacket(census,packet);
+  assert.equal(receipt.distinctJustificationIds,4);
+  assert.equal(receipt.checkedMessageCount,7);
+  assert.equal(receipt.authenticatedProducer,false);
+  assert.equal(receipt.rustFinalizerReplayed,false);
+  assert.equal(receipt.verdict,"SOURCE_GRAPH_AND_TRANSPORT_REPRESENTABLE_ONLY");
+});
+
+test("changed or resealed unsupported DAG is rejected",()=>{
+  const {census,packet}=inputs();
+  packet.sourceGraph.messages.find(x=>x.id==="a3").seen=["a3"];
+  assert.throws(()=>verifyPacket(census,packet),/packet content mismatch/);
+  packet.exactGraphSha256=digest(canonical(packet.sourceGraph));
+  const resealed=reseal(packet);
+  assert.throws(()=>verifyPacket(census,resealed),/Seen set/);
+});
+
+test("repeated justification ID cannot be laundered by a new hash",()=>{
+  const {census,packet}=inputs();
+  packet.selectedJustificationIds=["a2","a2","b3","c3"];
+  packet.sourceGraph.justifications=[...packet.selectedJustificationIds];
+  packet.exactGraphSha256=digest(canonical(packet.sourceGraph));
+  assert.throws(()=>verifyPacket(census,reseal(packet)),/Repeated message ID/);
+});
+
+test("missing parent and altered sequence fail even if content hashes are updated",()=>{
+  const {census,packet}=inputs();
+  packet.sourceGraph.messages.find(x=>x.id==="a3").parents=["phantom"];
+  packet.exactGraphSha256=digest(canonical(packet.sourceGraph));
+  assert.throws(()=>verifyPacket(census,reseal(packet)),/missing parent/);
+  const p=inputs();
+  p.packet.sourceGraph.messages.find(x=>x.id==="a3").senderSeq=7;
+  p.packet.exactGraphSha256=digest(canonical(p.packet.sourceGraph));
+  assert.throws(()=>verifyPacket(p.census,reseal(p.packet)),/sequence/);
+});
+
+test("counterfeit source-model pass flags and wrong census link are rejected",()=>{
+  const {census,packet}=inputs();
+  packet.rustReplayVerified=true;
+  assert.throws(()=>verifyPacket(census,reseal(packet)),/false/);
+  const p=inputs();
+  p.packet.censusSha256="f".repeat(64);
+  assert.throws(()=>verifyPacket(p.census,reseal(p.packet)),/censusSha256/);
+});
