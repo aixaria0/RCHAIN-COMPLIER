@@ -57,6 +57,29 @@ class DashboardTests(unittest.TestCase):
         self.assertNotIn("<script>", page)
         self.assertIn("&lt;script&gt;", page)
 
+    def test_verified_cross_repo_handoff_is_visible_with_claim_boundary(self):
+        integration = {
+            "schema": "aria-verified-four-repo-evidence/v1",
+            "sourceTestsPassed": 4,
+            "externalWitnessConsumers": 3,
+            "liveNetwork": False,
+            "independentlyVerifiedCasperFinality": False,
+            "sourceRevisions": {
+                "cbc": evidence.SOURCES["cbc"]["sha"],
+                "sentinel": evidence.SOURCES["sentinel"]["sha"],
+                "lattice": evidence.SOURCES["lattice"]["sha"],
+            },
+            "witnessTransportSha256": "a" * 64,
+            "claimBoundary": "PBFT is a distinct protocol; source-reported only <no live proof>.",
+        }
+        page = render(report(), integration)
+        self.assertIn("Verified four-source evidence handoff", page)
+        self.assertIn("separately labelled PBFT control", page)
+        self.assertIn("&lt;no live proof&gt;", page)
+        integration["independentlyVerifiedCasperFinality"] = True
+        with self.assertRaisesRegex(ValueError, "Invalid or elevated"):
+            render(report(), integration)
+
     def test_tampered_bundle_rejected(self):
         item = report()
         item["entries"][0]["source_sha"] = "f" * 40
