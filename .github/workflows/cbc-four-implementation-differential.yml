@@ -8,6 +8,8 @@ on:
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
       - tools/cbc_cross_fork_compare.py
+      - tools/render_cbc_four_fork_comparison.py
+      - tests/fork_drift/test_render_cbc_four_fork_comparison.py
       - tests/fork_drift/test_cbc_cross_fork_compare.py
       - .github/workflows/cbc-four-implementation-differential.yml
   pull_request:
@@ -16,6 +18,8 @@ on:
       - tools/make_cbc_four_fork_fixture.mjs
       - tools/cbc_cross_fork_probe.py
       - tools/cbc_cross_fork_compare.py
+      - tools/render_cbc_four_fork_comparison.py
+      - tests/fork_drift/test_render_cbc_four_fork_comparison.py
       - tests/fork_drift/test_cbc_cross_fork_compare.py
       - .github/workflows/cbc-four-implementation-differential.yml
   workflow_dispatch:
@@ -60,8 +64,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - run: python -m unittest discover -s tests/fork_drift -p 'test_*cbc_four_fork_comparison.py' -v
       - run: python -m unittest discover -s tests/fork_drift -p test_cbc_cross_fork_compare.py -v
-      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py
+      - run: python -m py_compile tools/cbc_cross_fork_probe.py tools/cbc_cross_fork_compare.py tools/render_cbc_four_fork_comparison.py
 
   compare:
     name: Run identical Finalizer probe on ${{ matrix.target }}
@@ -151,10 +156,16 @@ jobs:
             --fixture fixture/comparison-input.json \
             --probe scripts/upstream/cbc-four-fork-minimum-sender-probe.rs \
             --output cbc-four-implementation-differential.json
+      - name: Render four observed Rust results as offline mobile-friendly evidence dashboard
+        run: |
+          python tools/render_cbc_four_fork_comparison.py \
+            --report cbc-four-implementation-differential.json \
+            --output cbc-four-implementation-differential.html
       - uses: actions/upload-artifact@v4
         with:
           name: cbc-four-implementation-differential
           path: |
             cbc-four-implementation-differential.json
+            cbc-four-implementation-differential.html
             fixture/comparison-input.json
           retention-days: 30
