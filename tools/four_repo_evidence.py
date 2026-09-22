@@ -15,10 +15,12 @@ SCHEMA = "aria-four-repo-execution/v1"
 SOURCES = {
     "cbc": {
         "repository": "aixaria0/RCHAIN-COMPLIER",
-        "sha": "db2421cc482bb05770e009d88e31524b287ed214",
-        "scope": "synthetic CBC replay test (not upstream/node test)",
+        "sha": "2d2c3d879b1a078693c8551385efb54a811d7172",
+        "scope": "synthetic CBC replay, upstream-anchored M26 observation and bounded M27 witness search tests; not a live network test",
         "command": ["node", "--experimental-strip-types", "--test",
-                    "src/lib/cbc/cbc-simulator.test.ts"],
+                    "src/lib/cbc/cbc-simulator.test.ts",
+                    "src/lib/cbc/casper-cbc-upstream-replay.test.ts",
+                    "src/lib/cbc/casper-reachable-adversarial-history-search.test.ts"],
     },
     "workbench": {
         "repository": "aixaria0/rlsenti",
