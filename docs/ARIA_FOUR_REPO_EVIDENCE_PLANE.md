@@ -54,6 +54,10 @@ The final bundle job requires both the **four successful actual source test reco
 
 Download the `cbc-workbench-bridge` artifact to inspect `cbc-four-repo-handoff.json` and `lattice-pbft-control.json`; the final `four-repo-bundle` includes `four-repo-integration.json` plus the source-test dashboard and original evidence references.
 
+## First semantic boundary on the imported M27 report
+
+The first source-reported M27 minimum-distance finalizing tuple contains `a3,a3,c3,d3`: **four ordered slots but only three unique message IDs**. The real Rust Finalizer takes a `BTreeSet<Message>`; this selected tuple cannot be passed directly as four distinct justifications. The independent [four-implementation identity audit](M27_FIRST_SEMANTIC_DIVERGENCE.md) establishes that its post-set four-message count gate does **not** pass. This does **not** negate the separate M11.5 constructed DAG with two **distinct** v0 message IDs. The evidence plane preserves RLSenti and Sentinel's flags as *source-reported model results only*, and the final bundle/dashboard now record `selectedM27FourDistinctIdsRepresentable: false` and `selectedM27RealFinalizerFinalityIndependentlyReplayed: false`.
+
 ## Current architecture / next end-to-end integration
 
 ```text
