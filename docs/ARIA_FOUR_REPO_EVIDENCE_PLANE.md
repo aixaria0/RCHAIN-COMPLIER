@@ -10,7 +10,7 @@ Turn four separate codebases into a **measurable, revision-pinned integration pl
 | --- | --- | --- | --- |
 | [RCHAIN-COMPLIER](https://github.com/aixaria0/RCHAIN-COMPLIER) | `2d2c3d879b1a078693c8551385efb54a811d7172` (read-only PR #16 HEAD) | CBC simulator + M26 upstream-anchored replay + M27 bounded witness search tests | Synthetic CBC scenarios, observed pinned-revision semantics, bounded minimal-witness regression; **not** live network evidence |
 | [rlsenti](https://github.com/aixaria0/rlsenti) | `00e1ed1b30a1779f72c59c0505467da60080a365` | `src/lib/compiler/compiler.test.ts` | Deterministic execution, provenance, adversarial mutation model |
-| [Sovereign-Lattice](https://github.com/aixaria0/Sovereign-Lattice) | `e141e89e5ff158c0eba375448b8839bf7859fef5` | `rust_engine/tests/adversarial_scheduler.rs` | Independent PBFT input and quorum bounds; **not** RChain Casper CBC |
+| [Sovereign-Lattice](https://github.com/aixaria0/Sovereign-Lattice) | `03259325d33a89e523b0ba83d55dd32f42ae4101` (Sovereign-Lattice draft PR #1) | Full Rust test suite and evidence-bound offline PBFT control | Independent PBFT topology, quorum and malformed-frame experiment correlated to the same witness digest; **not** Casper CBC finality |
 | [rchain-sentinel](https://github.com/aixaria0/rchain-sentinel) | `7823bac56f8dd845d9b9f9e7c50982b49decdcc2` (Sentinel draft PR #1) | Backend full Cargo tests + offline external M27 witness inspector | RNode-style evidence inventory + independent transport/shape observer; **not** independent stake-weighted finality |
 
 Each CI matrix worker checks out the **actual corresponding source repository** at the exact SHA, executes the named test with Node or Cargo, hashes its full stdout/stderr, and records the test command, source identity and exit code. The Rust repositories currently ship lockfiles that fail Cargo's `--locked` check on the selected runner; their tests are therefore allowed to resolve dependencies. The tool preserves both original and effective `Cargo.lock` bytes and hashes, and records whether resolution modified the checkout. This is **source-revision pinning with dependency-graph provenance**, not a fully frozen reproducible binary. Freeze/audit effective lockfiles before making reproducible-build or performance claims. The separate bundler checks all four entries are present, successful, at the expected commits, and have matching log bytes before publishing `four-repo-bundle.json`. A failed worker cannot become a four-of-four PASS report.
@@ -46,6 +46,14 @@ From Actions, download the `cbc-workbench-bridge` artifact to inspect `cbc-m27-w
 
 **This is actual external-data interoperability among CBC / RLSenti / Sentinel on an offline source-reported witness.** It is not authentication of the report producer, proof that a deployed network generated the witness, independent finality verification, or a live RNode adapter. Sovereign-Lattice is the fourth source under a separate PBFT control test; no CBC witness is incorrectly interpreted as a PBFT certificate.
 
+## Proven four-source correlation without cross-protocol conflation
+
+Sovereign-Lattice's actual Rust `pbft_external_control` binary now receives the **same M27 transport digest and sender labels** after RLSenti and Sentinel have independently inspected the imported witness. It invokes the real `PbftState::new` topology/registry checks and `PbftMessage::from_bytes` malformed-frame checks. A fourth receipt records the exact Sovereign-Lattice source SHA, observed PBFT control results, the original/effective dependency-lockfile hashes, and an explicit `cbcFinalityVerified: false` / `pbftCertificateVerified: false` / `liveNetwork: false` boundary. The source is also independently executed in the four-way test matrix.
+
+The final bundle job requires both the **four successful actual source test records** and the **M27 → RLSenti → Sentinel → Sovereign-Lattice evidence handoff** to pass, and emits `four-repo-integration.json`. Negative tests reject missing fourth-source execution, altered PBFT results and re-sealed source-pin substitutions. The PBFT receiver uses CBC participant labels as metadata for its own independent experiment, never as imported PBFT votes or certificates. This is real four-source integration **at the evidence plane**, not four interoperating live consensus engines or a CBC vulnerability proof.
+
+Download the `cbc-workbench-bridge` artifact to inspect `cbc-four-repo-handoff.json` and `lattice-pbft-control.json`; the final `four-repo-bundle` includes `four-repo-integration.json` plus the source-test dashboard and original evidence references.
+
 ## Current architecture / next end-to-end integration
 
 ```text
@@ -58,10 +66,10 @@ typed, revision-pinned witness envelope             [DONE: offline v1 transport]
           |
           +----> Sentinel offline witness inspector [DONE: integrity-only adapter; live RNode NEXT]
           |
-          +----> Sovereign-Lattice PBFT analysis     [NEXT: separate BFT control experiment]
+          +----> Sovereign-Lattice PBFT control      [DONE: separate PBFT control correlated by digest]
           |
           v
-four-source CI + three-source witness handoff        [COMPLETE; same-protocol conformance NEXT]
+four-source CI + four-source evidence handoff        [COMPLETE; live-node adapter and same-protocol conformance NEXT]
 ```
 
 Sovereign-Lattice operates a different PBFT protocol. Its role is an independent, clearly labelled BFT *control experiment*, never a Casper finality oracle. RLSenti's demo/compiler output must be labelled synthetic unless real adapter data is supplied. Sentinel reports node-provided claims and evidence; its 2/3 node-count agreement must not be confused with Casper's stake-weighted finality.
