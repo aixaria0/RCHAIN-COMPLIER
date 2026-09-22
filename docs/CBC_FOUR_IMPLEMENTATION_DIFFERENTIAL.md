@@ -48,6 +48,12 @@ All four actual Rust test invocations **passed the original constructed multi-la
 
 This adds a source-backed, multi-layer differential regression to the research evidence: all four tested snapshots exhibit the original M11.5 behavior, **not** an observed quality or security ranking among their maintainers.
 
+## Mandatory M27 identity-realizability gate — correction to the first-model-witness interpretation
+
+The selected M27 research report emits the **same `a3` message ID twice** in its first minimum-distance modeled-finalizing tuple (`a3,a3,c3,d3`). Its four ordered entries are **three unique message IDs**, and the genuine Rust Finalizer accepts a `BTreeSet<Message>` rather than a four-slot tuple with duplicate identical message IDs. Four independent source-level Rust audits confirm the three-message set and the **false** post-set four-message count-gate outcome. The original modeled-first-M27-tuple finalization must **not** be described as a demonstrated four-distinct-message Rust Finalizer replay.
+
+This is the **first semantic divergence** between the model's tuple representation and the real implementation boundary. It does not invalidate the separate original M11.5 causal DAG test with **two distinct IDs from v0**, and it does not establish absence or presence of a live-network exploit. See `docs/M27_FIRST_SEMANTIC_DIVERGENCE.md` and the same-workflow `cbc-m27-first-semantic-divergence.json`. The offline HTML comparison now displays this finding *before* source-level comparisons.
+
 ## What this does — and does not — establish
 
 The sender labels come from a source-reported **bounded M27 reachable/finalizing witness**, but the four-message, empty-parent **local DAG constructed for this comparison is not that causal DAG**. The imported sender *shape* can characterize an admission-gate behavior across four real codebases; it cannot transfer M27's finality conclusion, prove remote exploitability, or establish causality from partitions/equivocation. Even a positive `check_min_messages` result is not block-receiver ingress, full validation, finality, or protocol safety.
