@@ -80,6 +80,16 @@ export async function verifyFourRepoBundle(bundleFile, bridgeDir) {
     report.authenticatedProducer,
     report.liveNetwork,
   ]) assert.equal(flag, false, "Evidence must not elevate unverified claim");
+  const selected = witness.report.minimalFinalizingWitnesses[0];
+  assert.equal(selected.justifications.length, 4, "M27 report must contain four tuple slots");
+  assert.equal(selected.minimumMessageSenders.length, 4);
+  const senderById = { a3: "v0", b3: "v1", c3: "v2", d3: "v3" };
+  for (let i = 0; i < 4; i++) {
+    assert.equal(senderById[selected.justifications[i]], selected.minimumMessageSenders[i],
+      "M27 source-report message identity must match sender label");
+  }
+  const uniqueSelectedIds = new Set(selected.justifications).size;
+  const selectedFourDistinctIdsRepresentable = uniqueSelectedIds === 4;
   const final = {
     schema: "aria-verified-four-repo-evidence/v1",
     sourceTestBundleSha256: hash(bundleBytes),
@@ -93,10 +103,17 @@ export async function verifyFourRepoBundle(bundleFile, bridgeDir) {
     },
     sourceTestsPassed: 4,
     externalWitnessConsumers: 3,
+    selectedM27MessageIds: [...selected.justifications],
+    selectedM27UniqueMessageIds: uniqueSelectedIds,
+    selectedM27FourDistinctIdsRepresentable,
+    selectedM27RealFinalizerFinalityIndependentlyReplayed: false,
+    firstSemanticDivergence: selectedFourDistinctIdsRepresentable
+      ? "No identical-ID collapse observed; real full-DAG replay remains unverified."
+      : "M27's four ordered tuple slots contain repeated identical message IDs. The actual Rust Finalizer takes a BTreeSet of unique Message identities; the selected four-slot modeled candidate cannot directly become four distinct justifications.",
     independentProtocols: ["Casper CBC research observation", "PBFT control"],
     liveNetwork: false,
     independentlyVerifiedCasperFinality: false,
-    claimBoundary: "Four pinned source test suites and one offline M27 witness handoff are verified. RLSenti and Sentinel inspect CBC transport; Sovereign-Lattice executes separate PBFT control only. No live RNode or cross-protocol finality equivalence is established.",
+    claimBoundary: "Four pinned source test suites and an offline source-reported M27 handoff are verified. The first selected modeled tuple repeats the same message ID and is not yet a four-distinct-ID Rust Finalizer replay; no independent finality or live RNode result is established. Sovereign-Lattice executes a separate PBFT control only.",
   };
   return final;
 }
