@@ -5,11 +5,15 @@ on:
     branches: [feat/cbc-fork-drift-evidence]
     paths:
       - tools/four_repo_evidence.py
+      - tools/render_four_repo_dashboard.py
+      - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
       - .github/workflows/aria-four-repo-evidence.yml
   pull_request:
     paths:
       - tools/four_repo_evidence.py
+      - tools/render_four_repo_dashboard.py
+      - tests/fork_drift/test_render_four_repo_dashboard.py
       - tests/fork_drift/test_four_repo_evidence.py
       - .github/workflows/aria-four-repo-evidence.yml
   workflow_dispatch:
@@ -104,8 +108,12 @@ jobs:
           path: evidence
       - name: Reject absent, failed, tampered or wrong-revision evidence
         run: python tools/four_repo_evidence.py combine --input-dir evidence --output four-repo-bundle.json
+      - name: Render offline four-source dashboard from real CI evidence
+        run: python tools/render_four_repo_dashboard.py --bundle four-repo-bundle.json --output four-repo-dashboard.html
       - uses: actions/upload-artifact@v4
         with:
           name: four-repo-bundle
-          path: four-repo-bundle.json
+          path: |
+            four-repo-bundle.json
+            four-repo-dashboard.html
           retention-days: 30
