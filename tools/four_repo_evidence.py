@@ -31,15 +31,17 @@ SOURCES = {
         "repository": "aixaria0/Sovereign-Lattice",
         "sha": "e141e89e5ff158c0eba375448b8839bf7859fef5",
         "scope": "independent PBFT adversarial-scheduler test, not Casper CBC",
-        "command": ["cargo", "test", "--locked", "--manifest-path",
+        "command": ["cargo", "test", "--manifest-path",
                     "rust_engine/Cargo.toml", "--test", "adversarial_scheduler"],
+        "lockfile": "rust_engine/Cargo.lock",
     },
     "sentinel": {
         "repository": "aixaria0/rchain-sentinel",
         "sha": "88250ff7ec2789a3c709c7e2991233e6dd244c4b",
         "scope": "Casper evidence inventory unit tests, not independent finality proof",
-        "command": ["cargo", "test", "--locked", "--manifest-path",
+        "command": ["cargo", "test", "--manifest-path",
                     "backend/Cargo.toml", "casper_evidence::tests"],
+        "lockfile": "backend/Cargo.lock",
     },
 }
 LIMITS = [
@@ -90,6 +92,7 @@ def capture(component, source_dir, out_dir, timeout=900):
     actual_sha = git_head(source_dir)
     if actual_sha != spec["sha"]:
         raise ValueError("Pinned SHA mismatch for " + component + ": " + actual_sha)
+    source_lock = (source_dir / spec["lockfile"]).read_bytes() if "lockfile" in spec else None
     result = subprocess.run(
         spec["command"], cwd=source_dir, capture_output=True,
         timeout=timeout, check=False,
@@ -98,6 +101,15 @@ def capture(component, source_dir, out_dir, timeout=900):
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "stdout.log").write_bytes(result.stdout)
     (out_dir / "stderr.log").write_bytes(result.stderr)
+    lockfile = None
+    if "lockfile" in spec:
+        effective_lock = (source_dir / spec["lockfile"]).read_bytes()
+        (out_dir / "source-Cargo.lock").write_bytes(source_lock)
+        (out_dir / "effective-Cargo.lock").write_bytes(effective_lock)
+        lockfile = {"path": spec["lockfile"],
+                    "source_sha256": digest(source_lock),
+                    "effective_sha256": digest(effective_lock),
+                    "modified_by_cargo": source_lock != effective_lock}
     content = {
         "schema": SCHEMA,
         "component": component,
@@ -113,6 +125,7 @@ def capture(component, source_dir, out_dir, timeout=900):
         "evidence_kind": "source-test-execution",
         "live_network": False,
         "interoperability_verified": False,
+        "dependency_lockfile": lockfile,
     }
     record = sealed(content)
     (out_dir / "record.json").write_text(
@@ -144,10 +157,23 @@ def combine(input_dir, output_path):
         for key, value in expected.items():
             if record.get(key) != value:
                 raise ValueError("Wrong " + key + " in " + component)
+        component_dir = input_dir / ("component-" + component)
         for name in ("stdout", "stderr"):
-            blob = (input_dir / ("component-" + component) / (name + ".log")).read_bytes()
+            blob = (component_dir / (name + ".log")).read_bytes()
             if digest(blob) != record[name + "_sha256"] or len(blob) != record[name + "_bytes"]:
                 raise ValueError("Tampered " + name + " for " + component)
+        lock = record.get("dependency_lockfile")
+        if "lockfile" in spec:
+            if not isinstance(lock, dict) or lock.get("path") != spec["lockfile"]:
+                raise ValueError("Missing or mismatched lockfile metadata for " + component)
+            before = (component_dir / "source-Cargo.lock").read_bytes()
+            after = (component_dir / "effective-Cargo.lock").read_bytes()
+            if (digest(before) != lock.get("source_sha256")
+                or digest(after) != lock.get("effective_sha256")
+                or (before != after) != lock.get("modified_by_cargo")):
+                raise ValueError("Tampered dependency lockfile for " + component)
+        elif lock is not None:
+            raise ValueError("Unexpected dependency lockfile for " + component)
         records.append(record)
     report = sealed({
         "schema": "aria-four-repo-bundle/v1",
