@@ -128,7 +128,7 @@ export function census(fixtures, reachabilityFn, traceFn) {
     totalUnderCoverageModelFinalizingCandidates: all.filter(
       (c) => c.traceDistinctMinimumSenders < 4 && c.modelReportedFinalized).length,
     originalM27FirstTuple: ["a3", "a3", "c3", "d3"],
-    originalM27FirstTupleUniqueIds: 3,
+    originalM27SelectedTupleUniqueIds: 3,
     originalM27SelectedTupleAdmittedAsFourUniqueMessages: false,
     claimBoundary: "Both source DAGs pass source-level causal checks. The exhaustive subset census measures a TypeScript mirror only; individual candidates have NOT been replayed in Rust or wire ingress. The original distinct-ID M11.5 Rust integration test is a separate, independent observation.",
   };
