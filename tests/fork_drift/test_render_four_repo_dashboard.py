@@ -70,10 +70,15 @@ class DashboardTests(unittest.TestCase):
                 "lattice": evidence.SOURCES["lattice"]["sha"],
             },
             "witnessTransportSha256": "a" * 64,
+            "selectedM27MessageIds": ["a3", "a3", "c3", "d3"],
+            "selectedM27UniqueMessageIds": 3,
+            "selectedM27FourDistinctIdsRepresentable": False,
+            "selectedM27RealFinalizerFinalityIndependentlyReplayed": False,
             "claimBoundary": "PBFT is a distinct protocol; source-reported only <no live proof>.",
         }
         page = render(report(), integration)
         self.assertIn("Verified four-source evidence handoff", page)
+        self.assertIn("NOT DIRECTLY REPLAYABLE AS FOUR UNIQUE MESSAGE IDS", page)
         self.assertIn("separately labelled PBFT control", page)
         self.assertIn("&lt;no live proof&gt;", page)
         integration["independentlyVerifiedCasperFinality"] = True
