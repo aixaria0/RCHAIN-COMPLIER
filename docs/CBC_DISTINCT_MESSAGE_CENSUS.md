@@ -30,6 +30,12 @@ node --experimental-strip-types tools/cbc_distinct_message_census.mjs \
   --output distinct-message-census.json
 ```
 
+## Hash-bound, exact-graph replay input
+
+The census now produces a second artifact, `cbc-distinct-id-rust-replay-input.json`. A deterministic selection rule chooses the first model-finalizing, under-covered, **four-distinct-message-ID** candidate. Unlike a sender-label-only repro, the packet includes the complete **original source DAG**: every message's ID, sender, sequence number, parents and derived `seen` list; the exact bonded-stake map; selected justification IDs; a canonical graph SHA-256; and the census SHA-256. The producer rechecks ID/sender mapping and source-level reachability before exporting.
+
+The packet explicitly says `rustReplayVerified: false` and `wireIngressVerified: false`. It is an **input to** the next exact Rust replay—not proof that the replay has passed or that the graph is wire-admissible. Any claim of reproduction must be attached later to actual pinned Rust execution logs for the exact graph hash, not inferred from the mirror's `modelReportedFinalized` flag.
+
 ## Precise next acceptance gate
 
 Select individual four-distinct-ID / three-sender candidates by *content-hashed source input*; construct the **exact same causal graph** in Rust, compare each intermediate Finalizer state (minimum-message identities, count gate, sender-map size, support and fringe), and independently check full upstream block validation/ingress. If the mirror and Rust disagree, report the **first divergence and complete raw evidence**, not a security verdict. An epoch/bond-set-aware counterfactual sender-coverage check must be evaluated independently before proposing an upstream protocol change.
