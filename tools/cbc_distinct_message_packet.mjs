@@ -17,6 +17,21 @@ export function makePacket(census) {
   if (census?.schema !== SCHEMA) throw new Error("Unsupported census input schema");
   const { recordSha256: seal, ...body } = census;
   if (seal !== digest(canonical(body))) throw new Error("Census digest mismatch");
+  if (!Array.isArray(census.datasets) || census.datasets.length !== 2)
+    throw new Error("Exactly two source DAG datasets required");
+  for (const dataset of census.datasets) {
+    if (!Array.isArray(dataset.candidates)) throw new Error("Missing source candidates");
+    for (const candidate of dataset.candidates) {
+      if (!Array.isArray(candidate.messageIds) || candidate.messageIds.length !== 4 ||
+          new Set(candidate.messageIds).size !== 4 || candidate.messageIdsUnique !== true)
+        throw new Error("Census contains duplicate or invalid candidate message identity");
+      if (!Array.isArray(candidate.justificationSenders) ||
+          candidate.justificationSenders.length !== 4 ||
+          candidate.actualRustFinalizerExecutedForThisExactCandidate !== false ||
+          candidate.wireIngressVerified !== false)
+        throw new Error("Candidate attempts to elevate unverified source-model claims");
+    }
+  }
   const choices = census.datasets.flatMap((dataset) =>
     dataset.candidates
       .filter((candidate) =>
@@ -99,12 +114,11 @@ export async function runPacketFromPinnedSource(sourceDir) {
   const packet = makePacket(census);
   if (packet.selection !== "MODEL_CANDIDATE_READY_FOR_INDEPENDENT_RUST_REPLAY")
     return packet;
-  const path = new URL("file://" + source.replaceAll("%", "%25") +
-    "/src/lib/cbc/casper-concrete-dag.ts");
+  const path = pathToFileURL(join(source, "src/lib/cbc/casper-concrete-dag.ts"));
   // Use an explicit pinned source module, never any fixture copied into the orchestrator.
   const { buildCausallyValidDAG, buildDuplicateMinimumMessageDAG } = await import(path.href);
-  const { analyzeUpstreamReachability } = await import(new URL("file://" +
-    source.replaceAll("%", "%25") + "/src/lib/cbc/casper-upstream-reachability.ts").href);
+  const { analyzeUpstreamReachability } = await import(pathToFileURL(
+    join(source, "src/lib/cbc/casper-upstream-reachability.ts")).href);
   const selectedFixture = packet.sourceDAGFamily === "causally-valid-control"
     ? buildCausallyValidDAG() : buildDuplicateMinimumMessageDAG();
   assert.equal(selectedFixture.messages.length, packet.sourceDAGMessageCount);
