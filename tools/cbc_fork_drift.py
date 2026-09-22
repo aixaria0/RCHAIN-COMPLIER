@@ -25,7 +25,7 @@ def get_json(path):
 
 def repository_name(name):
     parts = name.split("/")
-    if len(parts) != 2 or any(not p or not all(c.isalnum() or c in "-_." for c in p) for p in parts):
+    if len(parts) != 2 or any(not p or p in (".", "..") or not p[0].isalnum() or not all(c.isalnum() or c in "-_." for c in p) for p in parts):
         raise ValueError("Expected GitHub owner/repository: " + name)
     return name
 
@@ -37,7 +37,6 @@ def compare_one(upstream, fork, ref="dev", fetch=get_json):
         raise ValueError("A fork cannot be its own upstream")
     if not ref or not all(c.isalnum() or c in "._-" for c in ref):
         raise ValueError("Invalid branch name")
-    upstream_owner, _ = upstream.split("/")
     owner, _ = fork.split("/")
     base = fetch("/repos/" + upstream + "/commits/" + quote(ref, safe=""))
     head = fetch("/repos/" + fork + "/commits/" + quote(ref, safe=""))
