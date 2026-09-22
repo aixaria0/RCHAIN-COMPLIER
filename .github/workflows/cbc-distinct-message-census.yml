@@ -1,0 +1,69 @@
+name: CBC distinct message ID census
+
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/cbc_distinct_message_census.mjs
+      - tests/fork_drift/test_cbc_distinct_message_census.mjs
+      - .github/workflows/cbc-distinct-message-census.yml
+  pull_request:
+    paths:
+      - tools/cbc_distinct_message_census.mjs
+      - tests/fork_drift/test_cbc_distinct_message_census.mjs
+      - .github/workflows/cbc-distinct-message-census.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  distinct-id-census:
+    name: Enumerate source-valid four-distinct-message candidates
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: pinned-research
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify no duplicate-ID or fictitious-Rust-proof regressions
+        run: node --test orchestrator/tests/fork_drift/test_cbc_distinct_message_census.mjs
+      - name: Execute exhaustive distinct-ID census on actual read-only research DAG sources
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_distinct_message_census.mjs \
+            --source-dir pinned-research \
+            --output evidence/cbc-distinct-message-census.json
+      - name: Check actual generated report has identity-safe candidates and transparent evidence scope
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('evidence/cbc-distinct-message-census.json').read_text())
+          assert r['schema']=='aria-cbc-distinct-message-census/v1'
+          assert r['totalDistinctIdCandidates']==105
+          assert r['originalM27SelectedTupleUniqueIds']==3
+          assert r['originalM27SelectedTupleAdmittedAsFourUniqueMessages'] is False
+          assert len(r['datasets'])==2
+          for dataset in r['datasets']:
+              for case in dataset['candidates']:
+                  assert len(case['messageIds'])==len(set(case['messageIds']))==4
+                  assert case['sourceDAGReachabilityChecked'] is True
+                  assert case['actualRustFinalizerExecutedForThisExactCandidate'] is False
+                  assert case['wireIngressVerified'] is False
+          print('PASS: distinct-ID source-model census; no individual-candidate Rust/finality claim')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbc-distinct-message-census
+          path: evidence/cbc-distinct-message-census.json
+          retention-days: 30
