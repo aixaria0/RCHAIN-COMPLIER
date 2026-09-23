@@ -6,17 +6,20 @@ Compare source-model predictions to source-level Rust observations without
 labelling a fringe result as live Casper finality or an exploitable defect.
 """
 import argparse
+from html import escape
 import json
 from pathlib import Path
 import sys
 
 from cbc_cross_fork_probe import TARGETS, canonical, sha, sha_file
 from cbc_run_exact_rust_dag import SCHEMA, TEST_TARGET, TEST_NAME, parse
+from cbc_emit_exact_rust_dag import emit, check
 
 SCHEMA_OUT = "aria-cbc-exact-dag-four-real-finalizers/v1"
 FIELDS = (
     "unique_justifications", "minimum_message_ids", "minimum_unique_senders",
     "count_gate", "next_layer_senders", "new_fringe", "new_fringe_ids",
+    "next_layer_ids", "support_map", "supporting_stake", "total_stake", "initial_fringe_predicate",
 )
 
 
@@ -25,6 +28,12 @@ def combine(directory, packet_path, census_path, test_file):
     packet = json.loads(Path(packet_path).read_text(encoding="utf8"))
     census = json.loads(Path(census_path).read_text(encoding="utf8"))
     source = Path(test_file).read_bytes()
+    check(packet)
+    census_body = {k: v for k, v in census.items() if k != "recordSha256"}
+    if sha(canonical(census_body)) != census.get("recordSha256"):
+        raise ValueError("Census integrity mismatch")
+    if source != emit(packet).encode("utf8"):
+        raise ValueError("Generated Rust source differs from packet")
     if packet.get("selection") != "MODEL_CANDIDATE_READY_FOR_INDEPENDENT_RUST_REPLAY":
         raise ValueError("Missing selected source-model candidate")
     if packet.get("rustReplayVerified") is not False or packet.get("wireIngressVerified") is not False:
@@ -92,6 +101,11 @@ def combine(directory, packet_path, census_path, test_file):
              candidate["traceDistinctMinimumSenders"],
              observed["minimum_unique_senders"]),
             ("count_gate", candidate["modelCountGatePassed"], observed["count_gate"]),
+            ("next_layer_ids", candidate["modelNextLayer"], observed["next_layer_ids"]),
+            ("support_map", candidate["modelSupportMap"], observed["support_map"]),
+            ("supporting_stake", candidate["modelReportedSupportStake"], observed["supporting_stake"]),
+            ("total_stake", candidate["modelTotalStake"], observed["total_stake"]),
+            ("initial_fringe_predicate", candidate["modelReportedFinalized"], observed["initial_fringe_predicate"]),
             ("new_fringe", candidate["modelReportedFinalized"], observed["new_fringe"]),
         ]
         first_mismatch = next((
@@ -101,6 +115,11 @@ def combine(directory, packet_path, census_path, test_file):
         comparisons.append({
             "target": record["target"], "sourceSha": record["sourceSha"],
             "observedRust": observed,
+            "intermediateComparisons": [
+                {"stage": n, "model": e, "rust": a, "equal": e == a}
+                for n, e, a in field_results
+            ],
+            "comparisonScope": "Initial iteration; minimum extraction is a test projection of a private method. Public support/gate/fringe methods and the complete Finalizer execute independently. No internal trace of subsequent iterations is claimed.",
             "modelPredictedCountGate": candidate["modelCountGatePassed"],
             "modelPredictedNewFringe": candidate["modelReportedFinalized"],
             "firstComparedModelVsRustDifference": first_mismatch,
@@ -121,12 +140,48 @@ def combine(directory, packet_path, census_path, test_file):
         "selectedFourUniqueJustificationIds": packet["selectedJustificationIds"],
         "modelSourceMinimumMessageIds": candidate["traceMinimumMessageIds"],
         "modelSourceFinalized": candidate["modelReportedFinalized"],
+        "rustRepresentation": {
+            "messageIdentity": "Original ASCII IDs in generic Message<String,String>; not signed block hashes",
+            "senderIdentity": "Original v0..v3 labels; not cryptographic validator keys",
+            "globalBonds": "Original stakes passed to calculate_finalization",
+            "unmodeledMessageFields": "height=0, bonds_map={}, fringe={}; no source-model values exist for these fields",
+        },
         "fourPinnedRustSourceResults": records,
         "modelVsRustByTarget": comparisons,
         "observedDifferentFieldsAcrossFourRustSnapshots": observed_diffs,
         "claimBoundary": "Same exact model-selected complete source DAG was built in and tested through four real Rust Finalizer source snapshots. This is source-level local finalizer behavior only; no authenticated source, wire-valid BlockReceiver ingress, deployed-network exploit, conflicting finality, protocol-fix approval or cross-implementation quality ranking.",
     }
     return {**body, "reportSha256": sha(canonical(body))}
+
+
+def render(report):
+    """Offline view generated only after combine has validated all raw records."""
+    enc = lambda v: escape(json.dumps(v, ensure_ascii=False, sort_keys=True))
+    rows = []
+    for result in report["modelVsRustByTarget"]:
+        target = escape(result["target"])
+        rows.append("<h2>" + target + "</h2><p>Source: <code>" +
+                    escape(result["sourceSha"]) + "</code></p><p>First compared difference: <code>" +
+                    enc(result["firstComparedModelVsRustDifference"]) + "</code></p>")
+        rows.append("<table><tr><th>Stage</th><th>Model</th><th>Rust</th><th>Equal</th></tr>")
+        for item in result["intermediateComparisons"]:
+            rows.append("<tr>" + "".join("<td><code>" + enc(item[k]) + "</code></td>"
+                for k in ("stage", "model", "rust", "equal")) + "</tr>")
+        rows.append("</table><p>" + escape(result["comparisonScope"]) + "</p>")
+        rows.append("<p><a href='evidence/exact-" + target + "/stdout.log'>Raw stdout</a> · " +
+                    "<a href='evidence/exact-" + target + "/stderr.log'>Raw stderr</a></p>")
+    return ("<!doctype html><html lang='en'><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Exact CBC DAG — source-level evidence</title>"
+        "<style>body{font:16px system-ui;max-width:1100px;margin:30px auto;padding:16px;background:#111923;color:#e9edf3}"
+        "table{border-collapse:collapse;display:block;overflow:auto}td,th{border:1px solid #536170;padding:10px}"
+        "code{overflow-wrap:anywhere}a{color:#86c7ff}</style>"
+        "<h1>Exact CBC DAG replay</h1><p><strong>SOURCE-LEVEL RUST · INGRESS UNVERIFIED · LIVE NETWORK UNVERIFIED</strong></p>"
+        "<p>Candidate: <code>" + enc(report["selectedFourUniqueJustificationIds"]) + "</code></p>"
+        "<p>Graph SHA-256: <code>" + escape(report["exactSourceGraphSha256"]) + "</code></p>"
+        "<p>Packet SHA-256: <code>" + escape(report["exactInputPacketSha256"]) + "</code></p>"
+        "<p>Rust test SHA-256: <code>" + escape(report["identicalGeneratedRustTestSha256"]) + "</code></p>"
+        "<p>" + escape(report["claimBoundary"]) + "</p>" + "".join(rows) + "</html>")
 
 
 def main():
@@ -142,6 +197,7 @@ def main():
         path = Path(a.output)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf8")
+        path.with_suffix(".html").write_text(render(report), encoding="utf8")
         print(json.dumps({
             "result": "FOUR_REAL_RUST_FINALIZERS_EXACT_SOURCE_DAG_OBSERVED",
             "graphSha256": report["exactSourceGraphSha256"],

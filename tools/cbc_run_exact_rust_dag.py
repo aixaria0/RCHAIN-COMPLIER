@@ -11,12 +11,15 @@ import re
 import subprocess
 import sys
 from cbc_cross_fork_probe import TARGETS, sha, sha_file, canonical
+from cbc_emit_exact_rust_dag import emit, check
 
 TEST_TARGET = "aria_exact_distinct_id_dag"
 TEST_NAME = "aria_exact_source_dag_finalizer_observation"
 FIELDS = ("graph_sha256", "packet_sha256", "source_message_count",
           "unique_justifications", "minimum_message_ids", "minimum_unique_senders",
-          "count_gate", "next_layer_senders", "new_fringe", "new_fringe_ids")
+          "count_gate", "next_layer_senders", "new_fringe", "new_fringe_ids",
+          "next_layer_ids", "support_map", "supporting_stake", "total_stake",
+          "initial_fringe_predicate")
 SCHEMA = "aria-cbc-exact-source-dag-rust-observation/v1"
 
 
@@ -33,9 +36,9 @@ def parse(stdout):
         if not re.fullmatch(r"[0-9a-f]{64}", observation[name]):
             raise ValueError("Invalid source-graph or packet digest")
     for key in ("source_message_count", "unique_justifications",
-                "minimum_unique_senders", "next_layer_senders"):
+                "minimum_unique_senders", "next_layer_senders", "supporting_stake", "total_stake"):
         observation[key] = int(observation[key])
-    for key in ("count_gate", "new_fringe"):
+    for key in ("count_gate", "new_fringe", "initial_fringe_predicate"):
         if observation[key] not in ("true", "false"):
             raise ValueError("Invalid Rust boolean")
         observation[key] = observation[key] == "true"
@@ -46,6 +49,14 @@ def parse(stdout):
     if observation["unique_justifications"] != 4 or (
         observation["new_fringe"] != bool(observation["new_fringe_ids"])):
         raise ValueError("Inconsistent Rust source witness observation")
+    for key in ("next_layer_ids", "support_map"):
+        observation[key] = json.loads(observation[key])
+        if not isinstance(observation[key], dict):
+            raise ValueError("Invalid Rust map observation")
+    if len(observation["next_layer_ids"]) != observation["next_layer_senders"]:
+        raise ValueError("Next-layer count differs from identities")
+    if not 0 <= observation["supporting_stake"] <= observation["total_stake"]:
+        raise ValueError("Invalid stake observation")
     return observation
 
 
@@ -56,6 +67,9 @@ def execute(target, checkout, packet_path, test_source_path, out_dir):
     out.mkdir(parents=True, exist_ok=True)
     packet = json.loads(Path(packet_path).read_text(encoding="utf8"))
     source = Path(test_source_path).read_bytes()
+    check(packet)
+    if source != emit(packet).encode("utf8"):
+        raise ValueError("Rust test source differs from deterministic packet translation")
     if packet.get("rustReplayVerified") is not False or packet.get("wireIngressVerified") is not False:
         raise ValueError("Source-model packet elevates unverified claims")
     if not source or b"fn aria_exact_source_dag_finalizer_observation()" not in source:
@@ -93,6 +107,12 @@ def execute(target, checkout, packet_path, test_source_path, out_dir):
                                     observation["packet_sha256"] != packet["packetSha256"] or
                                     observation["source_message_count"] != len(packet["sourceGraph"]["messages"])):
         raise ValueError("Actual Rust observation differs from hash-bound exact source DAG")
+    if finalizer.read_bytes() != production:
+        raise ValueError("Production Finalizer changed during test execution")
+    versions = {}
+    for command in (["rustc", "--version"], ["cargo", "--version"]):
+        versions[command[0]] = subprocess.run(command, check=True, text=True,
+            capture_output=True, timeout=20).stdout.strip()
     body = {
         "schema": SCHEMA,
         "target": target, "repository": repo, "sourceSha": pin,
@@ -104,6 +124,11 @@ def execute(target, checkout, packet_path, test_source_path, out_dir):
         "effectiveCargoLockSha256": sha(updated_lock),
         "cargoLockModified": original_lock != updated_lock,
         "command": cmd, "exitCode": result.returncode,
+        "toolchain": versions,
+        "workflowRunId": os.environ.get("GITHUB_RUN_ID"),
+        "workflowRunAttempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "minimumExtractionBasis": "TEST_PROJECTION_OF_INITIAL_PRIVATE_SELF_PARENT_WALK",
+        "supportBasis": "PRODUCTION_CALCULATE_NEXT_FRINGE_SUPPORT_MAP",
         "stdoutSha256": sha(result.stdout), "stderrSha256": sha(result.stderr),
         "rustObservation": observation,
         "evidenceScope": "Real pinned Finalizer on exact four-unique-message model-selected graph; not RNode ingress, conflicting finality or deployed-network safety.",

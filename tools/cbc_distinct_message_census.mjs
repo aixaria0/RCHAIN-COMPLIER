@@ -102,6 +102,9 @@ export function census(fixtures, reachabilityFn, traceFn) {
         modelCountGatePassed: mirror.checkMinMessagesPassed,
         modelReportedFinalized: mirror.finalized,
         modelReportedSupportStake: mirror.supportingStake,
+        modelNextLayer: mirror.nextLayer ?? null,
+        modelSupportMap: mirror.supportMap ?? null,
+        modelTotalStake: mirror.totalStake ?? null,
         actualRustFinalizerExecutedForThisExactCandidate: false,
         wireIngressVerified: false,
       };

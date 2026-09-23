@@ -137,14 +137,32 @@ SOURCE_BONDS
     let distinct_minimum_senders: BTreeSet<_> = minimum.iter().map(|m| m.sender.as_str()).collect();
     let gate = finalizer.check_min_messages(&minimum, &bonds);
     let next_layer = finalizer.calculate_next_layer(&minimum);
+    // Initial iteration only; all message fringes are empty in this model packet.
+    // The minimum chain is a test projection; support/fringe call production methods.
+    let support = finalizer.calculate_next_fringe_support_map(
+        &justifications, &next_layer, &BTreeSet::new());
+    let next_ids: BTreeMap<_, _> = next_layer.iter()
+        .map(|(s, m)| (s.clone(), m.id.clone())).collect();
+    let support_json: BTreeMap<_, BTreeMap<_, Vec<_>>> = support.iter()
+        .map(|(s, inner)| (s.clone(), inner.iter()
+            .map(|(n, observers)| (n.clone(), observers.iter().cloned().collect()))
+            .collect())).collect();
+    let bonded: BTreeSet<_> = bonds.keys().cloned().collect();
+    let supporting_stake: i128 = support.iter()
+        .filter(|(_, inner)| !inner.is_empty() && inner.values().all(|v| v == &bonded))
+        .filter_map(|(sender, _)| bonds.get(sender))
+        .map(|stake| i128::from(i64::from(*stake))).sum();
+    let total_stake: i128 = bonds.values().map(|v| i128::from(i64::from(*v))).sum();
+    let initial_fringe_predicate = finalizer.calculate_fringe(&support, &bonds);
     let (_parent_fringe, new_fringe) = finalizer.calculate_finalization(&justifications, &bonds);
     let new_fringe_ids: Vec<_> = new_fringe
         .as_ref().map(|s| s.iter().map(|m| m.id.as_str()).collect()).unwrap_or_default();
     println!(
-        "ARIA_EXACT_DAG_V1|graph_sha256={}|packet_sha256={}|source_message_count={}|unique_justifications={}|minimum_message_ids={}|minimum_unique_senders={}|count_gate={}|next_layer_senders={}|new_fringe={}|new_fringe_ids={}",
+        "ARIA_EXACT_DAG_V1|graph_sha256={}|packet_sha256={}|source_message_count={}|unique_justifications={}|minimum_message_ids={}|minimum_unique_senders={}|count_gate={}|next_layer_senders={}|new_fringe={}|new_fringe_ids={}|next_layer_ids={:?}|support_map={:?}|supporting_stake={}|total_stake={}|initial_fringe_predicate={}",
         graph_sha, packet_sha, all.len(), justifications.len(),
         minimum_ids.join(","), distinct_minimum_senders.len(), gate,
         next_layer.len(), new_fringe.is_some(), new_fringe_ids.join(","),
+        next_ids, support_json, supporting_stake, total_stake, initial_fringe_predicate,
     );
 }
 """.replace("GRAPH_SHA", graph_sha).replace("PACKET_SHA", packet_sha).replace(

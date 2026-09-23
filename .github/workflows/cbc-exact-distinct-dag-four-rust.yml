@@ -11,6 +11,7 @@ on:
       - tools/cbc_run_exact_rust_dag.py
       - tools/cbc_compare_exact_rust_dag.py
       - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
+      - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
       - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - tools/cbc_run_exact_rust_dag.py
       - tools/cbc_compare_exact_rust_dag.py
       - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
+      - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
       - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
   workflow_dispatch:
 
@@ -50,7 +52,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Run offline generated-Rust-source contract regressions
-        run: python -m unittest discover -s orchestrator/tests/fork_drift -p test_cbc_emit_exact_rust_dag.py -v
+        run: python -m unittest discover -s orchestrator/tests/fork_drift -p 'test_*exact*py' -v
       - name: Execute original source-model census
         run: |
           node --experimental-strip-types orchestrator/tools/cbc_distinct_message_census.mjs \
@@ -200,6 +202,8 @@ jobs:
           name: exact-dag-four-real-finalizers
           path: |
             exact-dag-four-real-finalizers.json
+            exact-dag-four-real-finalizers.html
+            evidence/
             fixture/packet.json
             fixture/aria_exact_distinct_id_dag.rs
           retention-days: 30
