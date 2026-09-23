@@ -10,6 +10,8 @@ on:
       - tools/cbc_emit_exact_rust_dag.py
       - tools/cbc_run_exact_rust_dag.py
       - tools/cbc_compare_exact_rust_dag.py
+      - tools/cbc_check_lean_stake.py
+      - tests/fork_drift/test_cbc_lean_stake.py
       - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
       - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
       - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
@@ -21,6 +23,8 @@ on:
       - tools/cbc_emit_exact_rust_dag.py
       - tools/cbc_run_exact_rust_dag.py
       - tools/cbc_compare_exact_rust_dag.py
+      - tools/cbc_check_lean_stake.py
+      - tests/fork_drift/test_cbc_lean_stake.py
       - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
       - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
       - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
@@ -206,4 +210,50 @@ jobs:
             evidence/
             fixture/packet.json
             fixture/aria_exact_distinct_id_dag.rs
+          retention-days: 30
+
+  lean-stake-conformance:
+    name: Kernel-check actual Rust stake observations against pinned Lean specification
+    needs: model-vs-rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-dag-four-real-finalizers
+          path: bundle
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test serialization and admission rejection
+        run: python -m unittest discover -s orchestrator/tests/fork_drift -p 'test_cbc_lean_stake.py' -v
+      - name: Install Lean toolchain manager
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Fetch pinned mathlib cache and build only stake specification
+        working-directory: implementation/spec
+        run: |
+          lake exe cache get
+          lake build Rchain.Casper.Stake
+      - name: Prove concrete equalities from independently validated Rust evidence
+        run: |
+          python orchestrator/tools/cbc_check_lean_stake.py \
+            --bundle bundle --checkout implementation --out-dir lean-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-dag-lean-stake-conformance
+          path: lean-evidence/
+          if-no-files-found: warn
           retention-days: 30
