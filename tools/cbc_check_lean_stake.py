@@ -4,6 +4,7 @@
 Finite input conformance, not a proof of the Rust program or Casper safety.
 """
 import argparse
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -100,6 +101,17 @@ def check_axioms(stdout, names):
         raise ValueError('Lean admission detected')
 
 
+def mutation_controls(report, packet):
+    """Deliberately inconsistent proof inputs, never research observations."""
+    wrong_stake = deepcopy(report)
+    wrong_stake['modelVsRustByTarget'][0]['observedRust']['supporting_stake'] += 1
+    wrong_bonds = deepcopy(packet)
+    first_bond = sorted(wrong_bonds['sourceGraph']['bondsMap'])[0]
+    wrong_bonds['sourceGraph']['bondsMap'][first_bond] += 1
+    return [('altered_supporting_stake', wrong_stake, packet),
+            ('altered_bonds', report, wrong_bonds)]
+
+
 def run(bundle, checkout, out):
     bundle, checkout, out = map(lambda p: Path(p).resolve(), (bundle, checkout, out))
     out.mkdir(parents=True, exist_ok=True)
@@ -147,6 +159,21 @@ def run(bundle, checkout, out):
     check_axioms(result.stdout, names)
     if hashes != {p: sha_file(spec / p) for p in source_paths}:
         raise ValueError('Specification changed during proof check')
+    controls = []
+    for label, changed_report, changed_packet in mutation_controls(report, packet):
+        changed_code, _, _ = generate(changed_report, changed_packet)
+        negative = out / (label + '.lean')
+        negative.write_text(changed_code)
+        rejected = subprocess.run(['lake', 'env', 'lean', str(negative)], cwd=spec,
+                                  capture_output=True, text=True, timeout=300)
+        log = out / (label + '.log')
+        log.write_text(rejected.stdout + rejected.stderr)
+        if rejected.returncode == 0 or "tactic 'decide'" not in rejected.stdout:
+            raise ValueError('Mutation control did not fail at proof checking: ' + label)
+        controls.append({'name': label, 'expectedRejection': True,
+                         'exitCode': rejected.returncode, 'logSha256': sha_file(log),
+                         'generatedLeanSha256': sha_file(negative)})
+    record['negativeControls'] = controls
     record['kernelChecked'] = True
     record['theorems'] = names
     record['recordSha256'] = sha(canonical(record))

@@ -1,4 +1,4 @@
-# Distinct-message CBC witness census — the next evidence gate
+# Distinct-message CBC witness census and exact replay
 
 ## Why this is a separate search
 
@@ -36,9 +36,9 @@ The census now produces a second artifact, `cbc-distinct-id-rust-replay-input.js
 
 The packet explicitly says `rustReplayVerified: false` and `wireIngressVerified: false`. It is an **input to** the next exact Rust replay—not proof that the replay has passed or that the graph is wire-admissible. Any claim of reproduction must be attached later to actual pinned Rust execution logs for the exact graph hash, not inferred from the mirror's `modelReportedFinalized` flag.
 
-## Precise next acceptance gate
+## Replay and remaining acceptance gates
 
-Select individual four-distinct-ID / three-sender candidates by *content-hashed source input*; construct the **exact same causal graph** in Rust, compare each intermediate Finalizer state (minimum-message identities, count gate, sender-map size, support and fringe), and independently check full upstream block validation/ingress. If the mirror and Rust disagree, report the **first divergence and complete raw evidence**, not a security verdict. An epoch/bond-set-aware counterfactual sender-coverage check must be evaluated independently before proposing an upstream protocol change.
+The selected `a2,a3,b2,c2` packet has now executed on all four pinned Rust Finalizers. [Run 35805385622](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/35805385622), at `8db29fbe10ae26bd9f9fc4fa0ed1bd591d10a70a`, records support 70/100, a true initial fringe predicate and final fringe `a1,b1,c1` in each implementation, with no difference at the compared initial-iteration stages. Minimum extraction remains a test projection of a private method, not an internal trace. See [the proof/code review entry point](CBC_LEAN_RUST_CONFORMANCE.md) for representation limits and the new Lean conformance gate. Full upstream block validation/ingress remains unverified. If the mirror and Rust disagree, report the **first divergence and complete raw evidence**, not a security verdict. An epoch/bond-set-aware counterfactual sender-coverage check must be evaluated independently before proposing an upstream protocol change.
 
 This census lives in independent draft PR #17. PR #16 remains unchanged and is consumed read-only.
 

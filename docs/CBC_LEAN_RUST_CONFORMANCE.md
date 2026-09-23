@@ -38,6 +38,9 @@ The actual Rust support maps and source bonds become concrete inputs to
 `fullPartitionStake`, `totalStake`, and `calculateFringe`. Every equality uses
 `by decide`; `#print axioms` must report no axioms for each new theorem.
 Missing declarations, admissions and nonempty axiom dependencies fail the job.
+Two deliberately mutated controls (changed supporting stake and changed bonds)
+must be rejected by Lean at `decide` proof checking; their proof sources and raw
+failure logs are retained separately from the genuine observations.
 The generated proof, source/manifest hashes, sender mapping, toolchain version,
 raw output, exit code and report binding are uploaded as
 `exact-dag-lean-stake-conformance`.
