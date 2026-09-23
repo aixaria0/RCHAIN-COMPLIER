@@ -45,9 +45,16 @@ The generated proof, source/manifest hashes, sender mapping, toolchain version,
 raw output, exit code and report binding are uploaded as
 `exact-dag-lean-stake-conformance`.
 
-Status of this addition: IMPLEMENTED / Python bridge tests passed; Lean execution
-is established only by a successful `lean-stake-conformance` job at the relevant
-HEAD. A triggered workflow is not a proof result.
+Status: **CI-VERIFIED at `24ecc9d78790a4951bfdad110c3ee68bf13b9851`** in
+[run 35876517742](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/35876517742).
+All four Rust runs and comparison passed. Lean 4.12.0 accepted all twelve concrete
+equalities with empty axiom audits; both mutations failed at `decide` (exit 1).
+The downloaded receipt and every retained output digest were independently
+checked before this checkpoint was committed.
+
+Review the [actual Lean proof](../artifacts/cbc-lean-stake-35876517742/ExactReplayStake.lean)
+and [frozen receipt/logs](../artifacts/cbc-lean-stake-35876517742/README.md) directly.
+This result belongs to that exact revision/run, not automatically to later HEADs.
 
 ## Representation contract and remaining proof work
 

@@ -1,0 +1,15 @@
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_supporting_stake.lean:6:97: error: tactic 'decide' proved that the proposition
+  Rchain.fullPartitionStake bill_kunj_support bill_kunj_bonds = 71
+is false
+'AriaReplay.bill_kunj_stake' depends on axioms: [sorryAx]
+'AriaReplay.bill_kunj_total' does not depend on any axioms
+'AriaReplay.bill_kunj_gate' does not depend on any axioms
+'AriaReplay.community_stake' does not depend on any axioms
+'AriaReplay.community_total' does not depend on any axioms
+'AriaReplay.community_gate' does not depend on any axioms
+'AriaReplay.nzpr_stake' does not depend on any axioms
+'AriaReplay.nzpr_total' does not depend on any axioms
+'AriaReplay.nzpr_gate' does not depend on any axioms
+'AriaReplay.shplarggle_stake' does not depend on any axioms
+'AriaReplay.shplarggle_total' does not depend on any axioms
+'AriaReplay.shplarggle_gate' does not depend on any axioms
