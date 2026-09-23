@@ -31,6 +31,10 @@ export function canonical(value) {
   }
   throw new Error("Non-JSON witness property");
 }
+// Hash the entire fixture independently of the selected justification subset.
+export const sourceGraphBase = (fixture) => ({
+  bondsMap: fixture.bondsMap, messages: fixture.messages,
+});
 export const digest = (value) =>
   createHash("sha256").update(value, "utf8").digest("hex");
 
@@ -109,6 +113,7 @@ export function census(fixtures, reachabilityFn, traceFn) {
     datasets.push({
       name,
       sourceMessageCount: fixture.messages.length,
+      sourceGraphBaseSha256: digest(canonical(sourceGraphBase(fixture))),
       candidatePool: pool,
       distinctFourMessageCandidateCount: candidates.length,
       underCoverageCandidateCount: underCoverage.length,
@@ -140,6 +145,10 @@ export async function runFromPinnedSource(sourceDir) {
     cwd: sourceDir, encoding: "utf8", timeout: 20_000,
   }).trim();
   assert.equal(sha, SOURCE_SHA, "Refusing an unpinned research source revision");
+  const dirty = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+    cwd: sourceDir, encoding: "utf8", timeout: 20_000,
+  });
+  assert.equal(dirty.trim(), "", "Refusing modified pinned research checkout");
   const folder = join(sourceDir, "src/lib/cbc");
   const { buildCausallyValidDAG, buildDuplicateMinimumMessageDAG } =
     await import(pathToFileURL(join(folder, "casper-concrete-dag.ts")).href);

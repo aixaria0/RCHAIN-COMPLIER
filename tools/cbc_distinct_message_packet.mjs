@@ -9,18 +9,25 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { runFromPinnedSource, SOURCE_SHA, SCHEMA, canonical, digest } from "./cbc_distinct_message_census.mjs";
+import { runFromPinnedSource, SOURCE_SHA, SCHEMA, canonical, digest, sourceGraphBase, UPSTREAM_REVISION } from "./cbc_distinct_message_census.mjs";
 
 export const PACKET_SCHEMA = "aria-cbc-distinct-id-rust-replay-input/v1";
+export const SELECTION_RULE = "ASCII lexical DAG family, then comma-joined ascending message IDs; first eligible candidate";
+const lexical = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 const BONDED = ["v0", "v1", "v2", "v3"];
 
 export function makePacket(census) {
   if (census?.schema !== SCHEMA) throw new Error("Unsupported census input schema");
   const { recordSha256: seal, ...body } = census;
   if (seal !== digest(canonical(body))) throw new Error("Census digest mismatch");
+  assert.equal(census.producer, "aixaria0/RCHAIN-COMPLIER@" + SOURCE_SHA, "Wrong census source SHA");
+  assert.equal(census.researchUpstreamRevision, UPSTREAM_REVISION, "Wrong model upstream pin");
   if (!Array.isArray(census.datasets) || census.datasets.length !== 2)
     throw new Error("Exactly two source DAG datasets required");
+  assert.deepEqual(census.datasets.map(d => d.name).sort(),
+    ["causally-valid-control", "distinct-v0-message-stress"], "Unknown or duplicate DAG family");
   for (const dataset of census.datasets) {
+    assert.match(dataset.sourceGraphBaseSha256, /^[0-9a-f]{64}$/, "Missing complete source graph digest");
     if (!Array.isArray(dataset.candidates)) throw new Error("Missing source candidates");
     for (const candidate of dataset.candidates) {
       if (!Array.isArray(candidate.messageIds) || candidate.messageIds.length !== 4 ||
@@ -46,8 +53,8 @@ export function makePacket(census) {
         candidate.wireIngressVerified === false)
       .map((candidate) => ({ dataset, candidate })));
   choices.sort((a, b) =>
-    a.dataset.name.localeCompare(b.dataset.name) ||
-    a.candidate.messageIds.join(",").localeCompare(b.candidate.messageIds.join(",")));
+    lexical(a.dataset.name, b.dataset.name) ||
+    lexical(a.candidate.messageIds.join(","), b.candidate.messageIds.join(",")));
   // No invented result if the constrained model has no candidate.
   const selected = choices[0];
   if (!selected) {
@@ -65,6 +72,8 @@ export function makePacket(census) {
     censusSha256: seal,
     sourceCommit: SOURCE_SHA,
     sourceDAGFamily: selected.dataset.name,
+    selectionRule: SELECTION_RULE,
+    sourceGraphBaseSha256: selected.dataset.sourceGraphBaseSha256,
     sourceDAGMessageCount: selected.dataset.sourceMessageCount,
     selectedJustificationIds: [...ids],
     selectedJustificationSenders: [...selected.candidate.justificationSenders],
@@ -104,6 +113,8 @@ export function bindSourceGraph(packet, fixture, reachabilityFn) {
     })),
     justifications: [...packet.selectedJustificationIds],
   };
+  assert.equal(digest(canonical(sourceGraphBase(sourceGraph))), packet.sourceGraphBaseSha256,
+    "Source graph differs from census fixture (messages or bonds)");
   const exactGraphSha256 = digest(canonical(sourceGraph));
   const content = { ...packet, sourceGraph, exactGraphSha256 };
   return { ...content, packetSha256: digest(canonical(content)) };

@@ -62,7 +62,7 @@ jobs:
       - name: Independently verify the selected full graph and content hashes
         run: |
           node orchestrator/tools/verify_cbc_distinct_message_packet.mjs \
-            --census evidence/cbc-distinct-message-census.json \
+            --source-dir pinned-research --census evidence/cbc-distinct-message-census.json \
             --packet evidence/cbc-distinct-id-rust-replay-input.json
       - name: Check selected candidate carries the exact graph but makes no Rust claim
         run: |

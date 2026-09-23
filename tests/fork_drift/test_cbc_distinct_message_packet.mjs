@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { digest, canonical, SCHEMA, SOURCE_SHA } from "../../tools/cbc_distinct_message_census.mjs";
+import { digest, canonical, SCHEMA, SOURCE_SHA, UPSTREAM_REVISION, sourceGraphBase } from "../../tools/cbc_distinct_message_census.mjs";
 import { bindSourceGraph, makePacket, PACKET_SCHEMA } from "../../tools/cbc_distinct_message_packet.mjs";
 
 const ids = ["a2", "a3", "b3", "c3"];
@@ -16,11 +16,11 @@ function census(candidateOverride = {}) {
     wireIngressVerified: false, ...candidateOverride,
   };
   const body = {
-    schema: SCHEMA,
+    schema: SCHEMA, producer: "aixaria0/RCHAIN-COMPLIER@" + SOURCE_SHA, researchUpstreamRevision: UPSTREAM_REVISION,
     datasets: [
-      { name: "distinct-v0-message-stress", sourceMessageCount: 4,
+      { name: "distinct-v0-message-stress", sourceMessageCount: 4, sourceGraphBaseSha256: digest(canonical(sourceGraphBase(graph()))),
         candidates: [candidate] },
-      { name: "causally-valid-control", sourceMessageCount: 4,
+      { name: "causally-valid-control", sourceMessageCount: 4, sourceGraphBaseSha256: digest(canonical(sourceGraphBase(graph()))),
         candidates: [] },
     ],
   };

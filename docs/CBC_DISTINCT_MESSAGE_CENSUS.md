@@ -41,3 +41,13 @@ The packet explicitly says `rustReplayVerified: false` and `wireIngressVerified:
 Select individual four-distinct-ID / three-sender candidates by *content-hashed source input*; construct the **exact same causal graph** in Rust, compare each intermediate Finalizer state (minimum-message identities, count gate, sender-map size, support and fringe), and independently check full upstream block validation/ingress. If the mirror and Rust disagree, report the **first divergence and complete raw evidence**, not a security verdict. An epoch/bond-set-aware counterfactual sender-coverage check must be evaluated independently before proposing an upstream protocol change.
 
 This census lives in independent draft PR #17. PR #16 remains unchanged and is consumed read-only.
+
+## Packet audit continuation (2026-09-23)
+
+The handoff HEAD `a1a23270f9badc0977b7fdee30b9823dce12a56c` already included a packet verifier and Rust replay workflow. The census workflow succeeded, but exact replay run [35799781504](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/35799781504) failed: the generated Rust collection expression borrowed the collected set (`E0308`). That is a generated-test compilation failure, not a Finalizer semantic result.
+
+Local regeneration confirmed 105 / 81 / 43. Deterministic selection is ASCII lexical DAG family followed by the comma-joined message IDs; the selected candidate remains `a2,a3,b2,c2` from `causally-valid-control`, with all 16 original messages. Its graph digest remains `d5145646e47d650acfdfc87d44d02e6eb5c9e126eed7d61bc5adf21b2e494281`.
+
+The audit found that the old verifier accepted a changed positive stake if the packet and graph were resealed. The census now commits to the complete message/stake graph independently of the selected subset. Packet verification compares against that digest, checks deterministic selection and exact metadata, and the CLI regenerates the census from a clean pinned source checkout via required `--source-dir`. This rejects coordinated census/packet edits in the CI path, rather than trusting a self-reported SHA. SHA-256 still does not authenticate a producer.
+
+Added regressions cover resealed stake changes, extra graph messages, source SHA, sender mapping, missing-coverage metadata, extra elevated claims and order-independent selection. The packet and census envelopes gain additive graph-binding metadata; historical artifacts are preserved, while the strengthened verifier requires newly generated bound inputs. These are integrity/representation checks, not Rust or ingress results.

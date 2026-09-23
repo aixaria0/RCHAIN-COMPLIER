@@ -62,7 +62,7 @@ jobs:
       - name: Independently verify causal source DAG and model-only claim flags
         run: |
           node orchestrator/tools/verify_cbc_distinct_message_packet.mjs \
-            --census fixture/census.json --packet fixture/packet.json
+            --source-dir pinned-research --census fixture/census.json --packet fixture/packet.json
       - name: Emit actual identical Rust source using all original source DAG messages
         run: |
           python orchestrator/tools/cbc_emit_exact_rust_dag.py \

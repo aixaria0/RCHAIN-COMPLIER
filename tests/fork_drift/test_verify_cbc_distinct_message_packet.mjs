@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SCHEMA, canonical, digest } from "../../tools/cbc_distinct_message_census.mjs";
+import { SCHEMA, canonical, digest, SOURCE_SHA, UPSTREAM_REVISION, sourceGraphBase } from "../../tools/cbc_distinct_message_census.mjs";
 import { makePacket, bindSourceGraph } from "../../tools/cbc_distinct_message_packet.mjs";
 import { verifyPacket } from "../../tools/verify_cbc_distinct_message_packet.mjs";
 
@@ -26,9 +26,9 @@ function inputs(){
     sourceDAGReachabilityChecked:true,actualRustFinalizerExecutedForThisExactCandidate:false,
     wireIngressVerified:false,
   };
-  const body={schema:SCHEMA,datasets:[
-    {name:"distinct-v0-message-stress",sourceMessageCount:graph.messages.length,candidates:[candidate]},
-    {name:"causally-valid-control",sourceMessageCount:graph.messages.length,candidates:[]},
+  const body={schema:SCHEMA,producer:"aixaria0/RCHAIN-COMPLIER@"+SOURCE_SHA,researchUpstreamRevision:UPSTREAM_REVISION,datasets:[
+    {name:"distinct-v0-message-stress",sourceMessageCount:graph.messages.length,sourceGraphBaseSha256:digest(canonical(sourceGraphBase(graph))),candidates:[candidate]},
+    {name:"causally-valid-control",sourceMessageCount:graph.messages.length,sourceGraphBaseSha256:digest(canonical(sourceGraphBase(graph))),candidates:[]},
   ]};
   const census={...body,recordSha256:digest(canonical(body))};
   const packet=bindSourceGraph(makePacket(census),graph,
@@ -85,4 +85,51 @@ test("counterfeit source-model pass flags and wrong census link are rejected",()
   const p=inputs();
   p.packet.censusSha256="f".repeat(64);
   assert.throws(()=>verifyPacket(p.census,reseal(p.packet)),/Expected values to be strictly equal/);
+});
+
+function resealGraph(packet) {
+  packet.exactGraphSha256 = digest(canonical(packet.sourceGraph));
+  return reseal(packet);
+}
+test("resealed changed stake or removed unselected source message cannot substitute the source graph", () => {
+  const a = inputs();
+  a.packet.sourceGraph.bondsMap.v0 = 71;
+  assert.throws(() => verifyPacket(a.census, resealGraph(a.packet)), /differs from census fixture/);
+  const b = inputs();
+  b.packet.sourceGraph.messages.push({id:"extra",sender:"v3",senderSeq:0,parents:[],seen:["extra"]});
+  b.packet.sourceDAGMessageCount++;
+  assert.throws(() => verifyPacket(b.census, resealGraph(b.packet)), /differs from census fixture/);
+});
+test("wrong source SHA, sender mapping, missing coverage and elevated extra claims fail closed", () => {
+  for (const mutate of [
+    p => { p.sourceCommit = "f".repeat(40); },
+    p => { p.selectedJustificationSenders[0] = "v3"; },
+    p => { p.missingBondedMinimumSenders = []; },
+    p => { p.producerAuthenticated = true; },
+    p => { p.liveNetwork = true; },
+    p => { p.exactGraphSha256 = "f".repeat(64); },
+  ]) {
+    const {census,packet} = inputs(); mutate(packet);
+    assert.throws(() => verifyPacket(census, reseal(packet)));
+  }
+});
+test("wrong census source SHA cannot be repaired with a new digest", () => {
+  const {census} = inputs();
+  census.producer = "aixaria0/RCHAIN-COMPLIER@" + "f".repeat(40);
+  const {recordSha256: old, ...body} = census;
+  census.recordSha256 = digest(canonical(body));
+  assert.throws(() => makePacket(census), /Wrong census source SHA/);
+});
+test("deterministic selection ignores dataset and candidate arrival order", () => {
+  const {census} = inputs();
+  const second = structuredClone(census.datasets[0].candidates[0]);
+  second.messageIds = ["a2","a3","b3","z3"];
+  census.datasets[0].candidates.unshift(second);
+  const seal = value => { const {recordSha256: old,...body}=value; return {...body,recordSha256:digest(canonical(body))}; };
+  const expected = makePacket(seal(census));
+  census.datasets.reverse();
+  census.datasets[1].candidates.reverse();
+  const actual = makePacket(seal(census));
+  assert.deepEqual(actual.selectedJustificationIds, expected.selectedJustificationIds);
+  assert.deepEqual(actual.selectedJustificationIds, ids);
 });

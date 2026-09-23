@@ -7,8 +7,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { SCHEMA as CENSUS_SCHEMA, canonical, digest, SOURCE_SHA } from "./cbc_distinct_message_census.mjs";
-import { PACKET_SCHEMA } from "./cbc_distinct_message_packet.mjs";
+import { SCHEMA as CENSUS_SCHEMA, canonical, digest, SOURCE_SHA, sourceGraphBase, runFromPinnedSource } from "./cbc_distinct_message_census.mjs";
+import { PACKET_SCHEMA, makePacket } from "./cbc_distinct_message_packet.mjs";
 
 const identity = (m) => m.id;
 export function verifyPacket(census, packet) {
@@ -80,6 +80,11 @@ export function verifyPacket(census, packet) {
   assert.equal(matching.sourceDAGReachabilityChecked, true);
   assert.equal(matching.actualRustFinalizerExecutedForThisExactCandidate, false);
   assert.equal(matching.wireIngressVerified, false);
+  assert.equal(digest(canonical(sourceGraphBase(graph))), matchingDataset.sourceGraphBaseSha256,
+    "Source graph differs from census fixture (messages or bonds)");
+  const expected = makePacket(census);
+  const { sourceGraph: _graph, exactGraphSha256: _graphHash, packetSha256: _seal, ...metadata } = packet;
+  assert.deepEqual(metadata, expected, "Packet metadata or deterministic selection differs from census");
   return {
     schema: "aria-cbc-distinct-id-packet-verification/v1",
     sourceCommit: SOURCE_SHA,
@@ -103,6 +108,11 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.
       throw new Error("Usage: --census REPORT.json --packet INPUT.json");
     const census = JSON.parse(await readFile(resolve(args[i + 1]), "utf8"));
     const packet = JSON.parse(await readFile(resolve(args[j + 1]), "utf8"));
+    const sourceIndex = args.indexOf("--source-dir");
+    if (sourceIndex < 0 || !args[sourceIndex + 1])
+      throw new Error("CLI verification requires --source-dir for independent pinned-source regeneration");
+    const regenerated = await runFromPinnedSource(resolve(args[sourceIndex + 1]));
+    assert.deepEqual(census, regenerated, "Census differs from independently regenerated pinned source");
     console.log(JSON.stringify(verifyPacket(census, packet)));
   } catch (error) { console.error(error); process.exitCode = 1; }
 }
