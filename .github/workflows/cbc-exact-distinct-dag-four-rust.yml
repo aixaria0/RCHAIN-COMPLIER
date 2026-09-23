@@ -73,18 +73,57 @@ jobs:
           path: fixture/
           retention-days: 30
 
+  primary-real-finalizer:
+    name: Execute exact causal DAG on primary community Finalizer
+    needs: exact-fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-distinct-source-fixture
+          path: fixture
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream native build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Execute actual pinned Finalizer source on identical complete DAG
+        run: |
+          python orchestrator/tools/cbc_run_exact_rust_dag.py \
+            --target community \
+            --checkout implementation \
+            --packet fixture/packet.json \
+            --rust-source fixture/aria_exact_distinct_id_dag.rs \
+            --out-dir rust-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-community
+          path: rust-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
   four-real-finalizers:
     name: Execute exact causal DAG on ${{ matrix.target }}
-    needs: exact-fixture
+    needs: [exact-fixture, primary-real-finalizer]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: community
-            repository: rchain-community/rchain-rust
-            sha: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
           - target: shplarggle
             repository: Shplarggle/rchain-rust
             sha: 1470256ecd9d1ce3926754c321f5703ef8f95e1a
@@ -133,7 +172,7 @@ jobs:
 
   model-vs-rust:
     name: Compare actual four-Finalizer outcomes against exact source-model prediction
-    needs: [exact-fixture, four-real-finalizers]
+    needs: [exact-fixture, primary-real-finalizer, four-real-finalizers]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

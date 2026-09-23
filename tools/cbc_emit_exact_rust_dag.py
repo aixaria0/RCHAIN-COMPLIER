@@ -122,7 +122,7 @@ SOURCE_MESSAGES
     let all: BTreeMap<String, Message<String, String>> =
         messages.into_iter().map(|m| (m.id.clone(), m)).collect();
     assert_eq!(source_message_count, all.len(), "No duplicate message IDs allowed");
-    let ids: BTreeSet<String> = SOURCE_JUSTIFICATIONS.iter().map(|id| id.to_string()).collect();
+    let ids: BTreeSet<String> = (SOURCE_JUSTIFICATIONS).iter().map(|id| id.to_string()).collect();
     assert_eq!(ids.len(), 4, "The same four source IDs must reach the Rust Finalizer");
     let justifications: BTreeSet<Message<String, String>> =
         ids.iter().map(|id| all.get(id).expect("selected source ID exists").clone()).collect();

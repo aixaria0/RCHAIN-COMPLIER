@@ -42,7 +42,7 @@ class ExactRustEmitterTests(unittest.TestCase):
         source = module.emit(value)
         self.assertIn('msg("a2", "v0", 1, &["g0"], &["g0", "a2"])', source)
         self.assertIn('msg("a3", "v0", 2, &["a2"], &["g0", "a2", "a3"])', source)
-        self.assertIn('let ids: BTreeSet<String> = &["a2", "a3", "b3", "c3"]', source)
+        self.assertIn('let ids: BTreeSet<String> = (&["a2", "a3", "b3", "c3"]).iter()', source)
         self.assertIn("finalizer.calculate_finalization(&justifications, &bonds)", source)
         self.assertIn('ARIA_EXACT_DAG_V1|graph_sha256=', source)
         self.assertIn(value["exactGraphSha256"], source)
