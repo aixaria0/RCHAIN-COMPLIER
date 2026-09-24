@@ -122,31 +122,35 @@ grep -qi true "$evidence/retrust-reply.txt"
 submit rebond "$target_priv" 'pos!("bond", *deployerId, 50, *ret) | for (@r <- ret) { @"aria-rebond"!(r) }'
 grep -qi true "$evidence/rebond-reply.txt"
 
-# Advance actual blocks to the epoch boundary after a successful fresh bond.
+# The request deadline is quarantineLength + epochLength * (1 + block / epochLength).
+# Throwaway genesis params: 20 blocks of quarantine and 10 blocks per epoch.
 cat > examples/aria-attack.rho <<'RHO'
 Nil
 RHO
-height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/rebond-status.json")"
-[[ "$height" =~ ^[0-9]+$ ]] || { cat "$evidence/rebond-status.json"; exit 1; }
-advance_without_reply "$((10 - height))"
+withdraw_block="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/withdraw-status.json")"
+rebond_block="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/rebond-status.json")"
+[[ "$withdraw_block" =~ ^[0-9]+$ && "$rebond_block" =~ ^[0-9]+$ ]] || { cat "$evidence/withdraw-status.json" "$evidence/rebond-status.json"; exit 1; }
+withdraw_deadline="$((20 + 10 * (1 + withdraw_block / 10)))"
+advance_without_reply "$((withdraw_deadline - rebond_block))"
 
-# Read the real node state at the epoch-boundary tip. This manual devnet can lag on
-# Casper finality, so capture that separately and never label a tip read as finalized.
-curl -fsS http://localhost:40403/api/v1/status > "$evidence/status-at-epoch-boundary.json"
-tip_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/status-at-epoch-boundary.json")"
-[[ "${tip_height:-0}" -ge 10 ]] || { cat "$evidence/status-at-epoch-boundary.json"; exit 1; }
+# Read the real node state at the request's quarantine deadline. Capture finality separately.
+curl -fsS http://localhost:40403/api/v1/status > "$evidence/status-at-withdrawal-deadline.json"
+tip_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/status-at-withdrawal-deadline.json")"
+[[ "${tip_height:-0}" -ge "$withdraw_deadline" ]] || { cat "$evidence/status-at-withdrawal-deadline.json"; exit 1; }
 curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json"
 finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
 docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1
-if grep -qi true "$evidence/target-bond-status.txt"; then
-  target_bonded=true
-elif grep -qi false "$evidence/target-bond-status.txt"; then
+if grep -qiE 'not bonded|unbonded' "$evidence/target-bond-status.txt"; then
   target_bonded=false
+elif grep -qi 'bonded' "$evidence/target-bond-status.txt"; then
+  target_bonded=true
 else
   cat "$evidence/target-bond-status.txt"
-  echo 'Could not read an explicit target bond-status result' >&2
+  echo 'Could not parse target bond-status output' >&2
   exit 1
 fi
-printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_epoch_boundary=%s\n' \
+printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_withdrawal_deadline=%s\n' \
+  "$withdraw_deadline" "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge "$withdraw_deadline" ]] && echo true || echo false)" \
+  | tee "$evidence/observation.txt"
   "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge 10 ]] && echo true || echo false)" \
   | tee "$evidence/observation.txt"
