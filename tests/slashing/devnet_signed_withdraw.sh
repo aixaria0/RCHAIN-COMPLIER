@@ -139,14 +139,20 @@ tip_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p
 [[ "${tip_height:-0}" -ge "$withdraw_deadline" ]] || { cat "$evidence/status-at-withdrawal-deadline.json"; exit 1; }
 curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json"
 finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
-docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1
-if grep -qiE 'not bonded|unbonded' "$evidence/target-bond-status.txt"; then
+# This CLI reports a valid negative answer as an error with exit code 1.
+# Preserve that distinction without letting `set -e` discard the observation.
+if docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1; then
+  bond_status_exit=0
+else
+  bond_status_exit=$?
+fi
+if [[ "$bond_status_exit" -eq 1 ]] && grep -qx 'Validator is not bonded' "$evidence/target-bond-status.txt"; then
   target_bonded=false
-elif grep -qi 'bonded' "$evidence/target-bond-status.txt"; then
+elif [[ "$bond_status_exit" -eq 0 ]] && grep -qx 'Validator is bonded' "$evidence/target-bond-status.txt"; then
   target_bonded=true
 else
   cat "$evidence/target-bond-status.txt"
-  echo 'Could not parse target bond-status output' >&2
+  echo "Unexpected target bond-status result (exit $bond_status_exit)" >&2
   exit 1
 fi
 printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_withdrawal_deadline=%s\n' \
