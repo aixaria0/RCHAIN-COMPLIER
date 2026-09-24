@@ -7,6 +7,17 @@ evidence="$(realpath -m "${2:?evidence directory}")"
 mkdir -p "$evidence"
 cd "$implementation"
 
+# The upstream devnet launcher creates the genesis directory with mktemp's 0700 mode,
+# but the container runs as rnode. Make only this throwaway launcher readable.
+python3 - <<'PY'
+from pathlib import Path
+p = Path('tools/devnet.sh')
+source = p.read_text()
+anchor = '  genesis_files "$genesis_dir" "$n"\n'
+assert source.count(anchor) == 1
+p.write_text(source.replace(anchor, anchor + '  chmod 755 "$genesis_dir"\n  chmod 644 "$genesis_dir"/bonds.txt "$genesis_dir"/wallets.txt\n'))
+PY
+
 cleanup() {
   docker logs devnet-bootstrap > "$evidence/node.stdout" 2> "$evidence/node.stderr" || true
   tools/devnet.sh down -v >/dev/null 2>&1 || true
@@ -17,7 +28,7 @@ trap cleanup EXIT
 cat > examples/aria-signed-withdraw.rho <<'RHO'
 new pos(`rho:rchain:pos`), deployerId(`rho:rchain:deployerId`), ret in {
   pos!("withdraw", *deployerId, *ret) |
-  for (result <- ret) { @"aria-signed-withdraw-result"!(result) }
+  for (result <- ret) { @"aria-signed-withdraw-result"!(*result) }
 }
 RHO
 
