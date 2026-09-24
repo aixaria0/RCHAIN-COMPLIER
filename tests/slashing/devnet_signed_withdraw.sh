@@ -39,6 +39,7 @@ curl -fsS --retry 5 --retry-delay 2 http://localhost:40403/api/v1/status > "$evi
 tools/devnet.sh deploy aria-signed-withdraw.rho > "$evidence/deploy-cli.log" 2>&1
 deploy_id="$(sed -n 's/.*DeployId is: \([0-9a-f]*\).*/\1/p' "$evidence/deploy-cli.log")"
 [[ "$deploy_id" =~ ^[0-9a-f]{32,}$ ]] || { cat "$evidence/deploy-cli.log"; exit 1; }
+tools/devnet.sh propose > "$evidence/propose-cli.log" 2>&1
 
 seen=false
 for _ in $(seq 1 80); do
