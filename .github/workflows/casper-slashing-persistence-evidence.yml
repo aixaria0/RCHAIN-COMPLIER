@@ -1,0 +1,57 @@
+name: Casper Slashing Persistence Evidence
+on:
+  push:
+    branches: [research/casper-slashing-persistence-evidence]
+  pull_request:
+    paths:
+      - ".github/workflows/casper-slashing-persistence-evidence.yml"
+      - "scripts/upstream/casper-slashing-persistence-probe.rs"
+      - "scripts/upstream/casper-slashing-persistence-runner.py"
+  workflow_dispatch:
+
+jobs:
+  isolated-slashing-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Checkout exact upstream revision (read-only; no live network)
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          git -C upstream-rchain fetch --depth 1 origin dfdce49473f452a9e968c33e7569014d597b2866
+          git -C upstream-rchain checkout --detach dfdce49473f452a9e968c33e7569014d597b2866
+          test "$(git -C upstream-rchain rev-parse HEAD)" = "dfdce49473f452a9e968c33e7569014d597b2866"
+      - name: Insert isolated regression probes into upstream test module
+        run: python3 scripts/upstream/casper-slashing-persistence-runner.py inject
+      - name: Verify both suspected divergences reproduce (expected failing assertions)
+        id: baseline
+        shell: bash
+        run: |
+          set +e
+          (cd upstream-rchain && cargo test -p rchain-rholang aria_slash_ -- --nocapture) > baseline.log 2>&1
+          status=$?
+          set -e
+          cat baseline.log
+          if [ "$status" -eq 0 ]; then
+            echo "Both probes unexpectedly passed on the pinned upstream revision; investigate drift."
+            exit 1
+          fi
+          grep -q "ARIA_SLASH_PENDING_LEAK" baseline.log
+          grep -q "ARIA_SLASH_COMMITTED_LEAK" baseline.log
+          echo "Observed both expected baseline failures; these are not CI regressions."
+      - name: Apply a local-only counterfactual persistence fix
+        run: python3 scripts/upstream/casper-slashing-persistence-runner.py shadow
+      - name: Verify both probes pass against counterfactual
+        run: |
+          cd upstream-rchain
+          cargo test -p rchain-rholang aria_slash_ -- --nocapture
+          cargo test -p rchain-rholang slash_confiscates_to_coop_vault -- --nocapture
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: casper-slashing-persistence-evidence
+          path: baseline.log
+          if-no-files-found: ignore
