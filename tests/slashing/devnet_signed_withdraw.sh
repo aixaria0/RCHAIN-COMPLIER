@@ -82,7 +82,8 @@ submit() {
 }
 
 advance_without_reply() {
-  local count="$1" i height deploy_id
+  local count="$1" i height deploy_id advance_block follower_height bootstrap_height
+  local follower_ready bootstrap_caught_up
   for (( i = 0; i < count; i++ )); do
     height="$(curl -fsS http://localhost:40403/api/v1/status | sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
     docker exec devnet-bootstrap rnode --grpc-host localhost deploy \
@@ -92,42 +93,45 @@ advance_without_reply() {
     [[ "$deploy_id" =~ ^[0-9a-f]{32,}$ ]]
     for _ in $(seq 1 60); do
       curl -fsS "http://localhost:40403/api/v1/deploy-status/$deploy_id" > "$evidence/advance-$i-status.json" || true
-      grep -q 'ProcessedWithSuccess' "$evidence/advance-$i-status.json" && break
+      if grep -q 'ProcessedWithSuccess' "$evidence/advance-$i-status.json"; then break; fi
       sleep 1
     done
-    # The bootstrap's propose-on-deploy blocks are not enough to advance finality by themselves.
-    # Wait for validator 1 to sync each signed no-op, then have that validator propose an attesting block.
-    advance_block="$(sed -n 's/.*\"blockNumber\":[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' \"$evidence/advance-$i-status.json\")"
-    [[ \"$advance_block\" =~ ^[0-9]+$ ]]
+    grep -q 'ProcessedWithSuccess' "$evidence/advance-$i-status.json"
+    advance_block="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/advance-$i-status.json")"
+    [[ "$advance_block" =~ ^[0-9]+$ ]]
+
+    # The bootstrap's propose-on-deploy blocks alone did not advance finality.
+    # Wait for validator 1 to sync each signed no-op, then make it propose an attesting block.
     follower_ready=false
     for _ in $(seq 1 60); do
       curl -fsS --max-time 3 http://localhost:41403/api/v1/status \
-        > \"$evidence/advance-$i-validator-1-status.json\" 2>/dev/null || true
-      follower_height=\"$(sed -n 's/.*\"latestBlockNumber\":[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' \"$evidence/advance-$i-validator-1-status.json\")\"
-      if [[ \"$follower_height\" =~ ^[0-9]+$ ]] && (( follower_height >= advance_block )); then
+        > "$evidence/advance-$i-validator-1-status.json" 2>/dev/null || true
+      follower_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/advance-$i-validator-1-status.json")"
+      if [[ "$follower_height" =~ ^[0-9]+$ ]] && (( follower_height >= advance_block )); then
         follower_ready=true
         break
       fi
       sleep 1
     done
-    [[ \"$follower_ready\" == true ]] || { echo \"validator 1 did not sync block $advance_block\" >&2; return 1; }
+    [[ "$follower_ready" == true ]] || { echo "validator 1 did not sync block $advance_block" >&2; return 1; }
+
     docker exec devnet-validator-1 rnode --grpc-host localhost propose \
-      > \"$evidence/advance-$i-validator-1-propose.log\" 2>&1
+      > "$evidence/advance-$i-validator-1-propose.log" 2>&1
     bootstrap_caught_up=false
     for _ in $(seq 1 60); do
+      curl -fsS --max-time 3 http://localhost:41403/api/v1/status \
+        > "$evidence/advance-$i-validator-1-after-propose.json" 2>/dev/null || true
       curl -fsS --max-time 3 http://localhost:40403/api/v1/status \
-        > \"$evidence/advance-$i-bootstrap-after-attestation.json\" 2>/dev/null || true
-      bootstrap_height=\"$(sed -n 's/.*\"latestBlockNumber\":[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' \"$evidence/advance-$i-bootstrap-after-attestation.json\")\"
-      follower_height=\"$(sed -n 's/.*\"latestBlockNumber\":[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' \"$evidence/advance-$i-validator-1-status.json\")\"
-      if [[ \"$bootstrap_height\" =~ ^[0-9]+$ && \"$follower_height\" =~ ^[0-9]+$ ]] && (( bootstrap_height >= follower_height )); then
+        > "$evidence/advance-$i-bootstrap-after-attestation.json" 2>/dev/null || true
+      follower_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/advance-$i-validator-1-after-propose.json")"
+      bootstrap_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/advance-$i-bootstrap-after-attestation.json")"
+      if [[ "$bootstrap_height" =~ ^[0-9]+$ && "$follower_height" =~ ^[0-9]+$ ]] && (( bootstrap_height >= follower_height )); then
         bootstrap_caught_up=true
         break
       fi
       sleep 1
     done
-    [[ \"$bootstrap_caught_up\" == true ]] || { echo \"bootstrap did not observe validator 1's attestation\" >&2; return 1; }
-  done
-grep -q 'ProcessedWithSuccess' "$evidence/advance-$i-status.json"
+    [[ "$bootstrap_caught_up" == true ]] || { echo "bootstrap did not observe validator 1's attestation" >&2; return 1; }
   done
 }
 
