@@ -130,14 +130,22 @@ height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$eviden
 [[ "$height" =~ ^[0-9]+$ ]] || { cat "$evidence/rebond-status.json"; exit 1; }
 advance_without_reply "$((10 - height))"
 
-# Wait until the real node finalizes the epoch-boundary block, then ask its bond-status API.
+# Finality lags the tip on the real devnet. Keep proposing actual no-op blocks
+# until the node finalizes the epoch-boundary block, then query bond status.
 finalized_height=0
-for _ in $(seq 1 60); do
-  curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json" || true
-  finalized_hash="$(sed -n 's/.*"blockHash":[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$evidence/finalized-boundary-block.json")"
-  finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
+for round in $(seq 1 20); do
+  for _ in $(seq 1 10); do
+    curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json" || true
+    finalized_hash="$(sed -n 's/.*"blockHash":[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$evidence/finalized-boundary-block.json")"
+    finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
+    [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] && break
+    sleep 1
+  done
   [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] && break
-  sleep 1
+  cat > examples/aria-attack.rho <<'RHO'
+Nil
+RHO
+  advance_without_reply 1
 done
 [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] || { cat "$evidence/finalized-boundary-block.json"; exit 1; }
 docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1
