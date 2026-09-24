@@ -126,7 +126,8 @@ grep -qi true "$evidence/rebond-reply.txt"
 cat > examples/aria-attack.rho <<'RHO'
 Nil
 RHO
-height="$(curl -fsS http://localhost:40403/api/v1/status | sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
+height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/rebond-status.json")"
+[[ "$height" =~ ^[0-9]+$ ]] || { cat "$evidence/rebond-status.json"; exit 1; }
 advance_without_reply "$((10 - height))"
 
 # Wait until the real node finalizes the epoch-boundary block, then ask its bond-status API.
