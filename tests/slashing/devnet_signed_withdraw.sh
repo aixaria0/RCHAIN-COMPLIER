@@ -44,14 +44,14 @@ tools/devnet.sh propose > "$evidence/propose-cli.log" 2>&1
 seen=false
 for _ in $(seq 1 80); do
   curl -fsS "http://localhost:40403/api/v1/deploy-status/$deploy_id" > "$evidence/deploy-status.json" || true
-  if rg -q 'ProcessedWithSuccess' "$evidence/deploy-status.json"; then seen=true; break; fi
+  if grep -q 'ProcessedWithSuccess' "$evidence/deploy-status.json"; then seen=true; break; fi
   sleep 2
 done
 [[ "$seen" == true ]] || { cat "$evidence/deploy-status.json"; exit 1; }
 
 tools/devnet.sh query aria-signed-withdraw-result > "$evidence/withdraw-reply.txt" 2>&1
-rg -qi 'true' "$evidence/withdraw-reply.txt"
-if rg -qi 'false' "$evidence/withdraw-reply.txt"; then
+grep -qi 'true' "$evidence/withdraw-reply.txt"
+if grep -qi 'false' "$evidence/withdraw-reply.txt"; then
   cat "$evidence/withdraw-reply.txt"
   exit 1
 fi
