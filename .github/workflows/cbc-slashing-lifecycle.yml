@@ -4,11 +4,13 @@ on:
     branches: [feat/cbc-fork-drift-evidence]
     paths:
       - tools/cbc_slashing_lifecycle.py
+      - tools/cbc_slashing_runtime.py
       - tests/slashing/**
       - .github/workflows/cbc-slashing-lifecycle.yml
   pull_request:
     paths:
       - tools/cbc_slashing_lifecycle.py
+      - tools/cbc_slashing_runtime.py
       - tests/slashing/**
       - .github/workflows/cbc-slashing-lifecycle.yml
   workflow_dispatch:
@@ -17,7 +19,7 @@ permissions:
 jobs:
   native-pos:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +41,8 @@ jobs:
         run: python -m unittest discover -s orchestrator/tests/slashing -p 'test_*.py' -v
       - name: Execute original source then isolated candidate correction
         run: python orchestrator/tools/cbc_slashing_lifecycle.py --checkout implementation --out evidence
+      - name: Execute actual Rholang, Casper system deploy, and validation replay
+        run: python orchestrator/tools/cbc_slashing_runtime.py --checkout implementation --out evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
