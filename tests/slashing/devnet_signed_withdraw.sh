@@ -107,9 +107,10 @@ done
 
 # Ask the real node to derive validator 1's REV address, then fund that key through devnet faucet.
 submit address "$admin_priv" "revAddress!(\"fromPublicKey\", \"$target_pub\".hexToBytes(), *ret) | for (@addr <- ret) { @\"aria-address\"!(addr) }"
-target_addr="$(sed -n 's/.*\(111[1-9A-HJ-NP-Za-km-z]\{20,\}\).*/\1/p' "$evidence/address-reply.txt" | head -1)"
+target_addr="$(sed -n 's/.*GString("\([1-9A-HJ-NP-Za-km-z]\{40,\}\)").*/\1/p' "$evidence/address-reply.txt" | head -1)"
 [[ -n "$target_addr" ]] || { cat "$evidence/address-reply.txt"; exit 1; }
 tools/devnet.sh faucet "$target_addr" > "$evidence/faucet.json"
+grep -q "$target_addr" "$evidence/faucet.json"
 
 # The actual sequence: withdraw, slash via untrust, restore trust, then bond fresh stake.
 submit withdraw "$target_priv" 'pos!("withdraw", *deployerId, *ret) | for (@r <- ret) { @"aria-withdraw"!(r) }'
