@@ -118,4 +118,57 @@ mod aria_slashing_live_probe {
         assert_eq!(i64::from(native.pos_vault_balance().await.unwrap()), after_staking);
         assert_eq!(i64::from(native.coop_balance().await.unwrap()), after_coop);
     }
+
+    #[tokio::test]
+    async fn reproducer_slash_leaves_committed_rewards_behind() {
+        let native = fixture(10, 20).await;
+        let v = validator(1);
+
+        native.set_committed_rewards(&BTreeMap::from([
+            (v, NonNegI64::try_from(7).unwrap())
+        ]));
+        native.slash(&v).await.unwrap().unwrap();
+
+        let committed = native.committed_rewards().await.unwrap();
+        assert_eq!(
+            i64::from(committed[&v]),
+            7,
+            "current Rust slash leaves the pre-slash committed reward entry intact"
+        );
+    }
+
+    #[tokio::test]
+    async fn reproducer_stale_committed_reward_can_follow_a_rebond_into_later_payout() {
+        let native = fixture(10, 0).await;
+        let v = validator(1);
+
+        native.set_committed_rewards(&BTreeMap::from([
+            (v, NonNegI64::try_from(7).unwrap())
+        ]));
+        native.slash(&v).await.unwrap().unwrap();
+        assert_eq!(i64::from(native.committed_rewards().await.unwrap()[&v]), 7);
+
+        // New stake plus enough legitimate staking-vault liquidity to cover the
+        // stale committed claim if the implementation carries it forward.
+        let addr = native.vault_address(&v).unwrap();
+        native.set_vault_balance(&addr, NonNegI64::try_from(40).unwrap());
+        native.bond(&v, NonNegI64::try_from(40).unwrap(), 6)
+            .await.unwrap().unwrap();
+        native.credit_pos_vault(7).await.unwrap();
+
+        // Fresh withdrawal after re-bond. At boundary 10 it becomes a claim;
+        // at boundary 20 it is payable. The old committed entry is still keyed
+        // to the same validator and is therefore included in the payout path.
+        native.withdraw(&v, 6).await.unwrap().unwrap();
+        native.close_block(10).await.unwrap().unwrap();
+        native.close_block(20).await.unwrap().unwrap();
+
+        let paid = native.vault_balance(&addr).await.unwrap().unwrap();
+        assert_eq!(
+            i64::from(paid),
+            47,
+            "40 new bond + 7 pre-slash committed reward reached the later withdrawal payout"
+        );
+    }
+
 }
