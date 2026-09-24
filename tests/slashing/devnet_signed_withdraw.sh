@@ -34,9 +34,21 @@ old = '  genesis_files "$genesis_dir" "$n"\n'
 assert s.count(old) == 1
 s = s.replace(old, old + '  chmod 755 "$genesis_dir"\n  chmod 644 "$genesis_dir"/bonds.txt "$genesis_dir"/wallets.txt\n')
 old = '  # Validators 1..n-1: bonded in genesis.\n'
-new = '''  # Build a short finalized prefix before launching the follower, so bootstrap sync
+new = r'''  # Build a short finalized prefix before launching the follower, so bootstrap sync
   # never starts from the transient empty fringe.
   wait_for_http
+  local bootstrap_proposed=false
+  for _ in $(seq 1 120); do
+    if node_cli "$BOOTSTRAP" propose >/dev/null 2>&1; then
+      bootstrap_proposed=true
+      break
+    fi
+    sleep 1
+  done
+  [[ "$bootstrap_proposed" == true ]] || {
+    echo "bootstrap proposer API did not become ready" >&2
+    return 1
+  }
   local bootstrap_finalized_height=0
   for _ in $(seq 1 30); do
     node_cli "$BOOTSTRAP" propose >/dev/null
