@@ -1,0 +1,39 @@
+name: Casper Slashing Real Rust Probe
+
+on:
+  push:
+    branches: [feat/casper-slashing-conformance]
+    paths:
+      - ".github/workflows/casper-slashing-real-rust.yml"
+      - "scripts/upstream/casper-slashing-live-probe.rs"
+      - "docs/CASPER_SLASHING_CONFORMANCE.md"
+  workflow_dispatch:
+
+jobs:
+  slashing-real-rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Clone and pin upstream RChain Rust
+        run: |
+          git clone https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git checkout --detach 9f06172567d28e306a8649f4d85ba6d9c1cf2c75
+          test "$(git rev-parse HEAD)" = "9f06172567d28e306a8649f4d85ba6d9c1cf2c75"
+
+      - name: Inject source-adjacent adversarial probe
+        run: cat scripts/upstream/casper-slashing-live-probe.rs >> upstream-rchain/rholang/src/native_state.rs
+
+      - name: Execute real Rust slashing reproducer
+        working-directory: upstream-rchain
+        run: |
+          cargo test -p rchain-rholang aria_slashing_live_probe -- --nocapture --test-threads=1
