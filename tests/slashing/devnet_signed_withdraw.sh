@@ -35,8 +35,8 @@ assert s.count(old) == 1
 s = s.replace(old, old + '  chmod 755 "$genesis_dir"\n  chmod 644 "$genesis_dir"/bonds.txt "$genesis_dir"/wallets.txt\n')
 # openssl's subject output includes spaces around the common name; remove them
 # before embedding the node ID in the rnode:// bootstrap URI.
-old = "    | awk -F'=' '{print $NF}'\\n"
-new = "    | awk -F'=' '{print $NF}' | tr -d '[:space:]'\\n"
+old = "    | awk -F'=' '{print $NF}'\n"
+new = "    | awk -F'=' '{print $NF}' | tr -d '[:space:]'\n"
 assert s.count(old) == 1
 s = s.replace(old, new)
 p.write_text(s)
