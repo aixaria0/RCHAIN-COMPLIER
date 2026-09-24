@@ -33,6 +33,12 @@ s = s.replace(old, new)
 old = '  genesis_files "$genesis_dir" "$n"\n'
 assert s.count(old) == 1
 s = s.replace(old, old + '  chmod 755 "$genesis_dir"\n  chmod 644 "$genesis_dir"/bonds.txt "$genesis_dir"/wallets.txt\n')
+# openssl's subject output includes spaces around the common name; remove them
+# before embedding the node ID in the rnode:// bootstrap URI.
+old = "    | awk -F'=' '{print $NF}'\\n"
+new = "    | awk -F'=' '{print $NF}' | tr -d '[:space:]'\\n"
+assert s.count(old) == 1
+s = s.replace(old, new)
 p.write_text(s)
 PY
 
@@ -107,6 +113,26 @@ for _ in $(seq 1 120); do
   sleep 2
 done
 [[ "$ready" == true ]] || { cat "$evidence/genesis-ready.log"; exit 1; }
+
+# Do not start the scenario unless both real devnet nodes have connected.
+peer_ready=false
+for _ in $(seq 1 90); do
+  curl -fsS --max-time 3 http://localhost:40403/api/v1/status \
+    > "$evidence/status-bootstrap-peer.json" 2>/dev/null || true
+  curl -fsS --max-time 3 http://localhost:41403/api/v1/status \
+    > "$evidence/status-validator-1-peer.json" 2>/dev/null || true
+  if python3 -c 'import json,sys; xs=[json.load(open(p)) for p in sys.argv[1:]]; sys.exit(0 if len(xs)==2 and all(int(x.get("peers",0)) > 0 for x in xs) else 1)' \
+    "$evidence/status-bootstrap-peer.json" "$evidence/status-validator-1-peer.json" 2>/dev/null; then
+    peer_ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$peer_ready" != true ]]; then
+  printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|result=INCONCLUSIVE_PEER_NOT_READY\n' | tee "$evidence/observation.txt"
+  echo "Both devnet nodes must be connected before signed-deploy testing." >&2
+  exit 1
+fi
 
 # Ask the real node to derive validator 1's REV address, then fund that key through devnet faucet.
 submit address "$admin_priv" "revAddress!(\"fromPublicKey\", \"$target_pub\".hexToBytes(), *ret) | for (@addr <- ret) { @\"aria-address\"!(addr) }"
