@@ -152,5 +152,3 @@ fi
 printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_withdrawal_deadline=%s\n' \
   "$withdraw_deadline" "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge "$withdraw_deadline" ]] && echo true || echo false)" \
   | tee "$evidence/observation.txt"
-  "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge 10 ]] && echo true || echo false)" \
-  | tee "$evidence/observation.txt"
