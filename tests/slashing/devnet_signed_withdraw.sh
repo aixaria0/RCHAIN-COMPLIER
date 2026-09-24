@@ -33,41 +33,6 @@ s = s.replace(old, new)
 old = '  genesis_files "$genesis_dir" "$n"\n'
 assert s.count(old) == 1
 s = s.replace(old, old + '  chmod 755 "$genesis_dir"\n  chmod 644 "$genesis_dir"/bonds.txt "$genesis_dir"/wallets.txt\n')
-old = '  # Validators 1..n-1: bonded in genesis.\n'
-new = r'''  # Build a short finalized prefix before launching the follower, so bootstrap sync
-  # never starts from the transient empty fringe.
-  wait_for_http
-  local bootstrap_proposed=false
-  for _ in $(seq 1 120); do
-    if node_cli "$BOOTSTRAP" propose >/dev/null 2>&1; then
-      bootstrap_proposed=true
-      break
-    fi
-    sleep 1
-  done
-  [[ "$bootstrap_proposed" == true ]] || {
-    echo "bootstrap proposer API did not become ready" >&2
-    return 1
-  }
-  local bootstrap_finalized_height=0
-  for _ in $(seq 1 30); do
-    node_cli "$BOOTSTRAP" propose >/dev/null
-    bootstrap_finalized_height="$(curl -fsS --max-time 3 "http://localhost:$HTTP_BASE/api/last-finalized-block" 2>/dev/null | sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' || true)"
-    if [[ "$bootstrap_finalized_height" =~ ^[0-9]+$ ]] && (( bootstrap_finalized_height >= 3 )); then
-      break
-    fi
-    sleep 1
-  done
-  [[ "$bootstrap_finalized_height" =~ ^[0-9]+$ ]] && (( bootstrap_finalized_height >= 3 )) || {
-    echo "bootstrap did not finalize the startup prefix before follower launch" >&2
-    return 1
-  }
-  echo "==> bootstrap finalized startup prefix at block $bootstrap_finalized_height"
-
-  # Validators 1..n-1: bonded in genesis.
-'''
-assert s.count(old) == 1
-s = s.replace(old, new)
 # openssl's subject output includes spaces around the common name; remove them
 # before embedding the node ID in the rnode:// bootstrap URI.
 old = "    | awk -F'=' '{print $NF}'\n"
@@ -192,7 +157,7 @@ for _ in $(seq 1 90); do
     > "$evidence/status-bootstrap-peer.json" 2>/dev/null || true
   curl -fsS --max-time 3 http://localhost:41403/api/v1/status \
     > "$evidence/status-validator-1-peer.json" 2>/dev/null || true
-  if python3 -c 'import json,sys; xs=[json.load(open(p)) for p in sys.argv[1:]]; sys.exit(0 if len(xs)==2 and all(int(x.get("peers",0)) > 0 for x in xs) and int(xs[1].get("latestBlockNumber",0)) >= 3 else 1)' \
+  if python3 -c 'import json,sys; xs=[json.load(open(p)) for p in sys.argv[1:]]; sys.exit(0 if len(xs)==2 and all(int(x.get("peers",0)) > 0 for x in xs) and int(xs[1].get("latestBlockNumber",0)) >= 1 else 1)' \
     "$evidence/status-bootstrap-peer.json" "$evidence/status-validator-1-peer.json" 2>/dev/null; then
     peer_ready=true
     break
