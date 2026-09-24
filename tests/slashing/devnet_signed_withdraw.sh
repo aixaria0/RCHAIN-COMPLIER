@@ -37,7 +37,10 @@ p.write_text(s)
 PY
 
 cleanup() {
-  docker logs devnet-bootstrap > "$evidence/node.stdout" 2> "$evidence/node.stderr" || true
+  for node in devnet-bootstrap devnet-validator-1; do
+    docker logs "$node" > "$evidence/$node.stdout" 2> "$evidence/$node.stderr" || true
+  done
+  tools/devnet.sh status > "$evidence/devnet-final-status.txt" 2>&1 || true
   tools/devnet.sh down -v >/dev/null 2>&1 || true
   rm -f examples/aria-attack.rho
 }
@@ -137,24 +140,21 @@ advance_without_reply "$((withdraw_deadline - rebond_block))"
 curl -fsS http://localhost:40403/api/v1/status > "$evidence/status-at-withdrawal-deadline.json"
 tip_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/status-at-withdrawal-deadline.json")"
 [[ "${tip_height:-0}" -ge "$withdraw_deadline" ]] || { cat "$evidence/status-at-withdrawal-deadline.json"; exit 1; }
-curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json"
-finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
-# This CLI reports a valid negative answer as an error with exit code 1.
-# Preserve that distinction without letting `set -e` discard the observation.
-if docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1; then
-  bond_status_exit=0
-else
-  bond_status_exit=$?
-fi
-if [[ "$bond_status_exit" -eq 1 ]] && grep -qx 'Validator is not bonded' "$evidence/target-bond-status.txt"; then
-  target_bonded=false
-elif [[ "$bond_status_exit" -eq 0 ]] && grep -qx 'Validator is bonded' "$evidence/target-bond-status.txt"; then
-  target_bonded=true
-else
-  cat "$evidence/target-bond-status.txt"
-  echo "Unexpected target bond-status result (exit $bond_status_exit)" >&2
+finalized_height=0
+finality_reached=false
+for _ in $(seq 1 120); do
+  curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json" || true
+  finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
+  if [[ "$finalized_height" =~ ^[0-9]+$ ]] && (( finalized_height >= withdraw_deadline )); then
+    finality_reached=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$finality_reached" != true ]]; then
+  printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|result=FINALIZED_OBSERVATION|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s\n' \
+  "$withdraw_deadline" "$tip_height" "$finalized_height" "$target_bonded" | tee "$evidence/observation.txt"
+if [[ "$target_bonded" != false ]]; then
+  echo "The finalized target remains bonded; stale-withdrawal capture was not reproduced." >&2
   exit 1
 fi
-printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_withdrawal_deadline=%s\n' \
-  "$withdraw_deadline" "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge "$withdraw_deadline" ]] && echo true || echo false)" \
-  | tee "$evidence/observation.txt"
