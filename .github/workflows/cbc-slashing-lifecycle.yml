@@ -1,0 +1,48 @@
+name: CBC native slashing lifecycle
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/cbc_slashing_lifecycle.py
+      - tests/slashing/**
+      - .github/workflows/cbc-slashing-lifecycle.yml
+  pull_request:
+    paths:
+      - tools/cbc_slashing_lifecycle.py
+      - tests/slashing/**
+      - .github/workflows/cbc-slashing-lifecycle.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-pos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 0ac5498fe246ea8a901c9e5277383f672ed9635d
+          path: implementation
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Test evidence parser negative controls
+        run: python -m unittest discover -s orchestrator/tests/slashing -p 'test_*.py' -v
+      - name: Execute original source then isolated candidate correction
+        run: python orchestrator/tools/cbc_slashing_lifecycle.py --checkout implementation --out evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbc-native-slashing-lifecycle
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: error
