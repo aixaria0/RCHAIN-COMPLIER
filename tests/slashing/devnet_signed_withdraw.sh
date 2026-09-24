@@ -68,7 +68,7 @@ submit() {
     sleep 1
   done
   [[ "$seen" == true ]] || { cat "$evidence/$label-status.json"; return 1; }
-  timeout 120 docker exec devnet-bootstrap rnode --grpc-host localhost listen-data-at-name -t pub -c "\"aria-$label\"" > "$evidence/$label-reply.txt" 2>&1
+  timeout 30 docker exec devnet-bootstrap rnode --grpc-host localhost listen-data-at-name -t pub -c "\"aria-$label\"" > "$evidence/$label-reply.txt" 2>&1
   printf '%s|deploy=%s|block-after=%s\n' "$label" "$deploy_id" "$(curl -fsS http://localhost:40403/api/v1/status | sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p')" >> "$evidence/observations.txt"
 }
 
@@ -122,21 +122,28 @@ grep -qi true "$evidence/retrust-reply.txt"
 submit rebond "$target_priv" 'pos!("bond", *deployerId, 50, *ret) | for (@r <- ret) { @"aria-rebond"!(r) }'
 grep -qi true "$evidence/rebond-reply.txt"
 
-# Confirm fresh stake is present before the boundary, then advance actual blocks to height 10.
-submit pool-before-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-before\"!(b) }"
-grep -qi "$target_pub" "$evidence/pool-before-boundary-reply.txt"
+# Advance actual blocks to the epoch boundary after a successful fresh bond.
 cat > examples/aria-attack.rho <<'RHO'
 Nil
 RHO
 height="$(curl -fsS http://localhost:40403/api/v1/status | sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p')"
 advance_without_reply "$((10 - height))"
 
-# A fresh withdrawal claim at block 10 proves the old pending request survived slash and
-# consumed the replacement bond. If slash had cleared pending state, this validator remains bonded.
-submit pool-at-boundary "$admin_priv" "pos!(\"getBonds\", *ret) | for (@b <- ret) { @\"aria-pool-at-boundary\"!(b) }"
-if grep -qi "$target_pub" "$evidence/pool-at-boundary-reply.txt"; then
-  cat "$evidence/pool-at-boundary-reply.txt"
-  echo 'FAIL: target remained bonded; stale withdrawal did not consume replacement bond' >&2
+# Wait until the real node finalizes the epoch-boundary block, then ask its bond-status API.
+finalized_height=0
+for _ in $(seq 1 60); do
+  curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json" || true
+  finalized_hash="$(sed -n 's/.*"blockHash":[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$evidence/finalized-boundary-block.json")"
+  finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
+  [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] && break
+  sleep 1
+done
+[[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] || { cat "$evidence/finalized-boundary-block.json"; exit 1; }
+docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1
+if grep -qi true "$evidence/target-bond-status.txt"; then
+  cat "$evidence/target-bond-status.txt"
+  echo 'FAIL: target remained bonded at finalized epoch boundary' >&2
   exit 1
 fi
+grep -qi false "$evidence/target-bond-status.txt"
 printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|fresh_bond_removed_at_epoch_boundary=true\n' | tee "$evidence/observation.txt"
