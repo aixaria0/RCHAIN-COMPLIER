@@ -152,7 +152,27 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 if [[ "$finality_reached" != true ]]; then
-  printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|result=FINALIZED_OBSERVATION|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s\n' \
+  printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|result=FINALITY_NOT_REACHED|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s\n' \
+    "$withdraw_deadline" "$tip_height" "${finalized_height:-unknown}" | tee "$evidence/observation.txt"
+  exit 1
+fi
+
+# The CLI returns exit 1 for a valid negative bond-status answer.
+if docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1; then
+  bond_status_exit=0
+else
+  bond_status_exit=$?
+fi
+if [[ "$bond_status_exit" -eq 1 ]] && grep -qx 'Validator is not bonded' "$evidence/target-bond-status.txt"; then
+  target_bonded=false
+elif [[ "$bond_status_exit" -eq 0 ]] && grep -qx 'Validator is bonded' "$evidence/target-bond-status.txt"; then
+  target_bonded=true
+else
+  cat "$evidence/target-bond-status.txt"
+  echo "Unexpected target bond-status result (exit $bond_status_exit)" >&2
+  exit 1
+fi
+printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|result=FINALIZED_OBSERVATION|withdraw=true|untrust_slash=true|retrust=true|rebond=50|withdrawal_deadline=%s|tip_height=%s|finalized_height=%s|target_bonded=%s\n' \
   "$withdraw_deadline" "$tip_height" "$finalized_height" "$target_bonded" | tee "$evidence/observation.txt"
 if [[ "$target_bonded" != false ]]; then
   echo "The finalized target remains bonded; stale-withdrawal capture was not reproduced." >&2
