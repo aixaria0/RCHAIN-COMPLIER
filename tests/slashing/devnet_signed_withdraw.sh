@@ -2,8 +2,8 @@
 # Signed network ingress on an actual throwaway RNode, pinned by the workflow checkout.
 set -euo pipefail
 
-implementation="${1:?path to rchain-rust checkout}"
-evidence="${2:?evidence directory}"
+implementation="$(realpath "${1:?path to rchain-rust checkout}")"
+evidence="$(realpath -m "${2:?evidence directory}")"
 mkdir -p "$evidence"
 cd "$implementation"
 
