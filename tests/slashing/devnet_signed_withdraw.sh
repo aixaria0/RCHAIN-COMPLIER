@@ -46,7 +46,7 @@ trap cleanup EXIT
 write_term() {
   local body="$1"
   cat > examples/aria-attack.rho <<RHO
-new return, pos(\`rho:rchain:pos\`), revAddress(\`rho:rchain:revAddress\`), deployerId(\`rho:rchain:deployerId\`), ret in {
+new return, pos(\`rho:rchain:pos\`), revAddress(\`rho:rev:address\`), deployerId(\`rho:rchain:deployerId\`), ret in {
   $body
 }
 RHO
