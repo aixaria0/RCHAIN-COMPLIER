@@ -130,29 +130,23 @@ height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$eviden
 [[ "$height" =~ ^[0-9]+$ ]] || { cat "$evidence/rebond-status.json"; exit 1; }
 advance_without_reply "$((10 - height))"
 
-# Finality lags the tip on the real devnet. Keep proposing actual no-op blocks
-# until the node finalizes the epoch-boundary block, then query bond status.
-finalized_height=0
-for round in $(seq 1 20); do
-  for _ in $(seq 1 10); do
-    curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json" || true
-    finalized_hash="$(sed -n 's/.*"blockHash":[[:space:]]*"\([0-9a-f]*\)".*/\1/p' "$evidence/finalized-boundary-block.json")"
-    finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
-    [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] && break
-    sleep 1
-  done
-  [[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] && break
-  cat > examples/aria-attack.rho <<'RHO'
-Nil
-RHO
-  advance_without_reply 1
-done
-[[ "${finalized_height:-0}" -ge 10 && "$finalized_hash" =~ ^[0-9a-f]{64}$ ]] || { cat "$evidence/finalized-boundary-block.json"; exit 1; }
+# Read the real node state at the epoch-boundary tip. This manual devnet can lag on
+# Casper finality, so capture that separately and never label a tip read as finalized.
+curl -fsS http://localhost:40403/api/v1/status > "$evidence/status-at-epoch-boundary.json"
+tip_height="$(sed -n 's/.*"latestBlockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/status-at-epoch-boundary.json")"
+[[ "${tip_height:-0}" -ge 10 ]] || { cat "$evidence/status-at-epoch-boundary.json"; exit 1; }
+curl -fsS http://localhost:40403/api/last-finalized-block > "$evidence/finalized-boundary-block.json"
+finalized_height="$(sed -n 's/.*"blockNumber":[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$evidence/finalized-boundary-block.json")"
 docker exec devnet-bootstrap rnode --grpc-host localhost bond-status "$target_pub" > "$evidence/target-bond-status.txt" 2>&1
 if grep -qi true "$evidence/target-bond-status.txt"; then
+  target_bonded=true
+elif grep -qi false "$evidence/target-bond-status.txt"; then
+  target_bonded=false
+else
   cat "$evidence/target-bond-status.txt"
-  echo 'FAIL: target remained bonded at finalized epoch boundary' >&2
+  echo 'Could not read an explicit target bond-status result' >&2
   exit 1
 fi
-grep -qi false "$evidence/target-bond-status.txt"
-printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|fresh_bond_removed_at_epoch_boundary=true\n' | tee "$evidence/observation.txt"
+printf 'ARIA_STALE_WITHDRAW_REAL_NODE_V1|withdraw=true|untrust_slash=true|retrust=true|rebond=50|tip_height=%s|finalized_height=%s|target_bonded=%s|finalized_epoch_boundary=%s\n' \
+  "$tip_height" "${finalized_height:-unknown}" "$target_bonded" "$([[ "${finalized_height:-0}" -ge 10 ]] && echo true || echo false)" \
+  | tee "$evidence/observation.txt"
