@@ -1,0 +1,66 @@
+name: Casper Slashing Counterfactual Fix
+
+on:
+  push:
+    branches: [feat/casper-slashing-conformance]
+    paths:
+      - ".github/workflows/casper-slashing-counterfactual-fix.yml"
+      - "scripts/upstream/casper-slashing-fix-control.rs"
+  workflow_dispatch:
+
+jobs:
+  counterfactual-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Clone pinned upstream
+        run: |
+          git clone https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git checkout --detach 9f06172567d28e306a8649f4d85ba6d9c1cf2c75
+          test "$(git rev-parse HEAD)" = "9f06172567d28e306a8649f4d85ba6d9c1cf2c75"
+
+      - name: Apply minimal slashing state-cleanup counterfactual
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("upstream-rchain/rholang/src/native_state.rs")
+          s=p.read_text()
+          old='''        let mut pending = self.pending_withdrawers().await?;
+        let stake = pool.remove(validator);
+        active.remove(validator);
+        withdrawers.remove(validator);
+        pending.remove(validator);'''
+          new='''        let mut pending = self.pending_withdrawers().await?;
+        let mut committed = self.committed_rewards().await?;
+        let stake = pool.remove(validator);
+        active.remove(validator);
+        withdrawers.remove(validator);
+        pending.remove(validator);
+        committed.remove(validator);'''
+          assert old in s, "slash prelude changed"
+          s=s.replace(old,new,1)
+          old2='''        self.set_bonds(&pool);
+        self.set_active(&active);
+        self.set_withdrawers(&withdrawers);
+        Ok(Ok(()))'''
+          new2='''        self.set_bonds(&pool);
+        self.set_active(&active);
+        self.set_withdrawers(&withdrawers);
+        self.set_pending_withdrawers(&pending);
+        self.set_committed_rewards(&committed);
+        Ok(Ok(()))'''
+          assert old2 in s, "slash persistence tail changed"
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+
+      - name: Inject remediation controls
+        run: cat scripts/upstream/casper-slashing-fix-control.rs >> upstream-rchain/rholang/src/native_state.rs
+
+      - name: Run real Rust counterfactual
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-rholang aria_slashing_fix_control -- --nocapture --test-threads=1
