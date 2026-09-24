@@ -1,0 +1,42 @@
+name: CBC signed devnet withdrawal
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tests/slashing/devnet_signed_withdraw.sh
+      - .github/workflows/cbc-slashing-signed-devnet.yml
+  pull_request:
+    paths:
+      - tests/slashing/devnet_signed_withdraw.sh
+      - .github/workflows/cbc-slashing-signed-devnet.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  signed-ingress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 0ac5498fe246ea8a901c9e5277383f672ed9635d
+          path: implementation
+          persist-credentials: false
+      - name: Assert upstream revision and source identity
+        run: |
+          test "$(git -C implementation rev-parse HEAD)" = 0ac5498fe246ea8a901c9e5277383f672ed9635d
+          test -z "$(git -C implementation status --porcelain)"
+      - name: Boot real node and submit a signed PoS withdrawal
+        run: bash orchestrator/tests/slashing/devnet_signed_withdraw.sh implementation evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbc-signed-devnet-withdrawal
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: warn
