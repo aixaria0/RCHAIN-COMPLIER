@@ -1,0 +1,49 @@
+name: CBC ordinary devnet sync and finality
+on:
+  push:
+    branches: [test/cbc-genesis-sync]
+    paths:
+      - tests/devnet/**
+      - .github/workflows/cbc-devnet-sync.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cbc-devnet-sync-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  sync-finality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RNODE_IMAGE: rnode:genesis-11b2200
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 11b2200dcca580f2c00246302238840dcd4f08f6
+          path: implementation
+          persist-credentials: false
+      - name: Check evidence acceptance rules
+        run: python3 -m unittest discover -s orchestrator/tests/devnet -p 'test_*.py' -v
+      - name: Build unmodified pinned node
+        run: |
+          mkdir -p evidence
+          test "$(git -C implementation rev-parse HEAD)" = 11b2200dcca580f2c00246302238840dcd4f08f6
+          test -z "$(git -C implementation status --porcelain)"
+          bash implementation/tools/devnet.sh build > evidence/docker-build.log 2>&1
+      - name: Verify ordinary block exchange and shared finality
+        timeout-minutes: 15
+        run: python3 orchestrator/tests/devnet/sync_finality.py implementation evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbc-ordinary-devnet-sync-${{ github.run_id }}
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: error
