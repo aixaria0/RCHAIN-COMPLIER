@@ -1,0 +1,259 @@
+name: CBC exact distinct-ID DAG four-Rust replay
+
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/cbc_distinct_message_census.mjs
+      - tools/cbc_distinct_message_packet.mjs
+      - tools/verify_cbc_distinct_message_packet.mjs
+      - tools/cbc_emit_exact_rust_dag.py
+      - tools/cbc_run_exact_rust_dag.py
+      - tools/cbc_compare_exact_rust_dag.py
+      - tools/cbc_check_lean_stake.py
+      - tests/fork_drift/test_cbc_lean_stake.py
+      - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
+      - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
+      - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
+  pull_request:
+    paths:
+      - tools/cbc_distinct_message_census.mjs
+      - tools/cbc_distinct_message_packet.mjs
+      - tools/verify_cbc_distinct_message_packet.mjs
+      - tools/cbc_emit_exact_rust_dag.py
+      - tools/cbc_run_exact_rust_dag.py
+      - tools/cbc_compare_exact_rust_dag.py
+      - tools/cbc_check_lean_stake.py
+      - tests/fork_drift/test_cbc_lean_stake.py
+      - tests/fork_drift/test_cbc_emit_exact_rust_dag.py
+      - tests/fork_drift/test_cbc_compare_exact_rust_dag.py
+      - .github/workflows/cbc-exact-distinct-dag-four-rust.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-fixture:
+    name: Generate and independently validate exact distinct-ID source graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: pinned-research
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline generated-Rust-source contract regressions
+        run: python -m unittest discover -s orchestrator/tests/fork_drift -p 'test_*exact*py' -v
+      - name: Execute original source-model census
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_distinct_message_census.mjs \
+            --source-dir pinned-research --output fixture/census.json
+      - name: Export deterministic exact four-distinct-ID graph
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_distinct_message_packet.mjs \
+            --source-dir pinned-research --output fixture/packet.json
+      - name: Independently verify causal source DAG and model-only claim flags
+        run: |
+          node orchestrator/tools/verify_cbc_distinct_message_packet.mjs \
+            --source-dir pinned-research --census fixture/census.json --packet fixture/packet.json
+      - name: Emit actual identical Rust source using all original source DAG messages
+        run: |
+          python orchestrator/tools/cbc_emit_exact_rust_dag.py \
+            --packet fixture/packet.json --output fixture/aria_exact_distinct_id_dag.rs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-distinct-source-fixture
+          path: fixture/
+          retention-days: 30
+
+  primary-real-finalizer:
+    name: Execute exact causal DAG on primary community Finalizer
+    needs: exact-fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-distinct-source-fixture
+          path: fixture
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream native build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Execute actual pinned Finalizer source on identical complete DAG
+        run: |
+          python orchestrator/tools/cbc_run_exact_rust_dag.py \
+            --target community \
+            --checkout implementation \
+            --packet fixture/packet.json \
+            --rust-source fixture/aria_exact_distinct_id_dag.rs \
+            --out-dir rust-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-community
+          path: rust-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  four-real-finalizers:
+    name: Execute exact causal DAG on ${{ matrix.target }}
+    needs: [exact-fixture, primary-real-finalizer]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: shplarggle
+            repository: Shplarggle/rchain-rust
+            sha: 1470256ecd9d1ce3926754c321f5703ef8f95e1a
+          - target: nzpr
+            repository: nzpr/rchain-rust
+            sha: 0eabfc4a893bc42d1462f05ebb4bb477eabd0ee1
+          - target: bill_kunj
+            repository: Bill-Kunj/rchain-rust
+            sha: 9e667e203861c791aa9349b0351397ccc29f0fc8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-distinct-source-fixture
+          path: fixture
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install upstream native build dependency
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Execute actual pinned Finalizer source on identical complete DAG
+        run: |
+          python orchestrator/tools/cbc_run_exact_rust_dag.py \
+            --target ${{ matrix.target }} \
+            --checkout implementation \
+            --packet fixture/packet.json \
+            --rust-source fixture/aria_exact_distinct_id_dag.rs \
+            --out-dir rust-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-${{ matrix.target }}
+          path: rust-evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  model-vs-rust:
+    name: Compare actual four-Finalizer outcomes against exact source-model prediction
+    needs: [exact-fixture, primary-real-finalizer, four-real-finalizers]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-distinct-source-fixture
+          path: fixture
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: exact-*
+          path: evidence
+      - name: Require all four real source executions and emit first model-vs-Rust divergence
+        run: |
+          python tools/cbc_compare_exact_rust_dag.py \
+            --input-dir evidence \
+            --packet fixture/packet.json \
+            --census fixture/census.json \
+            --rust-source fixture/aria_exact_distinct_id_dag.rs \
+            --output exact-dag-four-real-finalizers.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exact-dag-four-real-finalizers
+          path: |
+            exact-dag-four-real-finalizers.json
+            exact-dag-four-real-finalizers.html
+            evidence/
+            fixture/packet.json
+            fixture/aria_exact_distinct_id_dag.rs
+          retention-days: 30
+
+  lean-stake-conformance:
+    name: Kernel-check actual Rust stake observations against pinned Lean specification
+    needs: model-vs-rust
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 7b986ee48cc1c0c09e21543c8ef01f84114d73b6
+          path: implementation
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: exact-dag-four-real-finalizers
+          path: bundle
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test serialization and admission rejection
+        run: python -m unittest discover -s orchestrator/tests/fork_drift -p 'test_cbc_lean_stake.py' -v
+      - name: Install Lean toolchain manager
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Fetch pinned mathlib cache and build only stake specification
+        working-directory: implementation/spec
+        run: |
+          lake exe cache get
+          lake build Rchain.Casper.Stake
+      - name: Prove concrete equalities from independently validated Rust evidence
+        run: |
+          python orchestrator/tools/cbc_check_lean_stake.py \
+            --bundle bundle --checkout implementation --out-dir lean-evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-dag-lean-stake-conformance
+          path: lean-evidence/
+          if-no-files-found: warn
+          retention-days: 30

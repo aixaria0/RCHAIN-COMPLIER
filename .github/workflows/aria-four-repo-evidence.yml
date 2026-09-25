@@ -1,0 +1,221 @@
+name: Aria four-repository source evidence
+
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/four_repo_evidence.py
+      - tools/cbc_workbench_bridge.mjs
+      - tools/verify_four_repo_handoff.mjs
+      - tests/fork_drift/test_four_repo_handoff.mjs
+      - tools/run_pbft_evidence_control.mjs
+      - tools/verify_cbc_sentinel_bridge.mjs
+      - tools/render_four_repo_dashboard.py
+      - tests/fork_drift/test_render_four_repo_dashboard.py
+      - tests/fork_drift/test_four_repo_evidence.py
+      - .github/workflows/aria-four-repo-evidence.yml
+  pull_request:
+    paths:
+      - tools/four_repo_evidence.py
+      - tools/cbc_workbench_bridge.mjs
+      - tools/verify_four_repo_handoff.mjs
+      - tests/fork_drift/test_four_repo_handoff.mjs
+      - tools/run_pbft_evidence_control.mjs
+      - tools/verify_cbc_sentinel_bridge.mjs
+      - tools/render_four_repo_dashboard.py
+      - tests/fork_drift/test_render_four_repo_dashboard.py
+      - tests/fork_drift/test_four_repo_evidence.py
+      - .github/workflows/aria-four-repo-evidence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-contract:
+    name: Offline evidence contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m unittest discover -s tests/fork_drift -p 'test_*.py' -v
+      - run: node --test tests/fork_drift/test_four_repo_handoff.mjs
+      - run: python -m py_compile tools/four_repo_evidence.py
+
+  execute-four-sources:
+    name: Execute ${{ matrix.component }} at pinned source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: cbc
+            repository: aixaria0/RCHAIN-COMPLIER
+            sha: 2d2c3d879b1a078693c8551385efb54a811d7172
+          - component: workbench
+            repository: aixaria0/rlsenti
+            sha: 00e1ed1b30a1779f72c59c0505467da60080a365
+          - component: lattice
+            repository: aixaria0/Sovereign-Lattice
+            sha: 03259325d33a89e523b0ba83d55dd32f42ae4101
+          - component: sentinel
+            repository: aixaria0/rchain-sentinel
+            sha: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
+    steps:
+      - name: Checkout evidence orchestrator
+        uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.sha }}
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        if: ${{ matrix.component == 'cbc' || matrix.component == 'workbench' }}
+        with:
+          node-version: '24'
+      - name: Set up Rust toolchain
+        if: ${{ matrix.component == 'lattice' || matrix.component == 'sentinel' }}
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Execute actual source test and capture revision evidence
+        run: |
+          python orchestrator/tools/four_repo_evidence.py capture \
+            --component ${{ matrix.component }} \
+            --source-dir source \
+            --out-dir evidence
+      - name: Publish code execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-${{ matrix.component }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 14
+
+  bundle:
+    name: Verify four evidence outputs
+    needs: [evidence-contract, execute-four-sources, cbc-workbench-bridge]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: component-*
+          path: evidence
+      - name: Reject absent, failed, tampered or wrong-revision evidence
+        run: python tools/four_repo_evidence.py combine --input-dir evidence --output four-repo-bundle.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: cbc-workbench-bridge
+          path: bridge-evidence
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify four actual source test outcomes and evidence-bound PBFT receipt
+        run: |
+          node tools/verify_four_repo_handoff.mjs \
+            --bundle four-repo-bundle.json \
+            --bridge-dir bridge-evidence \
+            --output four-repo-integration.json
+      - name: Render offline dashboard from verified four-source execution and real handoff
+        run: |
+          python tools/render_four_repo_dashboard.py \
+            --bundle four-repo-bundle.json \
+            --integration four-repo-integration.json \
+            --output four-repo-dashboard.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: four-repo-bundle
+          path: |
+            four-repo-bundle.json
+            four-repo-integration.json
+            four-repo-dashboard.html
+            bridge-evidence/bridge-manifest.json
+            bridge-evidence/cbc-four-repo-handoff.json
+            bridge-evidence/lattice-pbft-control.json
+          retention-days: 30
+
+  cbc-workbench-bridge:
+    name: Transfer real pinned M27 witness into RLSenti
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/RCHAIN-COMPLIER
+          ref: 2d2c3d879b1a078693c8551385efb54a811d7172
+          path: cbc
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/rlsenti
+          ref: 46a38c443e5904d7d485519d8ea348a442c010c1
+          path: workbench
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/rchain-sentinel
+          ref: 7823bac56f8dd845d9b9f9e7c50982b49decdcc2
+          path: sentinel
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: aixaria0/Sovereign-Lattice
+          ref: 03259325d33a89e523b0ba83d55dd32f42ae4101
+          path: lattice
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Execute pinned M27 source and import report through actual RLSenti adapter
+        run: |
+          node --experimental-strip-types orchestrator/tools/cbc_workbench_bridge.mjs \
+            --cbc-dir cbc --workbench-dir workbench --out-dir bridge
+      - name: Configure Rust for independently compiled Sentinel inspector
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+      - name: Preserve original and resolved Cargo dependency graph
+        run: cp sentinel/backend/Cargo.lock bridge/sentinel-source-Cargo.lock
+      - name: Inspect same real witness with pinned Sentinel Rust source
+        run: |
+          cargo run --manifest-path sentinel/backend/Cargo.toml --bin cbc_witness_inspect -- \
+            bridge/cbc-m27-witness.json > bridge/sentinel-witness-observation.json
+          cp sentinel/backend/Cargo.lock bridge/sentinel-effective-Cargo.lock
+      - name: Match CBC, Workbench and Sentinel revision-bound observation
+        run: |
+          node orchestrator/tools/verify_cbc_sentinel_bridge.mjs \
+            --sentinel-dir sentinel --evidence-dir bridge
+      - name: Execute real PBFT control correlated with validated external CBC witness
+        run: |
+          node orchestrator/tools/run_pbft_evidence_control.mjs \
+            --lattice-dir lattice --evidence-dir bridge
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cbc-workbench-bridge
+          path: bridge/
+          if-no-files-found: error
+          retention-days: 30

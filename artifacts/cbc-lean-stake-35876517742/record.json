@@ -1,0 +1,116 @@
+{
+  "schema": "aria-cbc-lean-stake-conformance/v1",
+  "leanSourceRepository": "rchain-community/rchain-rust",
+  "leanSourceSha": "7b986ee48cc1c0c09e21543c8ef01f84114d73b6",
+  "specSourceSha256": {
+    "Rchain/Casper/Stake.lean": "f4ec9f58d9cc6c7de7ce5d3b5c6f816d82ca919adc6dd652815c19e88e10fd77",
+    "lean-toolchain": "e6930c662006db4d6dc76c651d60a608e4f6a18bcfd53e6b0167d70a125285d5",
+    "lakefile.toml": "f8caba6c047a1064024272e37f9d264a43cebcd538bee3507ad54e9f05d64cb7",
+    "lake-manifest.json": "85e4057d2f0a07eb4844e10f61e69672567ba196c9abd46400ec258cf0dece57"
+  },
+  "rustComparisonSha256": "7c4146ca13720a04dd9de99c255941291f50c67c3134ff4b3705378b8da806be",
+  "packetSha256": "c450664b02b1d61331b9284ebad5ede2928ae72fd788b3e29956022e315c4484",
+  "graphSha256": "d5145646e47d650acfdfc87d44d02e6eb5c9e126eed7d61bc5adf21b2e494281",
+  "generatedLeanSha256": "48c9d242fbe3f9a156652c3514b3ac18a35198efd5c858f961bad18de54888be",
+  "command": [
+    "lake",
+    "env",
+    "lean",
+    "/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/ExactReplayStake.lean"
+  ],
+  "exitCode": 0,
+  "stdoutSha256": "0fc24679f76a80cfe1e643a4200bb9e13f6277add25eff1c06f88392a2e5af61",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "leanVersion": "Lean (version 4.12.0, x86_64-unknown-linux-gnu, commit dc2533473114, Release)",
+  "workflowRunId": "35876517742",
+  "cases": [
+    {
+      "target": "bill_kunj",
+      "rustSourceSha": "9e667e203861c791aa9349b0351397ccc29f0fc8",
+      "senderToLeanNat": {
+        "v0": 0,
+        "v1": 1,
+        "v2": 2,
+        "v3": 3
+      },
+      "supportingStake": 70,
+      "totalStake": 100,
+      "initialFringePredicate": true
+    },
+    {
+      "target": "community",
+      "rustSourceSha": "7b986ee48cc1c0c09e21543c8ef01f84114d73b6",
+      "senderToLeanNat": {
+        "v0": 0,
+        "v1": 1,
+        "v2": 2,
+        "v3": 3
+      },
+      "supportingStake": 70,
+      "totalStake": 100,
+      "initialFringePredicate": true
+    },
+    {
+      "target": "nzpr",
+      "rustSourceSha": "0eabfc4a893bc42d1462f05ebb4bb477eabd0ee1",
+      "senderToLeanNat": {
+        "v0": 0,
+        "v1": 1,
+        "v2": 2,
+        "v3": 3
+      },
+      "supportingStake": 70,
+      "totalStake": 100,
+      "initialFringePredicate": true
+    },
+    {
+      "target": "shplarggle",
+      "rustSourceSha": "1470256ecd9d1ce3926754c321f5703ef8f95e1a",
+      "senderToLeanNat": {
+        "v0": 0,
+        "v1": 1,
+        "v2": 2,
+        "v3": 3
+      },
+      "supportingStake": 70,
+      "totalStake": 100,
+      "initialFringePredicate": true
+    }
+  ],
+  "kernelChecked": true,
+  "universalRustRefinementProved": false,
+  "wireIngressVerified": false,
+  "liveNetworkVerified": false,
+  "claimBoundary": "Kernel-checked concrete stake equalities for one source-level DAG at four Rust pins. The Python serialization bridge is tested, not formally proved. No universal Rust refinement, causal-DAG derivation proof, ingress, live-network or safety theorem.",
+  "negativeControls": [
+    {
+      "name": "altered_supporting_stake",
+      "expectedRejection": true,
+      "exitCode": 1,
+      "logSha256": "b7b54705a1d528741cb6ebf0003fffba521d463dabcf6dfc8efdef51a6679944",
+      "generatedLeanSha256": "c082a79da8a1b93d65510f27214b7faaae1fe60b81aa85566752840817ba067e"
+    },
+    {
+      "name": "altered_bonds",
+      "expectedRejection": true,
+      "exitCode": 1,
+      "logSha256": "9771664c0a4ec68bcf76f99238287bb68e9cd9db1a63a5c3722ffec695603d01",
+      "generatedLeanSha256": "2dfa7666c0ef21dba122dd20270a2194d715410fb15075c47fb18bd90acc2cd7"
+    }
+  ],
+  "theorems": [
+    "AriaReplay.bill_kunj_stake",
+    "AriaReplay.bill_kunj_total",
+    "AriaReplay.bill_kunj_gate",
+    "AriaReplay.community_stake",
+    "AriaReplay.community_total",
+    "AriaReplay.community_gate",
+    "AriaReplay.nzpr_stake",
+    "AriaReplay.nzpr_total",
+    "AriaReplay.nzpr_gate",
+    "AriaReplay.shplarggle_stake",
+    "AriaReplay.shplarggle_total",
+    "AriaReplay.shplarggle_gate"
+  ],
+  "recordSha256": "4fc132a61894ea84cd7bbff2f02209d76068bb627bf2d9dd4b97d75d61ed1f08"
+}

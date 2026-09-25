@@ -1,0 +1,30 @@
+name: CBC fork drift evidence
+on:
+  push:
+    branches: [feat/cbc-fork-drift-evidence]
+    paths:
+      - tools/cbc_fork_drift.py
+      - tests/fork_drift/**
+      - .github/workflows/cbc-fork-drift.yml
+  pull_request:
+    paths:
+      - tools/cbc_fork_drift.py
+      - tests/fork_drift/**
+      - .github/workflows/cbc-fork-drift.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify comparison semantics and deterministic digest
+        run: python -m unittest discover -s tests/fork_drift -p 'test_*.py' -v
+      - name: Compile the standalone CLI
+        run: python -m py_compile tools/cbc_fork_drift.py

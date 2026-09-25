@@ -1,0 +1,36 @@
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:6:97: error: tactic 'decide' proved that the proposition
+  Rchain.fullPartitionStake bill_kunj_support bill_kunj_bonds = 70
+is false
+'AriaReplay.bill_kunj_stake' depends on axioms: [sorryAx]
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:8:72: error: tactic 'decide' proved that the proposition
+  Rchain.totalStake bill_kunj_bonds = 100
+is false
+'AriaReplay.bill_kunj_total' depends on axioms: [sorryAx]
+'AriaReplay.bill_kunj_gate' does not depend on any axioms
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:14:97: error: tactic 'decide' proved that the proposition
+  Rchain.fullPartitionStake community_support community_bonds = 70
+is false
+'AriaReplay.community_stake' depends on axioms: [sorryAx]
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:16:72: error: tactic 'decide' proved that the proposition
+  Rchain.totalStake community_bonds = 100
+is false
+'AriaReplay.community_total' depends on axioms: [sorryAx]
+'AriaReplay.community_gate' does not depend on any axioms
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:22:82: error: tactic 'decide' proved that the proposition
+  Rchain.fullPartitionStake nzpr_support nzpr_bonds = 70
+is false
+'AriaReplay.nzpr_stake' depends on axioms: [sorryAx]
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:24:62: error: tactic 'decide' proved that the proposition
+  Rchain.totalStake nzpr_bonds = 100
+is false
+'AriaReplay.nzpr_total' depends on axioms: [sorryAx]
+'AriaReplay.nzpr_gate' does not depend on any axioms
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:30:100: error: tactic 'decide' proved that the proposition
+  Rchain.fullPartitionStake shplarggle_support shplarggle_bonds = 70
+is false
+'AriaReplay.shplarggle_stake' depends on axioms: [sorryAx]
+/home/runner/work/RCHAIN-COMPLIER/RCHAIN-COMPLIER/lean-evidence/altered_bonds.lean:32:74: error: tactic 'decide' proved that the proposition
+  Rchain.totalStake shplarggle_bonds = 100
+is false
+'AriaReplay.shplarggle_total' depends on axioms: [sorryAx]
+'AriaReplay.shplarggle_gate' does not depend on any axioms
