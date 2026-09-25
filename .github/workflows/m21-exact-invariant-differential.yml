@@ -1,0 +1,40 @@
+name: M21 Exact Invariant Differential
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m21-exact-invariant-differential.yml"
+      - "scripts/upstream/m21-exact-invariant-differential.rs"
+  workflow_dispatch:
+
+jobs:
+  exact-invariant-differential:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject M21 exact invariant differential
+        run: |
+          cat scripts/upstream/m21-exact-invariant-differential.rs >> upstream-rchain/sdk/src/casper_syntax.rs
+          cat scripts/upstream/m21-active-four-entry-admission.rs >> upstream-rchain/casper/src/validate.rs
+
+      - name: Execute exact-revision invariant differential
+        working-directory: upstream-rchain
+        run: |
+          cargo test -p rchain-sdk exact_invariant_differential -- --nocapture
+          cargo test -p rchain-casper exact_four_entry_duplicate_sender_shape_is_admitted -- --nocapture

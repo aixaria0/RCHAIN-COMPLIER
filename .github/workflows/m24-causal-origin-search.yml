@@ -1,0 +1,37 @@
+name: M24 Causal Origin Search
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m24-causal-origin-search.yml"
+      - "scripts/upstream/m24-causal-origin-search.rs"
+      - "docs/CASPER_CBC_M24_CAUSAL_ORIGIN.md"
+  workflow_dispatch:
+
+jobs:
+  causal-origin-search:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject M24 causal-origin search
+        run: cat scripts/upstream/m24-causal-origin-search.rs >> upstream-rchain/block-storage/src/dag/message_state.rs
+
+      - name: Execute exact-revision causal-origin search
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-block-storage m24_causal_origin_search -- --nocapture

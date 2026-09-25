@@ -1,0 +1,37 @@
+name: M13 Upstream NodeRunning Ingress Dispatch
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/m13-upstream-node-running.yml"
+      - "scripts/upstream/m13-node-running-ingress.rs"
+  workflow_dispatch:
+
+jobs:
+  upstream-node-running:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned upstream source
+        run: |
+          git clone --depth 1 https://github.com/rchain-community/rchain-rust.git upstream-rchain
+          cd upstream-rchain
+          git fetch --depth 1 origin d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+          git checkout --detach d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
+
+      - name: Inject M13 NodeRunning probe
+        run: |
+          cat scripts/upstream/m13-node-running-ingress.rs             >> upstream-rchain/casper/src/engine/node_running.rs
+
+      - name: Execute exact-revision NodeRunning dispatch probe
+        working-directory: upstream-rchain
+        run: cargo test -p rchain-casper engine::node_running::m13_node_running_dispatch_boundary -- --nocapture

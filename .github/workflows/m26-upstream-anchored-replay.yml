@@ -1,0 +1,41 @@
+name: M26 Upstream-Anchored CBC Replay
+
+on:
+  push:
+    branches:
+      - research/m12-cryptographic-ingress-boundary
+    paths:
+      - "src/lib/cbc/**"
+      - "examples/casper-cbc-upstream-replay.ts"
+      - "scripts/upstream/**"
+      - ".github/workflows/m26-upstream-anchored-replay.yml"
+  pull_request:
+    branches:
+      - main
+      - research/m12-cryptographic-ingress-boundary
+
+jobs:
+  m26-upstream-anchored-replay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check exact upstream pin
+        run: |
+          test -n "$(grep -R "d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b" docs src scripts .github -n | head -1)"
+
+      - name: Run M26 replay certificate
+        run: npm test -- --test-name-pattern="M26 replay certificate|M26 covers the requested stress dimensions|M26 preserves the upstream boundary differential"
+
+      - name: Emit M26 evidence report
+        run: npm run demo:casper-cbc-upstream-replay
