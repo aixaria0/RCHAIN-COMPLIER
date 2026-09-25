@@ -36,6 +36,37 @@ CI corrections and intermediate failures are recorded in the
 
 ## Source diagnosis and policy decision
 
+### Additional candidate validation, 2026-09-25
+
+At upstream `11b2200dcca580f2c00246302238840dcd4f08f6`, the conditional
+persistence candidate passed **41 tests, with zero failed or ignored** in
+[run 36129888945](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36129888945):
+32 existing native-state unit tests, one new checkpoint/restore regression,
+seven existing Casper determinism tests, and one existing runtime-restart test.
+Harness commit: `f05490125e479f30a1145fa23cfbeb6ec1452443`.
+
+The new regression applies the corrected native transition to a committed
+two-validator fixture. It verifies that cancellation survives fresh-runtime
+restore, the other validator's pending request and bond are preserved, staking
+and Coop balances account for the transfer, repeated removal changes no root,
+two independent executions from the same root agree, and the old root remains
+readable with its original pending map. It uses the real Casper runtime and
+native storage implementation with an in-memory history repository.
+
+The [artifact](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36129888945/artifacts/10861436990)
+ZIP SHA-256 is `fe2fee8062df096478e5f12aaa9a5cb5d09486d02504e27ebbba56495d791daa`;
+the downloaded ZIP and all seven files in its manifest were independently
+verified. Its exact candidate source digest matches the earlier native
+experiment, and `report.json` confirms restoration of the original source.
+
+**Boundary:** the focused test calls the native transition directly; the seven
+upstream replay controls cover their own operations. This does not yet validate
+the corrected transition through Casper system-deploy replay or signed peer
+consensus. Fresh-runtime restore in one process is not an OS restart or a
+disk-durability result. See the [test scope](../tests/pos_review/README.md).
+
+### Persisted-state mismatch
+
 In [`rholang/src/native_state.rs`](https://github.com/rchain-community/rchain-rust/blob/0ac5498fe246ea8a901c9e5277383f672ed9635d/rholang/src/native_state.rs),
 `NativeSystemState::slash` reads `pending_withdrawers`, removes the validator
 from that local map, then persists the updated bond, active and claim maps;
