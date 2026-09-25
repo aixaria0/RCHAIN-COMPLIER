@@ -59,11 +59,29 @@ the downloaded ZIP and all seven files in its manifest were independently
 verified. Its exact candidate source digest matches the earlier native
 experiment, and `report.json` confirms restoration of the original source.
 
-**Boundary:** the focused test calls the native transition directly; the seven
-upstream replay controls cover their own operations. This does not yet validate
-the corrected transition through Casper system-deploy replay or signed peer
-consensus. Fresh-runtime restore in one process is not an OS restart or a
-disk-durability result. See the [test scope](../tests/pos_review/README.md).
+### Targeted Casper replay validation, 2026-09-25
+
+The next [run 36130977848](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36130977848)
+at harness commit `3fa0412f37b513e17d9b35ad51d4ed2d46e68cef` extended the
+focused test through `RuntimeManager::compute_state` with the supplied slash
+system deploy and `replay_compute_state` with its recorded result. The played
+and replayed roots matched. Reads from the replayed root confirmed cancellation,
+preservation of the other pending entry, and the expected staking/Coop balances.
+An empty-operation control produced a different root. All **41 tests passed
+again**, with zero failed or ignored; the expanded assertions are within the
+same focused test, not an additional test count.
+
+The downloaded [artifact](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36130977848/artifacts/10860824771)
+matched ZIP SHA-256 `f0537cf6fbd98e3099f82b3915d232330b2fc3b7e61bad3113b42dea057698f1`.
+All seven manifest file hashes were verified, and the archived Rust fixture
+matched the submitted fixture. Original source restoration was confirmed.
+
+**Boundary:** this validates execution/replay of a supplied system deploy under
+the candidate, not the consensus decision to select it or signed peer finality.
+Fresh-runtime restore in one process is not an OS restart or a disk-durability
+result. See the [test scope](../tests/pos_review/README.md). The finding and
+conditional repair are ready for maintainer review; protocol acceptance and
+network-impact validation remain open.
 
 ### Persisted-state mismatch
 
