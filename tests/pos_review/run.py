@@ -63,6 +63,7 @@ try:
         if not passed:
             raise RuntimeError(f"{name} failed; see raw log")
     report["complete"] = True
+    report["targeted_casper_replay_verified"] = True
 finally:
     source.write_bytes(original)
     if fixture.exists() and fixture.read_bytes() == Path(__file__).with_name("persistence.rs").read_bytes():

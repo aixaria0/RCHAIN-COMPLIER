@@ -54,6 +54,28 @@ async fn cancellation_survives_checkpoint_restore_and_preserves_other_validator(
         roots.push(after);
     }
     assert_eq!(roots[0], roots[1], "same input and repaired transition have identical roots");
+    // Exercise the repaired operation through Casper's recorded system-deploy replay.
+    let operation = rchain_casper::system_deploy::SystemDeploy::slash(&target, random.split_byte(7));
+    let (played, users, systems) = rm.compute_state(
+        &before, &[], &[operation], &random, BlockData::empty()
+    ).await.expect("Casper system-deploy execution");
+    assert!(users.is_empty());
+    assert_eq!(systems.len(), 1, "the removal must actually execute");
+    let processed: Vec<_> = systems.into_iter().map(|r| r.deploy).collect();
+    let (replayed, _) = rm.replay_compute_state(
+        &before, &[], &processed, &random, BlockData::empty(), true, &genesis, &[]
+    ).await.expect("Casper system-deploy replay");
+    assert_eq!(played, replayed, "the corrected transition replays to its recorded root");
+    let reader = rm.fork_play_runtime(replayed).await.expect("replayed state reader");
+    reader.reset(replayed).await.expect("restore replayed root");
+    let state = NativeSystemState::new(reader.native_store());
+    assert_eq!(state.pending_withdrawers().await.unwrap(), [(other, 40)].into_iter().collect());
+    assert_eq!(i64::from(state.pos_vault_balance().await.unwrap()), 60);
+    assert_eq!(i64::from(state.coop_balance().await.unwrap()), 40);
+    let (unchanged, _, _) = rm.compute_state(
+        &before, &[], &[], &random, BlockData::empty()
+    ).await.expect("empty-operation control");
+    assert_ne!(unchanged, played, "omitting the transition must not satisfy the same root check");
     let old = rm.fork_play_runtime(before).await.expect("old snapshot");
     old.reset(before).await.expect("old root restore");
     assert_eq!(NativeSystemState::new(old.native_store()).pending_withdrawers().await.unwrap(), pending);

@@ -16,11 +16,15 @@ Checks:
   entry remains intact, balances are conserved, repeated removal changes no root,
   and two independent applications from one root produce the same output root.
 - Existing upstream Casper determinism and runtime-restart integration controls.
+- The corrected transition through Casper `compute_state` and recorded
+  system-deploy `replay_compute_state`: equal output roots, cancellation and
+  accounting read from the replayed root, and a no-operation control producing a
+  different root.
 
 The fresh runtimes share an in-memory history repository; this is not an OS
-restart or a disk-durability test. The targeted fixture directly calls the native
-transition, so it does not validate Casper system-deploy replay for that transition.
-The existing determinism tests cover their own operations only. No signed peer
+restart or a disk-durability test. The fixture tests direct native persistence
+and the supplied system-deploy execution/replay, but not the consensus decision
+that selects that operation. The existing determinism tests cover their own operations only. No signed peer
 ingress, consensus evidence selection, network finality, or rebond scenario is
 exercised. The workflow's result is provisional until its raw logs are reviewed.
 
