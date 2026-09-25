@@ -146,7 +146,7 @@ class Runner:
         while time.monotonic() < deadline:
             try:
                 return fn()
-            except (ValueError, KeyError, urllib.error.URLError, TimeoutError) as exc:
+            except (ValueError, KeyError, urllib.error.URLError, ConnectionError, TimeoutError) as exc:
                 last = str(exc)
                 time.sleep(2)
         raise ValueError(f"{label} timed out: {last}")
@@ -225,7 +225,7 @@ class Runner:
                     h = block_info(finalized[0])["blockHash"]
                     confirmations = [self.http(i, f"/api/is-finalized/{h}") for i in range(2)]
                     witness = common_finality(*finalized, baseline, confirmations)
-                except (ValueError, KeyError, urllib.error.URLError, TimeoutError) as exc:
+                except (ValueError, KeyError, urllib.error.URLError, ConnectionError, TimeoutError) as exc:
                     self.result["lastFinalityObservation"] = str(exc)
                     continue
                 self.result["finalStatus"] = self.ready()

@@ -29,6 +29,15 @@ The bootstrap returned `Finalized fringe is not available.`; that run did not
 exercise the proposal/replay path. The startup gate is corrected, with a
 regression check. Finality remains mandatory at the end.
 
+The [next run](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36094971145)
+built the same pinned node and produced six blocks across both validators. Both
+reported block #2 as finalized, with the same block hash and post-state hash.
+The first attempt's downloaded evidence passed all 97 SHA-256 file checks.
+Its second attempt failed before block production when an initial status HTTP
+connection was reset. A bounded retry for temporary connection resets is now
+covered by a regression test; neither attempt establishes the native PoS
+pending-withdrawal result on a finalized live chain.
+
 The evidence gate rejects height-only progress, missing/ambiguous fields,
 mismatched hashes and one-sided finality. `result.json` identifies the failed
 phase; raw HTTP responses, command results, container logs, launcher diff,

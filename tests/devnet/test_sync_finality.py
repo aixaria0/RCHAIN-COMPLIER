@@ -1,5 +1,8 @@
 import copy
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from sync_finality import PUBKEYS, STAKES, Runner, common_finality, genesis_info
 
@@ -56,6 +59,21 @@ class FinalityEvidenceTests(unittest.TestCase):
                        [dict(info, bonds=[])], {"latestBlockNumber": 1}):
             with self.subTest(blocks=blocks), self.assertRaises(ValueError):
                 genesis_info(blocks)
+
+    def test_boot_status_connection_reset_is_transient(self):
+        with TemporaryDirectory() as root, patch("sync_finality.time.sleep"):
+            runner = Runner(Path(root), Path(root) / "evidence")
+            calls = 0
+
+            def reconnecting_status():
+                nonlocal calls
+                calls += 1
+                if calls == 1:
+                    raise ConnectionResetError(104, "Connection reset by peer")
+                return {"peers": 1}
+
+            self.assertEqual(runner.wait("status", reconnecting_status), {"peers": 1})
+            self.assertEqual(calls, 2)
 
 
 if __name__ == "__main__":
