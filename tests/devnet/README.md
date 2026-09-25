@@ -20,6 +20,15 @@ from each validator are required. Success additionally requires:
 - the latest finalized height, block hash and post-state hash agree;
 - both nodes explicitly report that common block as finalized.
 
+Startup checks the identical genesis block in both nodes' height indexes. It
+does not require a finalized fringe before allowing normal proposals. The first
+[CI run](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/runs/36092895016)
+built successfully and both nodes reached Running, but the original harness
+incorrectly required `/api/last-finalized-block` before producing any blocks.
+The bootstrap returned `Finalized fringe is not available.`; that run did not
+exercise the proposal/replay path. The startup gate is corrected, with a
+regression check. Finality remains mandatory at the end.
+
 The evidence gate rejects height-only progress, missing/ambiguous fields,
 mismatched hashes and one-sided finality. `result.json` identifies the failed
 phase; raw HTTP responses, command results, container logs, launcher diff,

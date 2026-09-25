@@ -50,6 +50,19 @@ def common_finality(left, right, baseline, confirmations):
     return {key: a[key] for key in ("blockNumber", "blockHash", "postStateHash")}
 
 
+def genesis_info(blocks):
+    require(isinstance(blocks, list) and len(blocks) == 1,
+            "exactly one indexed genesis block is required")
+    info = block_info({"blockInfo": blocks[0]})
+    require(info["blockNumber"] == 0, "expected the genesis height")
+    bonds = info.get("bonds")
+    require(isinstance(bonds, list) and len(bonds) == len(PUBKEYS),
+            "unexpected genesis bond count")
+    require({b["validator"]: b["stake"] for b in bonds} == dict(zip(PUBKEYS, STAKES)),
+            "genesis bonds do not match test configuration")
+    return info
+
+
 def prepare_launcher(source, prefix, genesis):
     """Adapt environment only. Rust, contracts and replay code remain unchanged."""
     replacements = [
@@ -146,6 +159,13 @@ class Runner:
                     "both nodes must have a connected peer")
         return statuses
 
+    def synced_genesis(self):
+        # A fresh DAG need not expose a finalized fringe yet. Check genesis
+        # membership via the height index, then let both validators make blocks.
+        infos = [genesis_info(self.http(i, "/api/blocks/0/0")) for i in range(2)]
+        require(infos[0] == infos[1], "indexed genesis metadata differs")
+        return infos
+
     def run(self):
         actual = self.command("source-head", ["git", "rev-parse", "HEAD"]).strip()
         require(actual == PIN, "upstream pin mismatch")
@@ -168,17 +188,10 @@ class Runner:
                               "--no-autopropose", "--no-propose-on-deploy"], timeout=240)
         self.phase("PEER_SYNC")
         self.result["initialStatus"] = self.wait("peer connectivity", self.ready)
-        initial = self.wait("genesis on both nodes", lambda: [
-            self.http(i, "/api/last-finalized-block") for i in range(2)])
-        infos = [block_info(b) for b in initial]
-        require(infos[0]["blockHash"] == infos[1]["blockHash"], "genesis hash mismatch")
-        baseline = max(b["blockNumber"] for b in infos)
-        require(baseline == 0, "manual network must start at genesis")
-        for info in infos:
-            require({b["validator"]: b["stake"] for b in info["bonds"]} ==
-                    dict(zip(PUBKEYS, STAKES)), "genesis bonds do not match test configuration")
-        self.save("initial-finalized.json", initial)
-        self.result["initialFinalizedHeight"] = baseline
+        infos = self.wait("indexed genesis on both nodes", self.synced_genesis)
+        baseline = infos[0]["blockNumber"]
+        self.save("initial-genesis.json", infos)
+        self.result["genesisHeight"] = baseline
         self.phase("BLOCK_EXCHANGE")
         # Keep proposals sequential and wait for the exact block to reach the peer.
         # Dev-mode's upstream signed Nil keepalive supplies ordinary, funded deploys.

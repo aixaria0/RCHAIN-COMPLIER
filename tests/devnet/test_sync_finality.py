@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from sync_finality import common_finality
+from sync_finality import PUBKEYS, STAKES, Runner, common_finality, genesis_info
 
 
 class FinalityEvidenceTests(unittest.TestCase):
@@ -37,6 +37,25 @@ class FinalityEvidenceTests(unittest.TestCase):
             altered["blockInfo"][field] = value
             with self.subTest(field=field, value=value), self.assertRaises(ValueError):
                 common_finality(altered, self.block, 0, [True, True])
+
+    def test_indexed_genesis_does_not_require_finality_before_proposals(self):
+        info = dict(self.block["blockInfo"], blockNumber=0,
+                    bonds=[{"validator": key, "stake": stake}
+                           for key, stake in zip(PUBKEYS, STAKES)])
+
+        class FreshNode:
+            def http(self, node, path):
+                if path == "/api/last-finalized-block":
+                    raise ValueError("Finalized fringe is not available.")
+                if path == "/api/blocks/0/0":
+                    return [info]
+                raise AssertionError(path)
+
+        self.assertEqual(Runner.synced_genesis(FreshNode()), [info, info])
+        for blocks in ([], [info, info], [dict(info, blockNumber=1)],
+                       [dict(info, bonds=[])], {"latestBlockNumber": 1}):
+            with self.subTest(blocks=blocks), self.assertRaises(ValueError):
+                genesis_info(blocks)
 
 
 if __name__ == "__main__":
