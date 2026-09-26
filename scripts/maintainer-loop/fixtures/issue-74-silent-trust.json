@@ -1,0 +1,30 @@
+{
+  "subject": {
+    "id": "rchain-rust-issue-74",
+    "label": "Post-genesis validator admission"
+  },
+  "source": {
+    "repository": "rchain-community/rchain-rust",
+    "url": "https://github.com/rchain-community/rchain-rust/issues/74"
+  },
+  "observedAt": "2026-09-24T17:20:08Z",
+  "observations": {
+    "trust": {
+      "processed": true,
+      "targetTrusted": false
+    },
+    "bond": {
+      "processed": true,
+      "present": false
+    },
+    "activation": {
+      "active": false,
+      "canPropose": false
+    },
+    "replay": {
+      "matched": true,
+      "expectedDigest": "fixture",
+      "observedDigest": "fixture"
+    }
+  }
+}
