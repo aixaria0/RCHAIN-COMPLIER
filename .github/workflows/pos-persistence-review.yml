@@ -1,0 +1,45 @@
+name: PoS candidate persistence review
+on:
+  push:
+    branches: [test/cbc-genesis-sync]
+    paths:
+      - tests/pos_review/**
+      - .github/workflows/pos-persistence-review.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CARGO_BUILD_JOBS: '2'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: orchestrator
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: rchain-community/rchain-rust
+          ref: 11b2200dcca580f2c00246302238840dcd4f08f6
+          path: implementation
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: implementation
+          key: pos-candidate-review
+      - name: Install protobuf compiler
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Validate conditional repair and existing runtime controls
+        run: python3 orchestrator/tests/pos_review/run.py implementation evidence
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pos-candidate-persistence-${{ github.run_id }}
+          path: evidence/
+          retention-days: 30
+          if-no-files-found: error
