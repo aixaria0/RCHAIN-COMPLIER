@@ -1,0 +1,19 @@
+{
+  "subject": {
+    "id": "rchain-rust-pr-81",
+    "label": "Dependency-bumped node artifact"
+  },
+  "source": {
+    "repository": "rchain-community/rchain-rust",
+    "url": "https://github.com/rchain-community/rchain-rust/pull/81"
+  },
+  "observedAt": "2026-09-26T15:13:46Z",
+  "observations": {
+    "node": {
+      "processRunning": true,
+      "httpBound": false,
+      "healthOk": false,
+      "statusReadable": false
+    }
+  }
+}
