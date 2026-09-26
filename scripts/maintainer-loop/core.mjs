@@ -136,7 +136,7 @@ export function runScenario({ scenario, input, previousDigest }) {
     ...(replayObservation?.expectedDigest ? { expectedDigest: replayObservation.expectedDigest } : {}),
     ...(replayObservation?.observedDigest ? { observedDigest: replayObservation.observedDigest } : {}),
     state: !scenario.replay
-      ? "INCOMPLETE"
+      ? "REPRODUCED"
       : replayObservation?.matched === true
         ? "REPRODUCED"
         : replayObservation?.matched === false
