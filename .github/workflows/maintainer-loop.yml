@@ -1,0 +1,40 @@
+name: maintainer-loop
+
+on:
+  push:
+    branches:
+      - feat/reality-plane-maintainer-loop
+    paths:
+      - "scripts/maintainer-loop/**"
+      - "docs/MAINTAINER_LOOP.md"
+      - ".github/workflows/maintainer-loop.yml"
+  pull_request:
+    paths:
+      - "scripts/maintainer-loop/**"
+      - "docs/MAINTAINER_LOOP.md"
+      - ".github/workflows/maintainer-loop.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run maintainer-loop tests
+        run: node --test scripts/maintainer-loop/core.test.mjs
+      - name: Exercise known silent-trust fixture
+        run: |
+          set +e
+          node scripts/maintainer-loop/cli.mjs \
+            --scenario TRUST_BOND_ACTIVATE \
+            --input scripts/maintainer-loop/fixtures/issue-74-silent-trust.json \
+            --out /tmp/issue-74.reality.json
+          code=$?
+          test "$code" -eq 1
+          test -s /tmp/issue-74.reality.json
