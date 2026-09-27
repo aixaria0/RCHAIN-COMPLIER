@@ -1,0 +1,60 @@
+{
+  "subject": {
+    "id": "rchain-maintainer-health",
+    "label": "Read-only RNode maintainer health snapshot"
+  },
+  "source": {
+    "nodeUrl": "http://rnode.example:40403",
+    "version": "0.14.0",
+    "networkId": "testnet",
+    "shardId": "root",
+    "sourceSha": "fixture"
+  },
+  "observedAt": "unix:0",
+  "observations": {
+    "health": {
+      "statusReadable": true,
+      "versionReadable": true,
+      "capabilitiesReadable": true,
+      "shardsReadable": true,
+      "finalizedBlockAvailable": true,
+      "canonicalConsistency": true,
+      "nodeReportedFinalized": true,
+      "bondStructureValid": true,
+      "crossNodeAgreement": true
+    },
+    "node": {
+      "latestBlock": 8,
+      "finalizedBlock": 7,
+      "networkId": "testnet",
+      "shardId": "root"
+    },
+    "finalized": {
+      "blockHash": "fixture-hash",
+      "payloadSha256": "fixture-digest",
+      "canonicalConsistency": true,
+      "canonicalMismatches": [],
+      "nodeReportedFinalized": true
+    },
+    "casper": {
+      "bondCount": 2,
+      "totalObservedStake": 100,
+      "bondStructureValid": true,
+      "justificationCount": 2,
+      "justificationStructureValid": true,
+      "bonds": [
+        {"validator":"v1","stake":70},
+        {"validator":"v2","stake":30}
+      ]
+    },
+    "crossNode": {
+      "targetCount": 2,
+      "reachableCount": 2,
+      "agreeingNodes": 2,
+      "quorumObserved": true,
+      "agreement": true,
+      "commonFinalizedHeight": 7,
+      "commonBlockHash": "fixture-hash"
+    }
+  }
+}
