@@ -18,6 +18,10 @@ import {
 } from "./reality-record.ts";
 import type { WeightedPossibilityResult } from "./possibility-plane.ts";
 import { isCryptographicallyVerifiedSentinelRecord } from "./sentinel-signed-adapter.ts";
+import {
+  isCryptographicallyVerifiedBuildProvenance,
+  type VerifiedBuildProvenance,
+} from "./build-provenance-signed-adapter.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
@@ -63,6 +67,8 @@ export interface AssuranceCheckInput {
 
 export interface AssuranceRequirements {
   requireReleaseArtifactIdentity: boolean;
+  requireBuildProvenanceVerification: boolean;
+  requireBuilderAuthorization: boolean;
   requireLiveObservation: boolean;
   requireObserverSignature: boolean;
   requireObserverAuthorization: boolean;
@@ -81,10 +87,30 @@ export interface AssuranceObserverTrust {
   authorizedKeyIds: string[];
 }
 
+export interface AssuranceBuilderTrust {
+  authorizedKeyIds: string[];
+  authorizedBuilderIds: string[];
+}
+
+export interface AssuranceBuildProvenanceReference {
+  schema: string;
+  repository: string;
+  commit: string;
+  binaryDigest: string;
+  statementDigest: string;
+  payloadDigest: string;
+  builderId: string;
+  signerKeyId: string;
+  subjectName: string;
+  runtimeVerified: boolean;
+}
+
 export interface AssuranceFabricInput {
   issuedAt: string;
   freshness: AssuranceFreshnessPolicy;
   observerTrust?: AssuranceObserverTrust;
+  builderTrust?: AssuranceBuilderTrust;
+  buildProvenance?: VerifiedBuildProvenance;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   records: AssuranceRecordInput[];
@@ -126,6 +152,8 @@ export interface AssuranceCertificate {
   };
   freshness: AssuranceFreshnessPolicy;
   observerTrust: AssuranceObserverTrust;
+  builderTrust: AssuranceBuilderTrust;
+  buildProvenance?: AssuranceBuildProvenanceReference;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   requirements: AssuranceRequirements;
@@ -147,6 +175,8 @@ export interface AssuranceCertificate {
 
 const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireReleaseArtifactIdentity: true,
+  requireBuildProvenanceVerification: true,
+  requireBuilderAuthorization: true,
   requireLiveObservation: true,
   requireObserverSignature: true,
   requireObserverAuthorization: true,
@@ -162,7 +192,8 @@ const MIN_CROSS_NODE_TARGETS = 2;
 const MANDATORY_LIMITATIONS = [
   "certificate SHA-256 integrity is not signer authenticity",
   "a verified Sentinel signature proves possession of the pinned observer key, not organizational authorization of that key",
-  "declared build-provenance digest is not cryptographic verification of the builder or provenance signature",
+  "a verified build-provenance signature proves possession of the pinned builder key and binds the signed SLSA statement to the declared source/artifact; it does not prove the trusted build platform behaved honestly outside that trust assumption",
+  "builder authorization is an explicit certificate policy declaration; organizational authority for that authorization remains external",
   "cross-node consistency does not prove operator or failure-domain independence",
   "cross-node consistency is not a stake-weighted Casper finality proof",
   "bounded possibility search proves only the declared model and search scope",
@@ -212,6 +243,11 @@ function strictPolicyDescriptor(): Record<string, unknown> {
     id: STRICT_POLICY_ID,
     requirements: DEFAULT_REQUIREMENTS,
     minimumCrossNodeTargets: MIN_CROSS_NODE_TARGETS,
+    buildProvenance: {
+      attestationSchema: "rchain-build-provenance-attestation/v1",
+      statementType: "https://in-toto.io/Statement/v1",
+      predicateType: "https://slsa.dev/provenance/v1",
+    },
     sourceClassBindings: {
       SYNTHETIC: ["rchain-reality-compiler"],
       LIVE_OBSERVATION: ["rchain-sentinel"],
@@ -250,6 +286,8 @@ function canonicalCertificatePayload(
     policy: certificate.policy,
     freshness: certificate.freshness,
     observerTrust: certificate.observerTrust,
+    builderTrust: certificate.builderTrust,
+    buildProvenance: certificate.buildProvenance,
     release: certificate.release,
     network: certificate.network,
     requirements: certificate.requirements,
@@ -300,6 +338,166 @@ function normalizedObserverTrust(
     );
   }
   return { authorizedKeyIds };
+}
+
+function normalizedBuilderTrust(
+  input?: AssuranceBuilderTrust,
+): AssuranceBuilderTrust {
+  const authorizedKeyIds = [...new Set(input?.authorizedKeyIds ?? [])]
+    .map((keyId) => keyId.toLowerCase())
+    .sort();
+  const malformed = authorizedKeyIds.filter(
+    (keyId) => !/^sha256:[0-9a-f]{64}$/.test(keyId),
+  );
+  if (malformed.length > 0) {
+    throw new Error(
+      `builderTrust contains malformed key ids: ${malformed.join(", ")}`,
+    );
+  }
+
+  const rawBuilderIds = input?.authorizedBuilderIds ?? [];
+  if (rawBuilderIds.some((builderId) => !builderId.trim())) {
+    throw new Error("builderTrust contains an empty builder id");
+  }
+  const authorizedBuilderIds = [...new Set(rawBuilderIds.map((builderId) => builderId.trim()))]
+    .sort();
+
+  return { authorizedKeyIds, authorizedBuilderIds };
+}
+
+function buildProvenanceReference(
+  provenance?: VerifiedBuildProvenance,
+): AssuranceBuildProvenanceReference | undefined {
+  if (!provenance) return undefined;
+  return {
+    schema: provenance.schema,
+    repository: provenance.repository,
+    commit: provenance.commit,
+    binaryDigest: provenance.binaryDigest,
+    statementDigest: provenance.statementDigest,
+    payloadDigest: provenance.payloadDigest,
+    builderId: provenance.builderId,
+    signerKeyId: provenance.signerKeyId,
+    subjectName: provenance.subjectName,
+    runtimeVerified: isCryptographicallyVerifiedBuildProvenance(provenance),
+  };
+}
+
+function buildProvenanceVerificationCheck(
+  release: AssuranceReleaseIdentity,
+  provenance: VerifiedBuildProvenance | undefined,
+  trust: AssuranceBuilderTrust,
+): AssuranceCheck {
+  if (!provenance) {
+    return {
+      id: "supply_chain_build_provenance",
+      plane: "SUPPLY_CHAIN",
+      state: "BLOCKED",
+      critical: true,
+      description: "No cryptographically verified signed SLSA build provenance was supplied.",
+      evidence: [],
+    };
+  }
+
+  const runtimeVerified = isCryptographicallyVerifiedBuildProvenance(provenance);
+  if (!runtimeVerified) {
+    return {
+      id: "supply_chain_build_provenance",
+      plane: "SUPPLY_CHAIN",
+      state: "FAIL",
+      critical: true,
+      description: "Build provenance object was not produced by the pinned-key cryptographic verifier.",
+      evidence: [`payload:${provenance.payloadDigest}`],
+    };
+  }
+
+  const releaseComplete = Boolean(release.binaryDigest && release.buildProvenance);
+  if (!releaseComplete) {
+    return {
+      id: "supply_chain_build_provenance",
+      plane: "SUPPLY_CHAIN",
+      state: "BLOCKED",
+      critical: true,
+      description: "Release identity is missing the binary or provenance-statement digest needed for provenance binding.",
+      evidence: [`payload:${provenance.payloadDigest}`],
+    };
+  }
+
+  const repositoryMatch =
+    provenance.repository.trim().toLowerCase() === release.repository.trim().toLowerCase();
+  const commitMatch =
+    provenance.commit.toLowerCase() === release.commit.toLowerCase();
+  const binaryMatch =
+    provenance.binaryDigest.toLowerCase() === release.binaryDigest!.toLowerCase();
+  const statementMatch =
+    provenance.statementDigest.toLowerCase() === release.buildProvenance!.toLowerCase();
+
+  if (!repositoryMatch || !commitMatch || !binaryMatch || !statementMatch) {
+    return {
+      id: "supply_chain_build_provenance",
+      plane: "SUPPLY_CHAIN",
+      state: "FAIL",
+      critical: true,
+      description: "Signed build provenance conflicts with the declared release repository, commit, binary digest, or provenance-statement digest.",
+      evidence: [
+        `repository-match:${repositoryMatch}`,
+        `commit-match:${commitMatch}`,
+        `binary-match:${binaryMatch}`,
+        `statement-match:${statementMatch}`,
+        `payload:${provenance.payloadDigest}`,
+      ],
+    };
+  }
+
+  if (trust.authorizedKeyIds.length === 0 || trust.authorizedBuilderIds.length === 0) {
+    return {
+      id: "supply_chain_build_provenance",
+      plane: "SUPPLY_CHAIN",
+      state: "BLOCKED",
+      critical: true,
+      description: "Builder trust policy must declare at least one authorized signer key and builder id.",
+      evidence: [
+        `signer:${provenance.signerKeyId}`,
+        `builder:${provenance.builderId}`,
+      ],
+    };
+  }
+
+  const signerAuthorized = trust.authorizedKeyIds.includes(
+    provenance.signerKeyId.toLowerCase(),
+  );
+  const builderAuthorized = trust.authorizedBuilderIds.includes(
+    provenance.builderId,
+  );
+
+  return {
+    id: "supply_chain_build_provenance",
+    plane: "SUPPLY_CHAIN",
+    state: signerAuthorized && builderAuthorized ? "PASS" : "FAIL",
+    critical: true,
+    description:
+      signerAuthorized && builderAuthorized
+        ? "Pinned-key signed SLSA provenance binds the authorized builder, source commit, and binary artifact to the declared release."
+        : "Cryptographically valid build provenance was signed by a key or builder id outside the declared authorization policy.",
+    evidence: [
+      `payload:${provenance.payloadDigest}`,
+      `statement:${provenance.statementDigest}`,
+      `signer:${provenance.signerKeyId}`,
+      `builder:${provenance.builderId}`,
+      `subject:${provenance.subjectName}`,
+      `signer-authorized:${signerAuthorized}`,
+      `builder-authorized:${builderAuthorized}`,
+    ],
+    metrics: {
+      runtimeVerified,
+      repositoryMatch,
+      commitMatch,
+      binaryMatch,
+      statementMatch,
+      signerAuthorized,
+      builderAuthorized,
+    },
+  };
 }
 
 function sentinelRecordShapeVerified(record: RealityRecord): boolean {
@@ -858,8 +1056,15 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
 
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
   const observerTrust = normalizedObserverTrust(input.observerTrust);
+  const builderTrust = normalizedBuilderTrust(input.builderTrust);
   const reality = realityChecks(input.records);
   const releaseIdentity = releaseArtifactIdentityCheck(input.release);
+  const buildProvenance = buildProvenanceVerificationCheck(
+    input.release,
+    input.buildProvenance,
+    builderTrust,
+  );
+  const buildProvenanceRef = buildProvenanceReference(input.buildProvenance);
   const observerAuthorization = observerAuthorizationCheck(input.records, observerTrust);
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
   const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
@@ -920,6 +1125,14 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       requirements.requireReleaseArtifactIdentity,
       releaseIdentity.state === "PASS",
       releaseIdentity.description,
+    ),
+    requiredPlaneCheck(
+      "gate_build_provenance",
+      "SUPPLY_CHAIN",
+      requirements.requireBuildProvenanceVerification &&
+        requirements.requireBuilderAuthorization,
+      buildProvenance.state === "PASS",
+      buildProvenance.description,
     ),
     requiredPlaneCheck(
       "gate_live_observation",
@@ -983,7 +1196,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [releaseIdentity, ...reality.checks, observerAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
@@ -999,6 +1212,9 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     input.issuedAt,
     JSON.stringify(input.freshness),
     ...observerTrust.authorizedKeyIds,
+    ...builderTrust.authorizedKeyIds,
+    ...builderTrust.authorizedBuilderIds,
+    input.buildProvenance?.payloadDigest ?? "",
     ...reality.references.map((record) => record.digest).sort(),
     policy.digest,
   ]).slice(0, 32)}`;
@@ -1011,6 +1227,8 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     policy,
     freshness: input.freshness,
     observerTrust,
+    builderTrust,
+    ...(buildProvenanceRef ? { buildProvenance: buildProvenanceRef } : {}),
     release: input.release,
     network: input.network,
     requirements,
