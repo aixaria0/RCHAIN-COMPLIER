@@ -6,12 +6,15 @@ import test from "node:test";
 import {
   createSignedBuildProvenanceAttestation,
   createSignedNativeReplayAttestation,
+  createSignedRecoveryReplayAttestation,
+  sha256File,
 } from "./attestation-producer-node.ts";
 import {
   verifySignedBuildProvenanceAttestation,
 } from "./build-provenance-signed-adapter.ts";
 import {
   NATIVE_REPLAY_ATTESTATION_SCHEMA,
+  signedNativeReplayAttestationToRecord,
   verifySignedNativeReplayAttestation,
   type NativeReplayAttestationPayload,
 } from "./native-replay-signed-adapter.ts";
@@ -93,5 +96,100 @@ test("producer rejects malformed raw private seed", async () => {
       privateSeedHex: "deadbeef",
     }),
     /32 bytes/,
+  );
+});
+
+
+test("recovery producer hashes real checkpoint/log/tool/binary artifacts and emits verifier-compatible evidence", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "assurance-recovery-producer-"));
+  const binary = path.join(dir, "rnode");
+  const checkpoint = path.join(dir, "checkpoint.bin");
+  const recoveryLog = path.join(dir, "recovery.log");
+  const restoreTool = path.join(dir, "restore-tool");
+  await Promise.all([
+    writeFile(binary, "rnode-binary"),
+    writeFile(checkpoint, "checkpoint-state"),
+    writeFile(recoveryLog, "restore completed"),
+    writeFile(restoreTool, "restore-tool-v1"),
+  ]);
+
+  const checkpointDigest = await sha256File(checkpoint);
+  const binaryDigest = await sha256File(binary);
+  const stateDigest = `sha256:${"7".repeat(64)}`;
+
+  const envelope = await createSignedRecoveryReplayAttestation({
+    repository: "rchain-community/rchain-rust",
+    commit: COMMIT,
+    binaryPath: binary,
+    subjectId: "state:recovery-test",
+    expectedDigest: stateDigest,
+    observedDigest: stateDigest,
+    inputDigests: [SHA_A],
+    checkpointPath: checkpoint,
+    checkpointSource: "staging-finalized-checkpoint",
+    recoveryLogPath: recoveryLog,
+    restoreToolPath: restoreTool,
+    previousRecordDigest: "8".repeat(64),
+    preProcessId: "pid-before",
+    recoveredProcessId: "pid-after",
+    preDiskId: "disk-before",
+    recoveredDiskId: "disk-after",
+    startedAtUnixMs: 1_800_000_000_000,
+    finishedAtUnixMs: 1_800_000_000_500,
+    privateSeedHex: TEST_SEED,
+  });
+
+  assert.equal(envelope.payload.release.binary_sha256, binaryDigest);
+  assert.equal(envelope.payload.recovery?.checkpoint_digest, checkpointDigest);
+  assert.ok(envelope.payload.replay.input_digests.includes(checkpointDigest));
+
+  const verification = await verifySignedNativeReplayAttestation(
+    envelope,
+    envelope.signature.key_id,
+  );
+  assert.equal(verification.valid, true);
+
+  const record = await signedNativeReplayAttestationToRecord({
+    snapshot: envelope,
+    expectedKeyId: envelope.signature.key_id,
+  });
+  assert.equal(record.replay.state, "REPRODUCED");
+  assert.equal(record.integrity.previousDigest, "8".repeat(64));
+  const recovery = record.observations.find(
+    (observation) => observation.type === "RecoveryContext",
+  );
+  assert.equal(recovery?.data.checkpointDigest, checkpointDigest);
+  assert.equal(recovery?.data.recoveryLogDigest, await sha256File(recoveryLog));
+  assert.equal(recovery?.data.restoreToolDigest, await sha256File(restoreTool));
+});
+
+test("recovery producer rejects same-process or same-disk pseudo-restores", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "assurance-recovery-producer-bad-"));
+  const file = path.join(dir, "artifact");
+  await writeFile(file, "x");
+  const stateDigest = `sha256:${"9".repeat(64)}`;
+
+  await assert.rejects(
+    createSignedRecoveryReplayAttestation({
+      repository: "rchain-community/rchain-rust",
+      commit: COMMIT,
+      binaryPath: file,
+      subjectId: "state:test",
+      expectedDigest: stateDigest,
+      observedDigest: stateDigest,
+      checkpointPath: file,
+      checkpointSource: "checkpoint",
+      recoveryLogPath: file,
+      restoreToolPath: file,
+      previousRecordDigest: "a".repeat(64),
+      preProcessId: "same",
+      recoveredProcessId: "same",
+      preDiskId: "disk-a",
+      recoveredDiskId: "disk-b",
+      startedAtUnixMs: 10,
+      finishedAtUnixMs: 20,
+      privateSeedHex: TEST_SEED,
+    }),
+    /process ids must be distinct/,
   );
 });
