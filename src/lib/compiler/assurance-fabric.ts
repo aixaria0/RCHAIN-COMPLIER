@@ -206,16 +206,40 @@ function canonicalCertificatePayload(
   }));
 }
 
-const TRUSTED_LIVE_RECORD_SOURCES = new Set(["rchain-sentinel"]);
+const SOURCE_CLASS_BINDINGS: Record<AssuranceSourceClass, ReadonlySet<string>> = {
+  SYNTHETIC: new Set(["rchain-reality-compiler"]),
+  LIVE_OBSERVATION: new Set(["rchain-sentinel"]),
+  NATIVE_REPLAY: new Set(["rchain-rust-native-replay"]),
+  FORMAL_MODEL: new Set(["quantum-logical-framework", "lean4"]),
+  INDEPENDENT_ATTESTATION: new Set(["sovereign-lattice"]),
+};
 
 function sourceClassVerified(input: AssuranceRecordInput): boolean {
-  if (input.sourceClass === "LIVE_OBSERVATION") {
-    return TRUSTED_LIVE_RECORD_SOURCES.has(input.record.source);
-  }
-  if (input.record.source === "rchain-reality-compiler") {
-    return input.sourceClass === "SYNTHETIC";
-  }
-  return true;
+  return SOURCE_CLASS_BINDINGS[input.sourceClass].has(input.record.source);
+}
+
+function sentinelRecordShapeVerified(record: RealityRecord): boolean {
+  if (record.source !== "rchain-sentinel") return false;
+  if (record.subject.kind !== "sentinel-observation") return false;
+
+  const block = record.observations.find(
+    (observation) =>
+      observation.type === "FinalizedBlockEvidence" &&
+      observation.source === "rchain-sentinel",
+  );
+  const network = record.observations.find(
+    (observation) =>
+      observation.type === "NetworkStatus" &&
+      observation.source === "rchain-sentinel",
+  );
+  if (!block || !network) return false;
+
+  const transformationIds = new Set(record.transformations.map((item) => item.id));
+  return (
+    transformationIds.has("transform_sentinel_finalized_block_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_network_status_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_observations_to_verification")
+  );
 }
 
 function liveEvidenceQuality(input: AssuranceRecordInput): {
@@ -223,10 +247,14 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   description: string;
   evidence: string[];
 } {
-  if (input.sourceClass !== "LIVE_OBSERVATION" || input.record.source !== "rchain-sentinel") {
+  if (
+    input.sourceClass !== "LIVE_OBSERVATION" ||
+    !sourceClassVerified(input) ||
+    !sentinelRecordShapeVerified(input.record)
+  ) {
     return {
       valid: false,
-      description: "Record is not a trusted rchain-sentinel live observation.",
+      description: "Record does not match the allowed rchain-sentinel live adapter source and shape.",
       evidence: [],
     };
   }
