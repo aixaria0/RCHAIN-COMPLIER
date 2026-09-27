@@ -1,0 +1,96 @@
+name: Assurance Build Provenance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Enforce trusted ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "::error::Signed provenance is restricted to main or a tag; got $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source before producing an artifact
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Create deterministic release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -czf rchain-reality-compiler-build.tgz \
+            dist package.json package-lock.json
+
+      - name: Materialize builder signing seed
+        shell: bash
+        env:
+          ASSURANCE_BUILDER_KEY: ${{ secrets.ASSURANCE_BUILDER_ED25519_PRIVATE_KEY_HEX }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ASSURANCE_BUILDER_KEY" ]]; then
+            echo "::error::ASSURANCE_BUILDER_ED25519_PRIVATE_KEY_HEX is not configured"
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ASSURANCE_BUILDER_KEY" > "$RUNNER_TEMP/assurance-builder-ed25519.hex"
+
+      - name: Produce signed in-toto/SLSA provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types scripts/assurance-attestation-producer.ts build \
+            --repository "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA" \
+            --artifact rchain-reality-compiler-build.tgz \
+            --subject-name rchain-reality-compiler-build.tgz \
+            --builder-id "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/assurance-provenance.yml" \
+            --invocation-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" \
+            --started-on "${{ github.event.repository.updated_at }}" \
+            --finished-on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --key-file "$RUNNER_TEMP/assurance-builder-ed25519.hex" \
+            --output rchain-build-provenance.json
+
+      - name: Remove signing material
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/assurance-builder-ed25519.hex"
+
+      - name: Upload release and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: rchain-assurance-build-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            rchain-reality-compiler-build.tgz
+            rchain-build-provenance.json
