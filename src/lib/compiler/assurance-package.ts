@@ -133,10 +133,20 @@ export async function verifyAssurancePackage(
   const certificate = envelope.payload.certificate;
   const certificateValidation = validateAssuranceCertificate(certificate);
   if (!certificateValidation.valid) {
-    return fail("embedded Assurance Certificate failed integrity/policy validation", {
+    return fail("embedded Assurance Certificate failed integrity/policy/semantic validation", {
       reviewerSignatureValid: true,
       reviewerKeyId: reviewer.keyId,
     });
+  }
+  if (certificate.status !== "PASS") {
+    return fail(
+      `embedded Assurance Certificate is valid but not promotion-grade: status=${certificate.status}`,
+      {
+        reviewerSignatureValid: true,
+        certificateValid: true,
+        reviewerKeyId: reviewer.keyId,
+      },
+    );
   }
 
   const provenanceSigner =
