@@ -827,19 +827,14 @@ test("a manually forged PASS cannot satisfy a required assurance plane", () => {
   assert.equal(certificate.status, "BLOCKED");
 });
 
-test("declared network identity must match the live Sentinel observation", () => {
-  const live = sentinelBundleToRecord({
-    sentinelBaseUrl: "http://sentinel.example",
-    collectedAt: "2026-09-27T00:05:00Z",
-    evidence: liveEvidence,
-    network: liveNetwork,
-    crossNode: liveCrossNode,
-  });
+test("declared network identity must match pinned-key live Sentinel evidence", async () => {
+  const live = await signedLiveRecord("2026-09-27T00:05:00Z");
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:05:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
+    observerTrust: { authorizedKeyIds: [TEST_OBSERVER_KEY_ID] },
     release: releaseIdentity(),
-    network: { genesis: "genesis:test", networkId: "wrong-network", shardId: "root" },
+    network: { genesis: "genesis:test", networkId: "wrong-network", shardId: "root", epoch: 42 },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: commonChecks(),
   });
