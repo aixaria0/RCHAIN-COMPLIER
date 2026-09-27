@@ -18,6 +18,7 @@ export const SENTINEL_ENDPOINTS = {
   blockVerification: "/api/verify/block",
   casperVerification: "/api/verify/casper",
   crossNodeVerification: "/api/verify/cross-node",
+  attestationSnapshot: "/api/attestation/snapshot",
   realityEvent: (eventId: string) => `/api/reality/event/${encodeURIComponent(eventId)}`,
   realityReplay: (eventId: string) => `/api/reality/replay/${encodeURIComponent(eventId)}`,
 } as const;
