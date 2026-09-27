@@ -64,6 +64,7 @@ export interface SignedSentinelAttestation {
 export type SentinelAttestationVerification = PinnedEd25519Verification;
 
 const verifiedSignedRecords = new WeakSet<RealityRecord>();
+const challengeVerifiedSignedRecords = new WeakSet<RealityRecord>();
 
 export function sentinelAttestationPayloadBytes(
   payload: SignedSentinelAttestation["payload"],
@@ -346,9 +347,6 @@ export async function signedSentinelAttestationToRecord(args: {
           keyId: verification.keyId,
           payloadDigest: verification.payloadDigest,
           challengeNonce: args.snapshot.payload.challenge_nonce,
-          challengeVerified:
-            args.expectedChallengeNonce === undefined ||
-            args.snapshot.payload.challenge_nonce === args.expectedChallengeNonce,
           signatureVerified: true,
         },
       },
@@ -427,6 +425,12 @@ export async function signedSentinelAttestationToRecord(args: {
   });
 
   verifiedSignedRecords.add(record);
+  if (
+    args.expectedChallengeNonce !== undefined &&
+    args.snapshot.payload.challenge_nonce === args.expectedChallengeNonce
+  ) {
+    challengeVerifiedSignedRecords.add(record);
+  }
   return record;
 }
 
@@ -434,6 +438,12 @@ export function isCryptographicallyVerifiedSentinelRecord(
   record: RealityRecord,
 ): boolean {
   return verifiedSignedRecords.has(record);
+}
+
+export function isChallengeVerifiedSentinelRecord(
+  record: RealityRecord,
+): boolean {
+  return challengeVerifiedSignedRecords.has(record);
 }
 
 export async function fetchSignedSentinelRealityRecord(
