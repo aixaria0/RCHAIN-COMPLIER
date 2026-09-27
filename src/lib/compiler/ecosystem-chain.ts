@@ -60,3 +60,46 @@ export function validateEcosystemChain(
   }
   return { status: "PASS", reason: "four-repository digest chain is complete" };
 }
+
+export type TamperBoundary =
+  | "POSSIBILITY_DIGEST"
+  | "OBSERVATION_BINDING"
+  | "WORKBENCH_BINDING"
+  | "ATTESTATION_BINDING"
+  | "PROVENANCE_TRUST";
+
+export interface TamperProbeResult {
+  boundary: TamperBoundary;
+  expected: "BLOCKED";
+  observed: "BLOCKED";
+  reason: string;
+}
+
+function cloneManifest(value: CausalAssuranceEcosystemManifest): CausalAssuranceEcosystemManifest {
+  return JSON.parse(JSON.stringify(value)) as CausalAssuranceEcosystemManifest;
+}
+
+/** Deterministic negative-control matrix. Every mutation must fail closed. */
+export function runTamperMatrix(
+  pristine: CausalAssuranceEcosystemManifest,
+): TamperProbeResult[] {
+  if (validateEcosystemChain(pristine).status !== "PASS") {
+    throw new Error("tamper matrix requires a valid pristine manifest");
+  }
+  const probes: Array<[TamperBoundary, (m: CausalAssuranceEcosystemManifest) => void]> = [
+    ["POSSIBILITY_DIGEST", (m) => { m.artifacts.possibility.digest = "sha256:" + "0".repeat(64); }],
+    ["OBSERVATION_BINDING", (m) => { m.artifacts.observation.bindsTo = ["sha256:" + "1".repeat(64)]; }],
+    ["WORKBENCH_BINDING", (m) => { m.artifacts.workbench.bindsTo = ["sha256:" + "2".repeat(64), m.artifacts.observation.digest]; }],
+    ["ATTESTATION_BINDING", (m) => { m.artifacts.attestation.bindsTo = ["sha256:" + "3".repeat(64)]; }],
+    ["PROVENANCE_TRUST", (m) => { m.artifacts.possibility.status = "BLOCKED"; }],
+  ];
+  return probes.map(([boundary, mutate]) => {
+    const candidate = cloneManifest(pristine);
+    mutate(candidate);
+    const result = validateEcosystemChain(candidate);
+    if (result.status !== "BLOCKED") {
+      throw new Error(`tamper probe escaped fail-closed boundary: ${boundary}`);
+    }
+    return { boundary, expected: "BLOCKED", observed: "BLOCKED", reason: result.reason };
+  });
+}
