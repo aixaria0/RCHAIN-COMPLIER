@@ -44,6 +44,17 @@ function payloadFixture(): SignedSentinelAttestation["payload"] {
         current_epoch: 1,
       },
     },
+    genesis: {
+      configured_hash: "genesis:test",
+      available: true,
+      raw: { blockHash: "genesis:test", blockNumber: 0 },
+      payload_sha256: `sha256:${"1".repeat(64)}`,
+      observed_hash: "genesis:test",
+      observed_height: 0,
+      hash_match: true,
+      height_zero: true,
+      error: null,
+    },
     finalized_block: {
       available: true,
       raw: { blockHash: "abc", blockNumber: 10 },
