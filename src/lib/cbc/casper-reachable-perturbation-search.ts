@@ -62,7 +62,7 @@ export function searchReachableFinalizationFlip(
   );
 }
 
-function removeParentAndRecomputeSeen(
+export function removeParentAndRecomputeSeen(
   fixture: ConcreteDagFixture,
   messageId: string,
   parentId: string,
