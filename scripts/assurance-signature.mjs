@@ -30,8 +30,25 @@ function canonicalCertificateBytes(certificate) {
   );
 }
 
+function isKeyObject(value, expectedType) {
+  return Boolean(
+    value &&
+    typeof value === "object" &&
+    value.type === expectedType &&
+    typeof value.export === "function",
+  );
+}
+
+function privateKeyObject(privateKey) {
+  return isKeyObject(privateKey, "private")
+    ? privateKey
+    : createPrivateKey(privateKey);
+}
+
 function publicKeyMaterial(publicKey) {
-  const key = createPublicKey(publicKey);
+  const key = isKeyObject(publicKey, "public")
+    ? publicKey
+    : createPublicKey(publicKey);
   if (key.asymmetricKeyType !== "ed25519") {
     throw new Error("assurance signature requires an Ed25519 public key");
   }
@@ -42,7 +59,7 @@ function publicKeyMaterial(publicKey) {
 }
 
 export function signAssuranceCertificate(certificate, privateKey) {
-  const key = createPrivateKey(privateKey);
+  const key = privateKeyObject(privateKey);
   if (key.asymmetricKeyType !== "ed25519") {
     throw new Error("assurance signature requires an Ed25519 private key");
   }
