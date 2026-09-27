@@ -1842,17 +1842,87 @@ export function verifyAssuranceCertificatePolicy(certificate: AssuranceCertifica
   return requirementsValid && limitationsValid;
 }
 
+export function verifyAssuranceCertificateSemantics(
+  certificate: AssuranceCertificate,
+): boolean {
+  const expectedSummary = summarize(certificate.checks);
+  const summaryValid =
+    certificate.summary.pass === expectedSummary.pass &&
+    certificate.summary.fail === expectedSummary.fail &&
+    certificate.summary.blocked === expectedSummary.blocked &&
+    certificate.summary.notTested === expectedSummary.notTested;
+  const statusValid = certificate.status === deriveStatus(certificate.checks);
+
+  const ids = certificate.checks.map((check) => check.id);
+  const uniqueIds = new Set(ids);
+  const checkIdsUnique = uniqueIds.size === ids.length;
+
+  const mandatoryGateIds = [
+    "gate_release_artifact_identity",
+    "gate_build_provenance",
+    "gate_native_replay_signature",
+    "gate_native_replay_authorization",
+    "gate_native_replay_release_binding",
+    "gate_live_observation",
+    "gate_failure_domain_declarations",
+    "gate_observer_signature",
+    "gate_observer_authorization",
+    "gate_network_identity",
+    "gate_freshness",
+    "gate_possibility",
+    "gate_conformance",
+    "gate_recovery",
+  ];
+  const mandatoryGatesPresent = mandatoryGateIds.every(
+    (id) =>
+      certificate.checks.filter((check) => check.id === id).length === 1,
+  );
+
+  const trustedPlanePasses = certificate.checks.filter(
+    (check) =>
+      check.state === "PASS" &&
+      (check.plane === "POSSIBILITY" ||
+        check.plane === "CONFORMANCE" ||
+        check.plane === "RECOVERY"),
+  );
+  const trustedPassMetadataValid = trustedPlanePasses.every(
+    (check) =>
+      check.producerVerified === true &&
+      typeof check.producer === "string" &&
+      (TRUSTED_CHECK_PRODUCERS as readonly string[]).includes(check.producer),
+  );
+
+  const passCertificateHasPassingMandatoryGates =
+    certificate.status !== "PASS" ||
+    mandatoryGateIds.every(
+      (id) =>
+        certificate.checks.find((check) => check.id === id)?.state === "PASS",
+    );
+
+  return (
+    summaryValid &&
+    statusValid &&
+    checkIdsUnique &&
+    mandatoryGatesPresent &&
+    trustedPassMetadataValid &&
+    passCertificateHasPassingMandatoryGates
+  );
+}
+
 export function validateAssuranceCertificate(certificate: AssuranceCertificate): {
   valid: boolean;
   integrity: boolean;
   policy: boolean;
+  semantics: boolean;
 } {
   const integrity = verifyAssuranceCertificateIntegrity(certificate);
   const policy = verifyAssuranceCertificatePolicy(certificate);
+  const semantics = verifyAssuranceCertificateSemantics(certificate);
   return {
-    valid: integrity && policy,
+    valid: integrity && policy && semantics,
     integrity,
     policy,
+    semantics,
   };
 }
 
