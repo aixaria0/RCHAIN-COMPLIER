@@ -200,3 +200,31 @@ The key IDs are normalized, validated, sorted, included in the certificate paylo
 A valid signature from a key outside that set is a `FAIL`, not merely missing evidence. An empty authorization set is `BLOCKED`.
 
 This mechanism records the trust decision; it does not itself establish who has organizational authority to add a key to the set. That authority should be controlled by the process/key that signs the final Assurance Certificate.
+
+
+## Cryptographic promotion boundary
+
+Logical PASS values are not self-authenticating. The default certificate policy therefore refuses promotion when a caller merely supplies strings that claim a build, replay, recovery, or live observation occurred.
+
+The trusted promotion path is:
+
+```text
+source commit
+    |
+signed SLSA / in-toto provenance
+    |
+binary SHA-256
+    |
+signed native replay -----------+
+                                 |
+signed Sentinel observation ----+--> Assurance Certificate
+       |                         |
+       +-- network/shard/epoch --+
+       +-- failure domains ------+
+                                 |
+previous Reality Record -> signed recovery replay
+```
+
+The runtime trust markers are intentionally non-serializable process-local capabilities (WeakSet-backed). Reconstructing equivalent JSON does not recreate cryptographic trust; the corresponding signed adapter must verify the pinned key in the current process.
+
+This v1 policy is intentionally conservative. A certificate may remain BLOCKED even when individual logical checks pass if their evidence is not cryptographically bound to the declared release and observed network.
