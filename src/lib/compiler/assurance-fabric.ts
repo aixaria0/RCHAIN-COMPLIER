@@ -146,6 +146,20 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
 };
 
 const STRICT_POLICY_ID = "rchain-revival-strict/v1" as const;
+const MIN_CROSS_NODE_TARGETS = 2;
+const MANDATORY_LIMITATIONS = [
+  "certificate SHA-256 integrity is not signer authenticity",
+  "declared build-provenance digest is not cryptographic verification of the builder or provenance signature",
+  "cross-node consistency does not prove operator or failure-domain independence",
+  "cross-node consistency is not a stake-weighted Casper finality proof",
+  "bounded possibility search proves only the declared model and search scope",
+] as const;
+const TRUSTED_CHECK_PRODUCERS = [
+  "weighted-possibility-search/v1",
+  "cbc-fragility-adapter/v1",
+  "digest-conformance/v1",
+  "digest-recovery/v1",
+] as const;
 const TRUSTED_CHECK_ATTESTATION = Symbol("rchain-assurance-trusted-check");
 
 type TrustedAssuranceCheckInput = AssuranceCheckInput & {
@@ -174,8 +188,25 @@ function isTrustedCheck(input: AssuranceCheckInput): boolean {
   return (input as Partial<TrustedAssuranceCheckInput>)[TRUSTED_CHECK_ATTESTATION] === true;
 }
 
+function strictPolicyDescriptor(): Record<string, unknown> {
+  return {
+    id: STRICT_POLICY_ID,
+    requirements: DEFAULT_REQUIREMENTS,
+    minimumCrossNodeTargets: MIN_CROSS_NODE_TARGETS,
+    sourceClassBindings: {
+      SYNTHETIC: ["rchain-reality-compiler"],
+      LIVE_OBSERVATION: ["rchain-sentinel"],
+      NATIVE_REPLAY: ["rchain-rust-native-replay"],
+      FORMAL_MODEL: ["quantum-logical-framework", "lean4"],
+      INDEPENDENT_ATTESTATION: ["sovereign-lattice"],
+    },
+    trustedCheckProducers: [...TRUSTED_CHECK_PRODUCERS],
+    mandatoryLimitations: [...MANDATORY_LIMITATIONS],
+  };
+}
+
 function strictPolicyDigest(): string {
-  return digest([JSON.stringify(DEFAULT_REQUIREMENTS)]);
+  return digest([JSON.stringify(canonicalize(strictPolicyDescriptor()))]);
 }
 
 function canonicalize(value: unknown): unknown {
@@ -304,7 +335,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const networkReachable = networkData.reachable === true;
   const crossNodeConsistent =
     typeof crossNodeData.targetCount === "number" &&
-    crossNodeData.targetCount >= 2 &&
+    crossNodeData.targetCount >= MIN_CROSS_NODE_TARGETS &&
     crossNodeData.agreement === true &&
     crossNodeData.conflictingNodes === 0 &&
     crossNodeData.hashAgreement === true &&
@@ -803,13 +834,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ...reality.references.map((record) => record.digest).sort(),
     policy.digest,
   ]).slice(0, 32)}`;
-  const limitations = [
-    "certificate SHA-256 integrity is not signer authenticity",
-    "declared build-provenance digest is not cryptographic verification of the builder or provenance signature",
-    "cross-node consistency does not prove operator or failure-domain independence",
-    "cross-node consistency is not a stake-weighted Casper finality proof",
-    "bounded possibility search proves only the declared model and search scope",
-  ];
+  const limitations = [...MANDATORY_LIMITATIONS];
 
   const payload: Omit<AssuranceCertificate, "integrity"> = {
     schema: "rchain-assurance-certificate/v1",
@@ -844,9 +869,13 @@ export function verifyAssuranceCertificateIntegrity(certificate: AssuranceCertif
 export function verifyAssuranceCertificatePolicy(certificate: AssuranceCertificate): boolean {
   if (certificate.policy.id !== STRICT_POLICY_ID) return false;
   if (certificate.policy.digest !== strictPolicyDigest()) return false;
-  return (Object.keys(DEFAULT_REQUIREMENTS) as Array<keyof AssuranceRequirements>).every(
+  const requirementsValid = (Object.keys(DEFAULT_REQUIREMENTS) as Array<keyof AssuranceRequirements>).every(
     (key) => DEFAULT_REQUIREMENTS[key] !== true || certificate.requirements[key] === true,
   );
+  const limitationsValid = MANDATORY_LIMITATIONS.every(
+    (limitation) => certificate.limitations.includes(limitation),
+  );
+  return requirementsValid && limitationsValid;
 }
 
 export function validateAssuranceCertificate(certificate: AssuranceCertificate): {
