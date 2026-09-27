@@ -9,6 +9,8 @@ import {
   type SentinelNetworkStatus,
 } from "./sentinel-adapter.ts";
 import { searchWeightedPossibility } from "./possibility-plane.ts";
+import { buildCausallyValidDAG } from "../cbc/casper-concrete-dag.ts";
+import { searchReachableCasperCounterexample } from "../cbc/casper-possibility-search.ts";
 import {
   BUILD_PROVENANCE_ATTESTATION_SCHEMA,
   IN_TOTO_STATEMENT_V1,
@@ -41,6 +43,7 @@ import {
   buildAssuranceCertificate,
   conformanceCheckFromDigests,
   conformanceCheckFromRealityRecord,
+  possibilityCheckFromCasperCounterexampleSearch,
   possibilityCheckFromSearch,
   recoveryCheckFromDigests,
   recoveryCheckFromRecordChain,
@@ -1486,4 +1489,36 @@ test("signed native replay from a different binary cannot bind to the release", 
     "FAIL",
   );
   assert.equal(certificate.status, "FAIL");
+});
+
+
+test("direct reachability-valid Casper counterexample is a trusted Possibility FAIL", () => {
+  const result = searchReachableCasperCounterexample(buildCausallyValidDAG());
+  const check = possibilityCheckFromCasperCounterexampleSearch({
+    id: "casper-direct-counterexample",
+    description: "Search for the cheapest reachability-valid parent-deletion history that flips finalization.",
+    result,
+  });
+
+  assert.equal(result.status, "COUNTEREXAMPLE_FOUND");
+  assert.equal(result.minimumCost, 1);
+  assert.equal(check.state, "FAIL");
+  assert.equal(check.producer, "casper-reachability-counterexample-search/v1");
+  assert.equal(check.metrics?.counterexampleFound, true);
+  assert.equal(check.metrics?.mutationCount, 1);
+});
+
+test("incomplete direct Casper search is BLOCKED rather than a false PASS", () => {
+  const result = searchReachableCasperCounterexample(buildCausallyValidDAG(), {
+    maxStates: 1,
+  });
+  const check = possibilityCheckFromCasperCounterexampleSearch({
+    id: "casper-budget-limited",
+    description: "Bounded search must not infer safety after budget exhaustion.",
+    result,
+  });
+
+  assert.equal(result.status, "LIMIT_REACHED");
+  assert.equal(check.state, "BLOCKED");
+  assert.equal(check.metrics?.searchComplete, false);
 });
