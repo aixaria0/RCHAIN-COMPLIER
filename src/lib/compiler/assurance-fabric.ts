@@ -17,6 +17,7 @@ import {
   type RealityRecord,
 } from "./reality-record.ts";
 import type { WeightedPossibilityResult } from "./possibility-plane.ts";
+import { isCryptographicallyVerifiedSentinelRecord } from "./sentinel-signed-adapter.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
@@ -63,6 +64,7 @@ export interface AssuranceCheckInput {
 export interface AssuranceRequirements {
   requireReleaseArtifactIdentity: boolean;
   requireLiveObservation: boolean;
+  requireObserverSignature: boolean;
   requireNetworkIdentityBinding: boolean;
   requireFreshness: boolean;
   requirePossibility: boolean;
@@ -138,6 +140,7 @@ export interface AssuranceCertificate {
 const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireReleaseArtifactIdentity: true,
   requireLiveObservation: true,
+  requireObserverSignature: true,
   requireNetworkIdentityBinding: true,
   requireFreshness: true,
   requirePossibility: true,
@@ -149,6 +152,7 @@ const STRICT_POLICY_ID = "rchain-revival-strict/v1" as const;
 const MIN_CROSS_NODE_TARGETS = 2;
 const MANDATORY_LIMITATIONS = [
   "certificate SHA-256 integrity is not signer authenticity",
+  "a verified Sentinel signature proves possession of the pinned observer key, not organizational authorization of that key",
   "declared build-provenance digest is not cryptographic verification of the builder or provenance signature",
   "cross-node consistency does not prove operator or failure-domain independence",
   "cross-node consistency is not a stake-weighted Casper finality proof",
@@ -277,13 +281,19 @@ function sentinelRecordShapeVerified(record: RealityRecord): boolean {
       observation.type === "CrossNodeReport" &&
       observation.source === "rchain-sentinel",
   );
-  if (!block || !network || !crossNode) return false;
+  const attestation = record.observations.find(
+    (observation) =>
+      observation.type === "AttestationSignature" &&
+      observation.source === "rchain-sentinel",
+  );
+  if (!block || !network || !crossNode || !attestation) return false;
 
   const transformationIds = new Set(record.transformations.map((item) => item.id));
   return (
     transformationIds.has("transform_sentinel_finalized_block_to_reality_observation") &&
     transformationIds.has("transform_sentinel_network_status_to_reality_observation") &&
     transformationIds.has("transform_sentinel_cross_node_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_attestation_to_verified_observation") &&
     transformationIds.has("transform_sentinel_observations_to_verification")
   );
 }
@@ -313,6 +323,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     "verify_sentinel_canonical_consistency",
     "verify_sentinel_finality_hash",
     "verify_sentinel_cross_node_consistency",
+    "verify_sentinel_attestation_signature",
   ];
   const missingOrUnverified = requiredVerificationIds.filter(
     (id) => verificationById.get(id)?.state !== "VERIFIED",
@@ -330,6 +341,9 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const blockData = block?.data ?? {};
   const networkData = network?.data ?? {};
   const crossNodeData = crossNode?.data ?? {};
+
+  const observerSignatureVerified =
+    isCryptographicallyVerifiedSentinelRecord(input.record);
 
   const blockEvidenceComplete =
     blockData.available === true &&
@@ -351,7 +365,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     missingOrUnverified.length === 0 &&
     blockEvidenceComplete &&
     networkReachable &&
-    crossNodeConsistent;
+    crossNodeConsistent &&
+    observerSignatureVerified;
 
   const evidence = [
     ...(block ? [block.id] : []),
@@ -365,8 +380,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   return {
     valid,
     description: valid
-      ? "Live Sentinel evidence is integrity-valid, network-reachable, canonically consistent, node-finalized, and cross-node consistent across at least two targets."
-      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}.`,
+      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, canonically consistent, node-finalized, and cross-node consistent across at least two targets."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}, observerSignatureVerified=${observerSignatureVerified}.`,
     evidence,
   };
 }
@@ -745,6 +760,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ) return false;
     return liveEvidenceQuality(record).valid;
   });
+  const hasObserverSignature = input.records.some(
+    (record) =>
+      record.sourceClass === "LIVE_OBSERVATION" &&
+      sourceClassVerified(record) &&
+      verifyRealityRecordIntegrity(record.record) &&
+      isCryptographicallyVerifiedSentinelRecord(record.record),
+  );
   const hasPossibility = suppliedChecks.some(
     (check) =>
       check.plane === "POSSIBILITY" &&
@@ -783,6 +805,15 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       hasLiveObservation
         ? "At least one integrity-valid, non-divergent live observation is present."
         : "No integrity-valid, non-divergent live observation is present. Synthetic evidence cannot satisfy this gate.",
+    ),
+    requiredPlaneCheck(
+      "gate_observer_signature",
+      "REALITY",
+      requirements.requireObserverSignature,
+      hasObserverSignature,
+      hasObserverSignature
+        ? "At least one live Sentinel Reality Record was cryptographically verified against a pinned Ed25519 observer key."
+        : "No live Sentinel Reality Record has runtime proof of pinned-key Ed25519 verification.",
     ),
     requiredPlaneCheck(
       "gate_network_identity",
