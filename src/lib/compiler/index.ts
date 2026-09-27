@@ -25,3 +25,4 @@ export * from "./reality-engine.ts";
 export { shortHex, hexPrefixed } from "./hash.ts";
 export * from "../cbc/index.ts";
 export * from "./portable-assurance-package.ts";
+export * from "./signed-package-root.ts";
