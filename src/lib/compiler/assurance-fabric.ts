@@ -17,7 +17,10 @@ import {
   type RealityRecord,
 } from "./reality-record.ts";
 import type { WeightedPossibilityResult } from "./possibility-plane.ts";
-import { isCryptographicallyVerifiedSentinelRecord } from "./sentinel-signed-adapter.ts";
+import {
+  isChallengeVerifiedSentinelRecord,
+  isCryptographicallyVerifiedSentinelRecord,
+} from "./sentinel-signed-adapter.ts";
 import {
   isCryptographicallyVerifiedBuildProvenance,
   type VerifiedBuildProvenance,
@@ -218,6 +221,7 @@ const MANDATORY_LIMITATIONS = [
   "cross-node consistency is not a stake-weighted Casper finality proof",
   "bounded possibility search proves only the declared model and search scope",
   "signed observation timestamps are tamper-evident but freshness still depends on observer clock accuracy",
+  "live anti-replay challenge proves response to a verifier-selected nonce in the verification process; offline package re-verification can verify the signed nonce but cannot independently prove how unpredictably that nonce was generated",
 ] as const;
 const TRUSTED_CHECK_PRODUCERS = [
   "weighted-possibility-search/v1",
@@ -264,6 +268,10 @@ function strictPolicyDescriptor(): Record<string, unknown> {
     id: STRICT_POLICY_ID,
     requirements: DEFAULT_REQUIREMENTS,
     minimumCrossNodeTargets: MIN_CROSS_NODE_TARGETS,
+    liveObservationAntiReplay: {
+      signedVerifierChallengeRequired: true,
+      challengeBytes: 32,
+    },
     failureDomainPolicy: {
       signedDeclarationsRequired: true,
       exactTargetCoverageRequired: true,
@@ -656,6 +664,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
 
   const observerSignatureVerified =
     isCryptographicallyVerifiedSentinelRecord(input.record);
+  const observerChallengeVerified =
+    isChallengeVerifiedSentinelRecord(input.record);
 
   const blockEvidenceComplete =
     blockData.available === true &&
@@ -699,7 +709,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     genesisVerified &&
     crossNodeConsistent &&
     failureDomainsDocumented &&
-    observerSignatureVerified;
+    observerSignatureVerified &&
+    observerChallengeVerified;
 
   const evidence = [
     ...(block ? [block.id] : []),
@@ -715,8 +726,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   return {
     valid,
     description: valid
-      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, RNode-genesis-verified, canonically consistent, node-finalized, cross-node consistent, and carries signed failure-domain declarations covering at least two distinct operators/failure domains."
-      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, genesisVerified=${genesisVerified}, crossNodeConsistent=${crossNodeConsistent}, failureDomainsDocumented=${failureDomainsDocumented}, observerSignatureVerified=${observerSignatureVerified}.`,
+      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, verifier-challenge-bound, network-reachable, RNode-genesis-verified, canonically consistent, node-finalized, cross-node consistent, and carries signed failure-domain declarations covering at least two distinct operators/failure domains."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, genesisVerified=${genesisVerified}, crossNodeConsistent=${crossNodeConsistent}, failureDomainsDocumented=${failureDomainsDocumented}, observerSignatureVerified=${observerSignatureVerified}, observerChallengeVerified=${observerChallengeVerified}.`,
     evidence,
   };
 }
