@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   SENTINEL_ATTESTATION_SCHEMA,
+  fetchSignedSentinelRealityRecord,
   isCryptographicallyVerifiedSentinelRecord,
   sentinelAttestationPayloadDigest,
   sentinelAttestationPublicKeyId,
@@ -203,5 +204,45 @@ test("only a cryptographically verified signed snapshot receives runtime trust",
         observation.data.keyId === keyId &&
         observation.data.signatureVerified === true,
     ),
+  );
+});
+
+
+test("fetch helper verifies the pinned snapshot before returning a trusted Reality Record", async () => {
+  const { snapshot, keyId } = await signedFixture();
+  const requested: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    requested.push(String(input));
+    return new Response(JSON.stringify(snapshot), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
+
+  const record = await fetchSignedSentinelRealityRecord(
+    "http://sentinel.example/",
+    keyId,
+    { fetchImpl },
+  );
+
+  assert.deepEqual(requested, [
+    "http://sentinel.example/api/attestation/snapshot",
+  ]);
+  assert.equal(isCryptographicallyVerifiedSentinelRecord(record), true);
+});
+
+test("fetch helper fails closed when the signed endpoint is unavailable", async () => {
+  const { keyId } = await signedFixture();
+  const fetchImpl: typeof fetch = async () =>
+    new Response("signing disabled", { status: 503 });
+
+  await assert.rejects(
+    () =>
+      fetchSignedSentinelRealityRecord(
+        "http://sentinel.example",
+        keyId,
+        { fetchImpl },
+      ),
+    /HTTP 503/,
   );
 });
