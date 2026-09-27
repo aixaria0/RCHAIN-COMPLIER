@@ -364,3 +364,69 @@ test("declared network identity must match the live Sentinel observation", () =>
   );
   assert.equal(certificate.status, "FAIL");
 });
+
+
+test("live label is insufficient when Sentinel evidence is unavailable", () => {
+  const unavailable = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:06:00Z",
+    evidence: {
+      ...liveEvidence,
+      available: false,
+      full_block_available: false,
+      full_block: null,
+      full_block_hash: null,
+      node_reported_finalized: null,
+      finality_hash_match: null,
+      canonical_consistency: null,
+      canonical_mismatches: [],
+      error: "RNode unavailable",
+    },
+    network: liveNetwork,
+  });
+
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:06:01Z",
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "unavailable live source", sourceClass: "LIVE_OBSERVATION", record: unavailable }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id.startsWith("reality_live_quality:"))?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_live_observation")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
+});
+
+test("unreachable network status cannot satisfy the live observation gate", () => {
+  const unreachable = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:07:00Z",
+    evidence: liveEvidence,
+    network: {
+      ...liveNetwork,
+      reachable: false,
+      error: "timeout",
+    },
+  });
+
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:07:01Z",
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "unreachable live source", sourceClass: "LIVE_OBSERVATION", record: unreachable }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id.startsWith("reality_live_quality:"))?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
+});
