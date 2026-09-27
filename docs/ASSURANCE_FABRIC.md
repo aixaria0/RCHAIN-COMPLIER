@@ -109,7 +109,7 @@ restart / restore --------------+----> RECOVERY
                        Assurance Certificate
 ```
 
-The certificate stores release identity, network/genesis identity, source-classified Reality Record digests, all gate results, and its own SHA-256 integrity digest. Certificate canonicalization sorts object keys recursively before hashing, so semantically identical metadata is not sensitive to object insertion order.
+The certificate stores release identity, network/genesis identity, source-classified Reality Record digests, all gate results, and its own SHA-256 integrity digest. Its certificate ID is also bound to repository/commit, network identity, issuance time, freshness scope, strict-policy digest, and the sorted Reality Record digests, so two materially different evidence snapshots do not share the same logical certificate identifier. Certificate canonicalization sorts object keys recursively before hashing, so semantically identical metadata is not sensitive to object insertion order.
 
 Recovery checks are stricter than digest equality: the helper requires an independent process, independent disk, and a trusted checkpoint in addition to matching pre/post recovery digests. A same-runtime or same-disk "restore" is therefore BLOCKED rather than promoted.
 
@@ -118,3 +118,13 @@ Recovery checks are stricter than digest equality: the helper requires an indepe
 A `PASS` means only that the declared gates passed for the declared commit, network identity, observations, model scope, and recovery test.
 
 It does not mean that RChain is bug-free, globally safe, economically secure, or immune to failures outside the tested assumptions.
+
+
+## Validation
+
+Consumers should run both:
+
+- `verifyAssuranceCertificateIntegrity()` — detects payload changes relative to the embedded SHA-256 digest.
+- `verifyAssuranceCertificatePolicy()` — confirms the certificate still carries the non-weakened `rchain-revival-strict/v1` requirements.
+
+`validateAssuranceCertificate()` combines both checks. These checks provide deterministic integrity and policy validation; they do **not** provide signer authenticity. Cryptographic observer/build signatures remain a separate trust layer.
