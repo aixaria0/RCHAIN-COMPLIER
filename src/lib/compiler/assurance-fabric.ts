@@ -63,13 +63,19 @@ export interface AssuranceCheckInput {
 export interface AssuranceRequirements {
   requireLiveObservation: boolean;
   requireNetworkIdentityBinding: boolean;
+  requireFreshness: boolean;
   requirePossibility: boolean;
   requireConformance: boolean;
   requireRecovery: boolean;
 }
 
+export interface AssuranceFreshnessPolicy {
+  maxObservationAgeMs: number;
+}
+
 export interface AssuranceFabricInput {
   issuedAt: string;
+  freshness: AssuranceFreshnessPolicy;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   records: AssuranceRecordInput[];
@@ -108,6 +114,7 @@ export interface AssuranceCertificate {
     id: "rchain-revival-strict/v1";
     digest: string;
   };
+  freshness: AssuranceFreshnessPolicy;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   requirements: AssuranceRequirements;
@@ -129,6 +136,7 @@ export interface AssuranceCertificate {
 const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireLiveObservation: true,
   requireNetworkIdentityBinding: true,
+  requireFreshness: true,
   requirePossibility: true,
   requireConformance: true,
   requireRecovery: true,
@@ -183,6 +191,7 @@ function canonicalCertificatePayload(
     id: certificate.id,
     issuedAt: certificate.issuedAt,
     policy: certificate.policy,
+    freshness: certificate.freshness,
     release: certificate.release,
     network: certificate.network,
     requirements: certificate.requirements,
@@ -452,6 +461,75 @@ function networkIdentityBindingCheck(
   };
 }
 
+function freshnessCheck(
+  records: AssuranceRecordInput[],
+  issuedAt: string,
+  policy: AssuranceFreshnessPolicy,
+): AssuranceCheck {
+  const issuedAtMs = Date.parse(issuedAt);
+  if (!Number.isFinite(issuedAtMs)) {
+    throw new Error("assurance certificate issuedAt must be a valid ISO timestamp");
+  }
+  if (!Number.isFinite(policy.maxObservationAgeMs) || policy.maxObservationAgeMs <= 0) {
+    throw new Error("freshness.maxObservationAgeMs must be a positive finite number");
+  }
+
+  const candidates = records
+    .filter((record) => liveEvidenceQuality(record).valid)
+    .flatMap((record) =>
+      record.record.observations
+        .filter((observation) => observation.timestamp)
+        .map((observation) => ({
+          id: observation.id,
+          timestamp: observation.timestamp!,
+          timeMs: Date.parse(observation.timestamp!),
+        })),
+    )
+    .filter((item) => Number.isFinite(item.timeMs));
+
+  if (candidates.length === 0) {
+    return {
+      id: "reality_freshness",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No timestamped promotion-grade live observations are available for freshness evaluation.",
+      evidence: [],
+    };
+  }
+
+  const future = candidates.filter((item) => item.timeMs > issuedAtMs);
+  if (future.length > 0) {
+    return {
+      id: "reality_freshness",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "One or more live observations are timestamped after certificate issuance.",
+      evidence: future.map((item) => `${item.id}@${item.timestamp}`),
+    };
+  }
+
+  const freshest = candidates.reduce((best, item) => item.timeMs > best.timeMs ? item : best);
+  const ageMs = issuedAtMs - freshest.timeMs;
+  const withinBudget = ageMs <= policy.maxObservationAgeMs;
+
+  return {
+    id: "reality_freshness",
+    plane: "REALITY",
+    state: withinBudget ? "PASS" : "BLOCKED",
+    critical: true,
+    description: withinBudget
+      ? `Freshest live observation age ${ageMs}ms is within the declared ${policy.maxObservationAgeMs}ms budget.`
+      : `Freshest live observation age ${ageMs}ms exceeds the declared ${policy.maxObservationAgeMs}ms budget.`,
+    evidence: [`${freshest.id}@${freshest.timestamp}`, `age-ms:${ageMs}`],
+    metrics: {
+      ageMs,
+      maxObservationAgeMs: policy.maxObservationAgeMs,
+    },
+  };
+}
+
 function requiredPlaneCheck(
   id: string,
   plane: AssurancePlane,
@@ -505,6 +583,9 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   if (!input.issuedAt) {
     throw new Error("assurance certificate requires an explicit issuedAt timestamp");
   }
+  if (!input.freshness) {
+    throw new Error("assurance certificate requires an explicit freshness policy");
+  }
 
   if (
     input.requirements &&
@@ -520,6 +601,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
   const reality = realityChecks(input.records);
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
+  const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
   const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
     const producerVerified = isTrustedCheck(check);
     const requestedState = check.state;
@@ -581,6 +663,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       networkIdentity.description,
     ),
     requiredPlaneCheck(
+      "gate_freshness",
+      "REALITY",
+      requirements.requireFreshness,
+      freshness.state === "PASS",
+      freshness.description,
+    ),
+    requiredPlaneCheck(
       "gate_possibility",
       "POSSIBILITY",
       requirements.requirePossibility,
@@ -603,7 +692,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [...reality.checks, networkIdentity, ...suppliedChecks, ...gates];
+  const checks = [...reality.checks, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const id = `assurance:${digest([
@@ -621,6 +710,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     id,
     issuedAt: input.issuedAt,
     policy,
+    freshness: input.freshness,
     release: input.release,
     network: input.network,
     requirements,
