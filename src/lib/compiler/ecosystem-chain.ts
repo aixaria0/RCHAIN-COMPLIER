@@ -35,21 +35,24 @@ function validDigest(value: string): boolean {
   return /^sha256:[0-9a-f]{64}$/i.test(value);
 }
 
+export type VerificationWitnessSemantics = "VIOLATION" | "SUPPORT";
+
 /**
- * Maps verification semantics into assurance semantics without promotion.
- * INCONCLUSIVE and LIMIT_REACHED are always BLOCKED; a found counterexample
- * is FAIL. Only model-scoped unreachability may become PASS.
+ * Maps verification outcomes into assurance states only when the caller
+ * explicitly declares what a witness means. Without polarity, conclusive
+ * reachability results remain BLOCKED rather than being silently promoted.
+ * INCONCLUSIVE and LIMIT_REACHED are always BLOCKED.
  */
-export function assuranceStatusFromVerificationOutcome(outcome: VerificationOutcome): AssuranceArtifactStatus {
-  switch (outcome) {
-    case "UNREACHABLE_IN_MODEL":
-      return "PASS";
-    case "WITNESS_FOUND":
-      return "FAIL";
-    case "LIMIT_REACHED":
-    case "INCONCLUSIVE":
-      return "BLOCKED";
+export function assuranceStatusFromVerificationOutcome(
+  outcome: VerificationOutcome,
+  witnessSemantics?: VerificationWitnessSemantics,
+): AssuranceArtifactStatus {
+  if (outcome === "INCONCLUSIVE" || outcome === "LIMIT_REACHED") return "BLOCKED";
+  if (!witnessSemantics) return "BLOCKED";
+  if (witnessSemantics === "VIOLATION") {
+    return outcome === "WITNESS_FOUND" ? "FAIL" : "PASS";
   }
+  return outcome === "WITNESS_FOUND" ? "PASS" : "FAIL";
 }
 
 export function validateEcosystemChain(
