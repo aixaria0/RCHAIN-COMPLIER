@@ -4,7 +4,6 @@ import {
   createSignedBuildProvenanceAttestation,
   createSignedNativeReplayAttestation,
   createSignedRecoveryReplayAttestation,
-  createSignedRecoveryReplayAttestation,
 } from "../src/lib/compiler/attestation-producer-node.ts";
 
 function parseArgs(argv) {
