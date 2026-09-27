@@ -12,8 +12,11 @@ on:
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
       - "src/lib/verification-core/**"
+      - "src/lib/subjects/**"
       - "examples/verification-compiler-generic.ts"
+      - "examples/aetherforge-external-subject.ts"
       - "tsconfig.verification-core.json"
+      - "tsconfig.external-subjects.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verification-core-ci.yml"
@@ -30,8 +33,11 @@ on:
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
       - "src/lib/verification-core/**"
+      - "src/lib/subjects/**"
       - "examples/verification-compiler-generic.ts"
+      - "examples/aetherforge-external-subject.ts"
       - "tsconfig.verification-core.json"
+      - "tsconfig.external-subjects.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verification-core-ci.yml"
@@ -65,5 +71,17 @@ jobs:
       - name: Test protocol-neutral core
         run: npm run test:verification-core
 
-      - name: Run standalone demo
+      - name: Run standalone generic demo
         run: npm run demo:verification-core
+
+      - name: Typecheck external subjects
+        run: npm run typecheck:external-subjects
+
+      - name: Lint external subjects
+        run: npm run lint:external-subjects
+
+      - name: Test AETHER FORGE as external subject
+        run: npm run test:external-subjects
+
+      - name: Run AETHER FORGE external-subject demo
+        run: npm run demo:aetherforge-subject
