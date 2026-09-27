@@ -5,6 +5,7 @@ export * from "./compile.ts";
 export * from "./reality-record.ts";
 export * from "./reality-record-adapter.ts";
 export * from "./sentinel-adapter.ts";
+export * from "./sentinel-signed-adapter.ts";
 export * from "./possibility-plane.ts";
 export * from "./assurance-fabric.ts";
 export * from "./reality-calculus.ts";
