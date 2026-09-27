@@ -78,13 +78,19 @@ function hexToBytes(value: string): Uint8Array {
   return output;
 }
 
+function toArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(value.byteLength);
+  new Uint8Array(buffer).set(value);
+  return buffer;
+}
+
 function bytesToHex(value: ArrayBuffer | Uint8Array): string {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function sha256(value: Uint8Array): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", toArrayBuffer(value));
   return `sha256:${bytesToHex(digest)}`;
 }
 
@@ -162,7 +168,7 @@ export async function verifySignedSentinelAttestation(
 
     const cryptoKey = await globalThis.crypto.subtle.importKey(
       "raw",
-      publicKey,
+      toArrayBuffer(publicKey),
       { name: "Ed25519" },
       false,
       ["verify"],
@@ -170,8 +176,8 @@ export async function verifySignedSentinelAttestation(
     const signatureValid = await globalThis.crypto.subtle.verify(
       { name: "Ed25519" },
       cryptoKey,
-      signature,
-      signingMessage(payloadBytes),
+      toArrayBuffer(signature),
+      toArrayBuffer(signingMessage(payloadBytes)),
     );
 
     return {
