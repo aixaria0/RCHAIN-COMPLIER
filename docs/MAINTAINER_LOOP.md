@@ -16,6 +16,7 @@ The loop makes steps 1-4 machine-readable so the maintainer spends time on the s
 
 | ID | Purpose | Recent maintainer pattern |
 |---|---|---|
+| `MAINTAINER_HEALTH` | consume Sentinel's GET-only node/finality/Casper health packet | one-call maintainer brief across the current public RNode surface |
 | `NODE_BOOT` | distinguish process-running from usable HTTP node | dependency/axum regression in rchain-rust PR #81 |
 | `TRUST_BOND_ACTIVATE` | verify validator admission by semantic effect | silent PoS admission problem in issue #74 |
 | `WITHDRAW_EPOCH` | verify pending-withdrawal to epoch-boundary transition | testnet behavior documented in PR #82 |
@@ -60,8 +61,8 @@ The generated artifact uses the existing `rchain-reality-record/v1` shape and re
 
 The first live integration should stay read-only and low-risk:
 
-1. Sentinel emits node identity, version, genesis, height, health, finality, bonds, active set, and trusted set.
-2. The Maintainer Loop evaluates the relevant scenario.
+1. Sentinel emits only what the current public RNode read surface actually establishes: node identity/version, network/shard, heights, finalized-block identity, canonical consistency, node-reported finality, bond structure, capabilities/shards, and cross-node agreement.
+2. The Maintainer Loop evaluates `MAINTAINER_HEALTH` or another bounded scenario. Evidence that the public API does not expose (for example native trusted-set or pending-withdrawal maps) remains explicitly unavailable instead of being inferred.
 3. The output becomes a sealed Reality Record.
 4. `rlsenti` displays `FIRST DIVERGENCE`, evidence, source SHA, replay state, and a reproducible command.
 5. Mutating testnet actions remain explicit maintainer-approved steps rather than automatic protocol actions.
@@ -80,3 +81,24 @@ artifact: <RealityRecord digest>
 ```
 
 That is the boundary: automate evidence gathering and diagnosis plumbing; keep protocol semantics and deployment decisions with maintainers.
+
+
+## Live Sentinel handoff
+
+The companion `rchain-sentinel` branch exposes:
+
+- `GET /maintainer` for the human one-screen brief;
+- `GET /api/maintainer/brief` for the full observational bundle;
+- `GET /api/maintainer/packet` for the exact packet consumed here.
+
+A captured packet can be sealed immediately:
+
+```bash
+curl -fsS http://localhost:8080/api/maintainer/packet > /tmp/rchain-maintainer.json
+node scripts/maintainer-loop/cli.mjs \
+  --scenario MAINTAINER_HEALTH \
+  --input /tmp/rchain-maintainer.json \
+  --out /tmp/rchain-maintainer.reality.json
+```
+
+The first command is GET-only; the second performs local deterministic evaluation and Reality Record sealing.
