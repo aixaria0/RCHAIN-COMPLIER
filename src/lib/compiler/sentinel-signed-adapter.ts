@@ -20,6 +20,18 @@ import {
 
 export const SENTINEL_ATTESTATION_SCHEMA = "rchain-sentinel-attestation/v1" as const;
 
+export interface SentinelGenesisEvidence {
+  configured_hash: string;
+  available: boolean;
+  raw: Record<string, unknown> | null;
+  payload_sha256: string | null;
+  observed_hash: string | null;
+  observed_height: number | null;
+  hash_match: boolean | null;
+  height_zero: boolean | null;
+  error: string | null;
+}
+
 export interface SentinelFailureDomainDeclaration {
   node_url: string;
   operator_id: string;
@@ -34,6 +46,7 @@ export interface SignedSentinelAttestation {
     schema: typeof SENTINEL_ATTESTATION_SCHEMA;
     collected_at_unix_ms: number;
     network: SentinelNetworkStatus;
+    genesis: SentinelGenesisEvidence;
     finalized_block: SentinelFinalizedBlockEvidence;
     cross_node: SentinelCrossNodeReport;
     failure_domains: SentinelFailureDomainDeclaration[];
@@ -219,6 +232,24 @@ export async function signedSentinelAttestationToRecord(args: {
   }
 
   const collectedAt = new Date(args.snapshot.payload.collected_at_unix_ms).toISOString();
+  const genesis = args.snapshot.payload.genesis;
+  const genesisVerified =
+    genesis.available === true &&
+    typeof genesis.configured_hash === "string" &&
+    genesis.configured_hash.trim().length > 0 &&
+    typeof genesis.observed_hash === "string" &&
+    genesis.observed_hash.trim().length > 0 &&
+    genesis.hash_match === true &&
+    genesis.observed_height === 0 &&
+    genesis.height_zero === true &&
+    typeof genesis.payload_sha256 === "string" &&
+    /^sha256:[0-9a-f]{64}$/i.test(genesis.payload_sha256);
+  const genesisDivergent =
+    genesis.available === true &&
+    (genesis.hash_match === false ||
+      genesis.height_zero === false ||
+      (typeof genesis.observed_height === "number" && genesis.observed_height !== 0));
+
   const base = sentinelBundleToRecord({
     sentinelBaseUrl: args.sentinelBaseUrl,
     collectedAt,
@@ -229,9 +260,12 @@ export async function signedSentinelAttestationToRecord(args: {
   const { integrity: _integrity, state: _state, ...payload } = base;
 
   const observationId = `sentinel-attestation:${verification.payloadDigest}`;
+  const genesisObservationId =
+    `sentinel-genesis:${verification.payloadDigest}`;
   const failureDomainObservationId =
     `sentinel-failure-domains:${verification.payloadDigest}`;
   const evidenceId = `evidence:${observationId}`;
+  const genesisEvidenceId = `evidence:${genesisObservationId}`;
   const failureDomainEvidenceId =
     `evidence:${failureDomainObservationId}`;
   const failureDomainValidation =
@@ -240,6 +274,23 @@ export async function signedSentinelAttestationToRecord(args: {
     ...payload,
     observations: [
       ...payload.observations,
+      {
+        id: genesisObservationId,
+        source: "rchain-sentinel",
+        type: "GenesisEvidence",
+        timestamp: collectedAt,
+        data: {
+          configuredHash: genesis.configured_hash,
+          available: genesis.available,
+          payloadSha256: genesis.payload_sha256,
+          observedHash: genesis.observed_hash,
+          observedHeight: genesis.observed_height,
+          hashMatch: genesis.hash_match,
+          heightZero: genesis.height_zero,
+          error: genesis.error,
+          genesisVerified,
+        },
+      },
       {
         id: failureDomainObservationId,
         source: "rchain-sentinel",
@@ -268,6 +319,12 @@ export async function signedSentinelAttestationToRecord(args: {
     evidence: [
       ...payload.evidence,
       {
+        id: genesisEvidenceId,
+        observationIds: [genesisObservationId],
+        ...(genesis.payload_sha256 ? { hash: genesis.payload_sha256 } : {}),
+        description: "Configured genesis trust anchor challenged against the RNode canonical block endpoint.",
+      },
+      {
         id: failureDomainEvidenceId,
         observationIds: [failureDomainObservationId],
         hash: verification.payloadDigest,
@@ -282,6 +339,13 @@ export async function signedSentinelAttestationToRecord(args: {
     ],
     transformations: [
       ...payload.transformations,
+      {
+        id: "transform_sentinel_genesis_to_verified_observation",
+        name: "RNode genesis challenge → signed genesis identity observation",
+        inputIds: [verification.payloadDigest],
+        outputIds: [genesisObservationId],
+        deterministic: true,
+      },
       {
         id: "transform_sentinel_failure_domains_to_verified_observation",
         name: "Signed failure-domain declarations → target-bound operational topology observation",
@@ -299,6 +363,15 @@ export async function signedSentinelAttestationToRecord(args: {
     ],
     verification: [
       ...payload.verification,
+      {
+        id: "verify_sentinel_genesis_identity",
+        predicate: "configured genesis hash resolves through RNode /block/{hash}, matches the returned hash, and has blockNumber = 0",
+        state: genesisVerified ? "VERIFIED" : genesisDivergent ? "DIVERGENT" : "INCOMPLETE",
+        message: genesisVerified
+          ? `RNode genesis identity verified: ${genesis.observed_hash}`
+          : genesis.error ?? `Genesis evidence incomplete or mismatched: configured=${genesis.configured_hash}, observed=${genesis.observed_hash ?? "missing"}, height=${genesis.observed_height ?? "missing"}`,
+        evidenceIds: [genesisEvidenceId],
+      },
       {
         id: "verify_sentinel_failure_domain_declarations",
         predicate: "signed failure-domain declarations exactly cover cross-node targets and document at least two operators/failure domains",
