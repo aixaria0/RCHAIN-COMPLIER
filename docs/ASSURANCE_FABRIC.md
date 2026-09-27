@@ -272,3 +272,10 @@ The whole package is then signed by a reviewer key using Ed25519. `verifyAssuran
 5. reverify every native-replay/recovery snapshot under an authorized replay key, reconstruct the records, and require the digest set to exactly equal the certificate's `NATIVE_REPLAY` references.
 
 Adding, deleting, replacing, or reordering evidence semantically outside the signed canonical package cannot silently change the trusted result. A reviewer signature proves possession of the pinned reviewer key; the governance process that authorizes that key remains external.
+
+
+## Semantic validation and promotion boundary
+
+Certificate verification is deliberately stronger than recomputing its SHA-256 digest. A verifier also recomputes the check summary and derived status, rejects duplicate check identifiers, requires every strict-policy gate exactly once, and rejects PASS results for Possibility/Conformance/Recovery unless they retain trusted-producer metadata. A signed Assurance Package is promotion-grade only when the embedded certificate itself is `PASS`.
+
+Build provenance repository identity is exact after normalization. Substring/prefix matches are rejected, preventing a dependency URI such as an attacker-controlled repository path that merely contains the expected repository name from satisfying source binding.
