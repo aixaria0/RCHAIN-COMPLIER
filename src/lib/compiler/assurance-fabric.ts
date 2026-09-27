@@ -57,10 +57,12 @@ export interface AssuranceCheckInput {
   critical?: boolean;
   evidence?: string[];
   metrics?: Record<string, string | number | boolean | null>;
+  producer?: string;
 }
 
 export interface AssuranceRequirements {
   requireLiveObservation: boolean;
+  requireNetworkIdentityBinding: boolean;
   requirePossibility: boolean;
   requireConformance: boolean;
   requireRecovery: boolean;
@@ -83,6 +85,8 @@ export interface AssuranceCheck {
   description: string;
   evidence: string[];
   metrics?: Record<string, string | number | boolean | null>;
+  producer?: string;
+  producerVerified?: boolean;
 }
 
 export interface AssuranceRecordReference {
@@ -100,6 +104,10 @@ export interface AssuranceCertificate {
   schema: "rchain-assurance-certificate/v1";
   id: string;
   issuedAt: string;
+  policy: {
+    id: "rchain-revival-strict/v1";
+    digest: string;
+  };
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   requirements: AssuranceRequirements;
@@ -120,10 +128,40 @@ export interface AssuranceCertificate {
 
 const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireLiveObservation: true,
+  requireNetworkIdentityBinding: true,
   requirePossibility: true,
   requireConformance: true,
   requireRecovery: true,
 };
+
+const STRICT_POLICY_ID = "rchain-revival-strict/v1" as const;
+const TRUSTED_CHECK_ATTESTATION = Symbol("rchain-assurance-trusted-check");
+
+type TrustedAssuranceCheckInput = AssuranceCheckInput & {
+  readonly [TRUSTED_CHECK_ATTESTATION]: true;
+};
+
+function trustedCheck(
+  input: AssuranceCheckInput,
+  producer: string,
+): AssuranceCheckInput {
+  const value = {
+    ...input,
+    producer,
+    evidence: Object.freeze([...(input.evidence ?? [])]),
+    ...(input.metrics ? { metrics: Object.freeze({ ...input.metrics }) } : {}),
+  } as TrustedAssuranceCheckInput;
+  Object.defineProperty(value, TRUSTED_CHECK_ATTESTATION, {
+    value: true,
+    enumerable: false,
+    writable: false,
+  });
+  return Object.freeze(value);
+}
+
+function isTrustedCheck(input: AssuranceCheckInput): boolean {
+  return (input as Partial<TrustedAssuranceCheckInput>)[TRUSTED_CHECK_ATTESTATION] === true;
+}
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -144,6 +182,7 @@ function canonicalCertificatePayload(
     schema: certificate.schema,
     id: certificate.id,
     issuedAt: certificate.issuedAt,
+    policy: certificate.policy,
     release: certificate.release,
     network: certificate.network,
     requirements: certificate.requirements,
@@ -229,6 +268,113 @@ function realityChecks(records: AssuranceRecordInput[]): {
   return { references, checks };
 }
 
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function observedNetworkIdentity(
+  records: AssuranceRecordInput[],
+): Array<{ networkId?: string; shardId?: string; epoch?: string | number; observationId: string }> {
+  const identities: Array<{ networkId?: string; shardId?: string; epoch?: string | number; observationId: string }> = [];
+  for (const input of records) {
+    if (
+      input.sourceClass !== "LIVE_OBSERVATION" ||
+      !sourceClassVerified(input) ||
+      !verifyRealityRecordIntegrity(input.record)
+    ) continue;
+
+    for (const observation of input.record.observations) {
+      if (observation.type !== "NetworkStatus") continue;
+      const rnode = objectValue(observation.data.rnode);
+      if (!rnode) continue;
+      const networkId = typeof rnode.network_id === "string" ? rnode.network_id : undefined;
+      const shardId = typeof rnode.shard_id === "string" ? rnode.shard_id : undefined;
+      const epoch =
+        typeof rnode.current_epoch === "string" || typeof rnode.current_epoch === "number"
+          ? rnode.current_epoch
+          : undefined;
+      identities.push({
+        ...(networkId ? { networkId } : {}),
+        ...(shardId ? { shardId } : {}),
+        ...(epoch !== undefined ? { epoch } : {}),
+        observationId: observation.id,
+      });
+    }
+  }
+  return identities;
+}
+
+function networkIdentityBindingCheck(
+  records: AssuranceRecordInput[],
+  expected: AssuranceNetworkIdentity,
+): AssuranceCheck {
+  const observed = observedNetworkIdentity(records);
+  const declaredComplete = Boolean(expected.networkId && expected.shardId);
+  if (!declaredComplete) {
+    return {
+      id: "reality_network_identity",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "Network identity binding requires declared networkId and shardId in addition to genesis.",
+      evidence: [],
+    };
+  }
+  if (observed.length === 0) {
+    return {
+      id: "reality_network_identity",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No integrity-valid live NetworkStatus observation is available to bind the declared network identity.",
+      evidence: [],
+    };
+  }
+
+  const comparable = observed.filter((identity) => identity.networkId && identity.shardId);
+  if (comparable.length === 0) {
+    return {
+      id: "reality_network_identity",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "Live NetworkStatus observations did not expose both network_id and shard_id.",
+      evidence: observed.map((identity) => identity.observationId),
+    };
+  }
+
+  const mismatches = comparable.filter((identity) =>
+    identity.networkId !== expected.networkId ||
+    identity.shardId !== expected.shardId ||
+    (expected.epoch !== undefined && identity.epoch !== expected.epoch)
+  );
+  if (mismatches.length > 0) {
+    return {
+      id: "reality_network_identity",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "Declared network identity conflicts with one or more live Sentinel observations.",
+      evidence: mismatches.map((identity) =>
+        `${identity.observationId}:network=${identity.networkId ?? "unknown"},shard=${identity.shardId ?? "unknown"},epoch=${identity.epoch ?? "unknown"}`
+      ),
+    };
+  }
+
+  return {
+    id: "reality_network_identity",
+    plane: "REALITY",
+    state: "PASS",
+    critical: true,
+    description: "Declared networkId/shardId are bound to integrity-valid live Sentinel NetworkStatus observations.",
+    evidence: comparable.map((identity) =>
+      `${identity.observationId}:network=${identity.networkId},shard=${identity.shardId},epoch=${identity.epoch ?? "unknown"}`
+    ),
+  };
+}
+
 function requiredPlaneCheck(
   id: string,
   plane: AssurancePlane,
@@ -283,13 +429,32 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     throw new Error("assurance certificate requires an explicit issuedAt timestamp");
   }
 
+  if (
+    input.requirements &&
+    Object.entries(DEFAULT_REQUIREMENTS).some(
+      ([key, required]) =>
+        required &&
+        input.requirements?.[key as keyof AssuranceRequirements] === false,
+    )
+  ) {
+    throw new Error("rchain-revival-strict/v1 requirements cannot be weakened");
+  }
+
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
   const reality = realityChecks(input.records);
-  const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => ({
-    ...check,
-    critical: check.critical ?? true,
-    evidence: check.evidence ?? [],
-  }));
+  const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
+  const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
+    const producerVerified = isTrustedCheck(check);
+    const requestedState = check.state;
+    return {
+      ...check,
+      state: !producerVerified && requestedState === "PASS" ? "BLOCKED" : requestedState,
+      critical: check.critical ?? true,
+      evidence: check.evidence ?? [],
+      producer: check.producer ?? "external/unverified",
+      producerVerified,
+    };
+  });
 
   const hasLiveObservation = reality.references.some(
     (record) =>
@@ -299,13 +464,25 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       record.state !== "DIVERGENT",
   );
   const hasPossibility = suppliedChecks.some(
-    (check) => check.plane === "POSSIBILITY" && check.critical && check.state === "PASS",
+    (check) =>
+      check.plane === "POSSIBILITY" &&
+      check.critical &&
+      check.producerVerified &&
+      check.state === "PASS",
   );
   const hasConformance = suppliedChecks.some(
-    (check) => check.plane === "CONFORMANCE" && check.critical && check.state === "PASS",
+    (check) =>
+      check.plane === "CONFORMANCE" &&
+      check.critical &&
+      check.producerVerified &&
+      check.state === "PASS",
   );
   const hasRecovery = suppliedChecks.some(
-    (check) => check.plane === "RECOVERY" && check.critical && check.state === "PASS",
+    (check) =>
+      check.plane === "RECOVERY" &&
+      check.critical &&
+      check.producerVerified &&
+      check.state === "PASS",
   );
 
   const gates: AssuranceCheck[] = [
@@ -317,6 +494,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       hasLiveObservation
         ? "At least one integrity-valid, non-divergent live observation is present."
         : "No integrity-valid, non-divergent live observation is present. Synthetic evidence cannot satisfy this gate.",
+    ),
+    requiredPlaneCheck(
+      "gate_network_identity",
+      "REALITY",
+      requirements.requireNetworkIdentityBinding,
+      networkIdentity.state === "PASS",
+      networkIdentity.description,
     ),
     requiredPlaneCheck(
       "gate_possibility",
@@ -341,7 +525,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [...reality.checks, ...suppliedChecks, ...gates];
+  const checks = [...reality.checks, networkIdentity, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const id = `assurance:${digest([
@@ -350,10 +534,15 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     input.network.genesis,
   ]).slice(0, 20)}`;
 
+  const policy = {
+    id: STRICT_POLICY_ID,
+    digest: digest([JSON.stringify(DEFAULT_REQUIREMENTS)]),
+  };
   const payload: Omit<AssuranceCertificate, "integrity"> = {
     schema: "rchain-assurance-certificate/v1",
     id,
     issuedAt: input.issuedAt,
+    policy,
     release: input.release,
     network: input.network,
     requirements,
@@ -388,7 +577,7 @@ export function possibilityCheckFromSearch(args: {
   const matched = result.status === args.expected;
   const limited = result.status === "LIMIT_REACHED";
 
-  return {
+  return trustedCheck({
     id: args.id,
     plane: "POSSIBILITY",
     state: limited ? "BLOCKED" : matched ? "PASS" : "FAIL",
@@ -404,7 +593,7 @@ export function possibilityCheckFromSearch(args: {
       expected: args.expected,
       observed: result.status,
     },
-  };
+  }, "weighted-possibility-search/v1");
 }
 
 
@@ -415,7 +604,7 @@ export function possibilityChecksFromFragilityReport(
     const counterexamples = report.counterexamples.filter(
       (counterexample) => counterexample.invariant === invariant.invariant,
     );
-    return {
+    return trustedCheck({
       id: `cbc_fragility:${invariant.invariant}`,
       plane: "POSSIBILITY",
       state: invariant.satisfied ? "PASS" : "FAIL",
@@ -430,7 +619,7 @@ export function possibilityChecksFromFragilityReport(
         reportDigest: report.digest,
         counterexamples: counterexamples.length,
       },
-    };
+    }, "cbc-fragility-adapter/v1");
   });
 }
 
@@ -443,7 +632,7 @@ export function conformanceCheckFromDigests(args: {
 }): AssuranceCheckInput {
   const complete = Boolean(args.expectedDigest && args.observedDigest);
   const match = complete && args.expectedDigest === args.observedDigest;
-  return {
+  return trustedCheck({
     id: args.id,
     plane: "CONFORMANCE",
     state: !complete ? "BLOCKED" : match ? "PASS" : "FAIL",
@@ -457,7 +646,7 @@ export function conformanceCheckFromDigests(args: {
       match,
       complete,
     },
-  };
+  }, "digest-conformance/v1");
 }
 
 export function recoveryCheckFromDigests(args: {
@@ -476,7 +665,7 @@ export function recoveryCheckFromDigests(args: {
     args.independentDisk === true &&
     args.checkpointTrusted === true;
   const match = complete && args.preRecoveryDigest === args.recoveredDigest;
-  return {
+  return trustedCheck({
     id: args.id,
     plane: "RECOVERY",
     state: !complete || !methodologyComplete ? "BLOCKED" : match ? "PASS" : "FAIL",
@@ -497,5 +686,5 @@ export function recoveryCheckFromDigests(args: {
       independentDisk: args.independentDisk === true,
       checkpointTrusted: args.checkpointTrusted === true,
     },
-  };
+  }, "digest-recovery/v1");
 }
