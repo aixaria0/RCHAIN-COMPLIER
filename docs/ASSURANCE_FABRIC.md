@@ -200,3 +200,22 @@ The key IDs are normalized, validated, sorted, included in the certificate paylo
 A valid signature from a key outside that set is a `FAIL`, not merely missing evidence. An empty authorization set is `BLOCKED`.
 
 This mechanism records the trust decision; it does not itself establish who has organizational authority to add a key to the set. That authority should be controlled by the process/key that signs the final Assurance Certificate.
+
+
+## Provenance and network identity
+
+A certificate cannot promote merely because a caller typed a commit, binary digest, or network name into the input object.
+
+The build-provenance gate requires:
+
+```text
+release.commit == provenance.sourceCommit
+release.binaryDigest == provenance.subjectDigest
+provenance.builderId != empty
+```
+
+This is a structural binding gate, not yet cryptographic verification of a SLSA/in-toto signature. A future adapter can verify signed provenance before constructing this input.
+
+The network-identity gate reads the `NetworkStatus` observation embedded by the Sentinel adapter and compares the declared network ID, shard ID, and epoch when supplied. A caller-provided identity with no matching live observation is BLOCKED.
+
+Genesis remains declared metadata in v1 because the current Sentinel status contract does not expose a genesis digest. It must not be described as observed until the upstream observer exposes that field.
