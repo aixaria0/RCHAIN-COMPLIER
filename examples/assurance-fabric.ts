@@ -23,6 +23,7 @@ const possibility = possibilityCheckFromSearch({
 // recovery evidence is supplied. The demo shows fail-closed behavior.
 const certificate = buildAssuranceCertificate({
   issuedAt: "2026-09-27T00:00:00Z",
+    freshness: { maxObservationAgeMs: 60_000 },
   release: {
     repository: "aixaria0/RCHAIN-COMPLIER",
     commit: "demo",
