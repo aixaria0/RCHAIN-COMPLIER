@@ -44,16 +44,60 @@
       ],
       "properties": {
         "possibility": {
-          "$ref": "#/$defs/artifact"
+          "allOf": [
+            {
+              "$ref": "#/$defs/artifact"
+            },
+            {
+              "properties": {
+                "producer": {
+                  "const": "RCHAIN-COMPLIER"
+                }
+              }
+            }
+          ]
         },
         "observation": {
-          "$ref": "#/$defs/artifact"
+          "allOf": [
+            {
+              "$ref": "#/$defs/artifact"
+            },
+            {
+              "properties": {
+                "producer": {
+                  "const": "rchain-sentinel"
+                }
+              }
+            }
+          ]
         },
         "workbench": {
-          "$ref": "#/$defs/artifact"
+          "allOf": [
+            {
+              "$ref": "#/$defs/artifact"
+            },
+            {
+              "properties": {
+                "producer": {
+                  "const": "rlsenti"
+                }
+              }
+            }
+          ]
         },
         "attestation": {
-          "$ref": "#/$defs/artifact"
+          "allOf": [
+            {
+              "$ref": "#/$defs/artifact"
+            },
+            {
+              "properties": {
+                "producer": {
+                  "const": "Sovereign-Lattice"
+                }
+              }
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -70,8 +114,12 @@
       ],
       "properties": {
         "producer": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "RCHAIN-COMPLIER",
+            "rchain-sentinel",
+            "rlsenti",
+            "Sovereign-Lattice"
+          ]
         },
         "schema": {
           "type": "string",
@@ -88,6 +136,14 @@
             "BLOCKED",
             "NOT_TESTED"
           ]
+        },
+        "bindsTo": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": true
