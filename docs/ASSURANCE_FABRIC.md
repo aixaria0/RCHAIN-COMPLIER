@@ -73,6 +73,8 @@ Freshness is an explicit scoped policy, not a hard-coded project promise. The ce
 
 Default promotion requirements are:
 
+- release artifact identity must include a canonical 40-hex source commit, a `sha256:` binary digest, and a `sha256:` digest for the build-provenance statement; this is identity completeness, not signature authentication;
+
 - at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
 - a matching live Sentinel network identity (`networkId` + `shardId`);
 - promotion-grade live evidence inside the declared freshness budget;
@@ -130,3 +132,16 @@ Consumers should run both:
 - `verifyAssuranceCertificatePolicy()` — confirms the certificate still carries the non-weakened `rchain-revival-strict/v1` requirements.
 
 `validateAssuranceCertificate()` combines both checks. These checks provide deterministic integrity and policy validation; they do **not** provide signer authenticity. Cryptographic observer/build signatures remain a separate trust layer.
+
+
+## Machine-readable limitations
+
+Every certificate carries explicit limitations inside the hashed payload. v1 states that:
+
+- SHA-256 integrity is not signer authenticity;
+- the declared provenance-statement digest is not cryptographic verification of the builder/signature;
+- cross-node consistency does not establish independent operators/failure domains;
+- cross-node consistency is not a stake-weighted Casper finality proof;
+- bounded possibility search applies only to its declared model/search scope.
+
+These limitations remain present even on a `PASS` certificate so consumers cannot infer stronger guarantees from the status than the evidence supports.
