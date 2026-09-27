@@ -340,3 +340,19 @@ A recovery attestation still proves only what the signer observed and signed. Th
 The signed payload binds those SHA-256 identities to the repository and commit, stable subject, previous Reality Record digest, distinct pre/recovered process and disk identities, checkpoint source, ordered timestamps, and expected/observed replay state. The checkpoint digest is inserted into the replay input set automatically.
 
 The producer does not perform or simulate a restore. It can only attest artifacts produced by an authorized staging recovery run. Without those artifacts and an authorized replay signing key, the strict Recovery gate remains `BLOCKED`.
+
+
+### Live anti-replay challenge
+
+Promotion-grade Sentinel fetches are challenge-response rather than timestamp-only.
+
+`fetchSignedSentinelRealityRecord()` generates a fresh 32-byte lowercase-hex nonce, requests
+`/api/attestation/snapshot?nonce=<nonce>`, and accepts the response only when that exact nonce is
+inside the Ed25519-signed payload. A correctly signed snapshot from a different request is rejected
+even if its timestamp is still inside the configured freshness budget.
+
+The challenge match is kept as verifier-process trust state rather than serialized into the
+Reality Record, so offline Assurance Package reconstruction remains deterministic. Offline package
+verification can re-check that the nonce was signed, but it cannot independently prove how
+unpredictably the original verifier generated that nonce; the reviewer/package signature is therefore
+still a separate trust statement.
