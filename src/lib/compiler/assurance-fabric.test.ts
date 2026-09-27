@@ -1408,3 +1408,71 @@ test("signed provenance must bind the exact statement digest declared by the rel
     "FAIL",
   );
 });
+
+
+test("RNode-verified genesis mismatch fails the declared network identity", async () => {
+  const live = await signedLiveRecord("2026-09-27T00:24:00Z");
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:24:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    observerTrust: { authorizedKeyIds: [TEST_OBSERVER_KEY_ID] },
+    release: releaseIdentity(),
+    network: {
+      genesis: "different-genesis",
+      networkId: "testnet",
+      shardId: "root",
+      epoch: 42,
+    },
+    records: [
+      { label: "signed live", sourceClass: "LIVE_OBSERVATION", record: live },
+    ],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "reality_network_identity")?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
+});
+
+test("signed native replay from a different binary cannot bind to the release", async () => {
+  const payload: NativeReplayAttestationPayload = {
+    schema: NATIVE_REPLAY_ATTESTATION_SCHEMA,
+    collected_at_unix_ms: Date.parse("2026-09-27T00:25:00Z"),
+    release: {
+      repository: "rchain-community/rchain-rust",
+      commit: RELEASE_COMMIT,
+      binary_sha256: `sha256:${"9".repeat(64)}`,
+    },
+    subject: {
+      id: "native-state:wrong-binary",
+      label: "Wrong binary replay",
+    },
+    replay: {
+      expected_digest: TEST_STATE_DIGEST,
+      observed_digest: TEST_STATE_DIGEST,
+      input_digests: [TEST_INPUT_DIGEST],
+    },
+  };
+  const record = await signNativePayload(payload);
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:25:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    nativeReplayTrust: { authorizedKeyIds: [TEST_NATIVE_KEY_ID] },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [
+      { label: "wrong binary replay", sourceClass: "NATIVE_REPLAY", record },
+    ],
+    checks: [],
+  });
+
+  assert.equal(
+    certificate.checks.find(
+      (check) => check.id === "reality_native_replay_release_binding",
+    )?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
+});
