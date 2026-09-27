@@ -10,6 +10,26 @@ import {
 } from "./sentinel-adapter.ts";
 import { searchWeightedPossibility } from "./possibility-plane.ts";
 import {
+  BUILD_PROVENANCE_ATTESTATION_SCHEMA,
+  IN_TOTO_STATEMENT_V1,
+  SLSA_PROVENANCE_V1,
+  buildProvenanceAttestationPayloadDigest,
+  buildProvenanceAttestationPublicKeyId,
+  buildProvenanceAttestationSigningBytes,
+  signedBuildProvenanceAttestationToVerified,
+  type BuildProvenanceAttestationPayload,
+  type SignedBuildProvenanceAttestation,
+} from "./build-provenance-signed-adapter.ts";
+import {
+  NATIVE_REPLAY_ATTESTATION_SCHEMA,
+  nativeReplayAttestationPayloadDigest,
+  nativeReplayAttestationPublicKeyId,
+  nativeReplayAttestationSigningBytes,
+  signedNativeReplayAttestationToRecord,
+  type NativeReplayAttestationPayload,
+  type SignedNativeReplayAttestation,
+} from "./native-replay-signed-adapter.ts";
+import {
   SENTINEL_ATTESTATION_SCHEMA,
   sentinelAttestationPayloadDigest,
   sentinelAttestationPublicKeyId,
@@ -33,12 +53,15 @@ const RELEASE_COMMIT = "a".repeat(40);
 const RELEASE_BINARY = `sha256:${"b".repeat(64)}`;
 const RELEASE_PROVENANCE = `sha256:${"c".repeat(64)}`;
 
-function releaseIdentity(repository = "rchain-community/rchain-rust") {
+function releaseIdentity(
+  repository = "rchain-community/rchain-rust",
+  provenanceDigest = RELEASE_PROVENANCE,
+) {
   return {
     repository,
     commit: RELEASE_COMMIT,
     binaryDigest: RELEASE_BINARY,
-    buildProvenance: RELEASE_PROVENANCE,
+    buildProvenance: provenanceDigest,
   };
 }
 
@@ -151,6 +174,185 @@ const TEST_OBSERVER_PUBLIC_KEY_HEX = testBytesToHex(TEST_OBSERVER_PUBLIC_KEY);
 const TEST_OBSERVER_KEY_ID = await sentinelAttestationPublicKeyId(
   TEST_OBSERVER_PUBLIC_KEY_HEX,
 );
+
+const TEST_BUILDER_ID = "https://github.com/actions/runner";
+const TEST_BUILDER_KEY_PAIR = await globalThis.crypto.subtle.generateKey(
+  { name: "Ed25519" },
+  true,
+  ["sign", "verify"],
+) as CryptoKeyPair;
+const TEST_BUILDER_PUBLIC_KEY = new Uint8Array(
+  await globalThis.crypto.subtle.exportKey("raw", TEST_BUILDER_KEY_PAIR.publicKey),
+);
+const TEST_BUILDER_PUBLIC_KEY_HEX = testBytesToHex(TEST_BUILDER_PUBLIC_KEY);
+const TEST_BUILDER_KEY_ID = await buildProvenanceAttestationPublicKeyId(
+  TEST_BUILDER_PUBLIC_KEY_HEX,
+);
+
+const TEST_NATIVE_KEY_PAIR = await globalThis.crypto.subtle.generateKey(
+  { name: "Ed25519" },
+  true,
+  ["sign", "verify"],
+) as CryptoKeyPair;
+const TEST_NATIVE_PUBLIC_KEY = new Uint8Array(
+  await globalThis.crypto.subtle.exportKey("raw", TEST_NATIVE_KEY_PAIR.publicKey),
+);
+const TEST_NATIVE_PUBLIC_KEY_HEX = testBytesToHex(TEST_NATIVE_PUBLIC_KEY);
+const TEST_NATIVE_KEY_ID = await nativeReplayAttestationPublicKeyId(
+  TEST_NATIVE_PUBLIC_KEY_HEX,
+);
+
+const TEST_STATE_DIGEST = `sha256:${"d".repeat(64)}`;
+const TEST_INPUT_DIGEST = `sha256:${"e".repeat(64)}`;
+const TEST_CHECKPOINT_DIGEST = `sha256:${"f".repeat(64)}`;
+
+async function signedBuildProvenance() {
+  const payload: BuildProvenanceAttestationPayload = {
+    schema: BUILD_PROVENANCE_ATTESTATION_SCHEMA,
+    release: {
+      repository: "rchain-community/rchain-rust",
+      commit: RELEASE_COMMIT,
+      binary_sha256: RELEASE_BINARY,
+    },
+    statement: {
+      _type: IN_TOTO_STATEMENT_V1,
+      subject: [
+        {
+          name: "rnode",
+          digest: { sha256: RELEASE_BINARY.replace(/^sha256:/, "") },
+        },
+      ],
+      predicateType: SLSA_PROVENANCE_V1,
+      predicate: {
+        buildDefinition: {
+          buildType: "https://github.com/actions/workflow/v1",
+          externalParameters: {
+            repository: "rchain-community/rchain-rust",
+            ref: "refs/heads/dev",
+          },
+          resolvedDependencies: [
+            {
+              uri: "git+https://github.com/rchain-community/rchain-rust@refs/heads/dev",
+              digest: { gitCommit: RELEASE_COMMIT },
+            },
+          ],
+        },
+        runDetails: {
+          builder: { id: TEST_BUILDER_ID },
+          metadata: { invocationId: "assurance-test-build" },
+        },
+      },
+    },
+  };
+
+  const payloadDigest = await buildProvenanceAttestationPayloadDigest(payload);
+  const signature = new Uint8Array(
+    await globalThis.crypto.subtle.sign(
+      { name: "Ed25519" },
+      TEST_BUILDER_KEY_PAIR.privateKey,
+      testArrayBuffer(buildProvenanceAttestationSigningBytes(payload)),
+    ),
+  );
+  const snapshot: SignedBuildProvenanceAttestation = {
+    schema: BUILD_PROVENANCE_ATTESTATION_SCHEMA,
+    payload,
+    payload_sha256: payloadDigest,
+    signature: {
+      algorithm: "Ed25519",
+      key_id: TEST_BUILDER_KEY_ID,
+      public_key_hex: TEST_BUILDER_PUBLIC_KEY_HEX,
+      signature_hex: testBytesToHex(signature),
+    },
+  };
+
+  return signedBuildProvenanceAttestationToVerified({
+    snapshot,
+    expectedKeyId: TEST_BUILDER_KEY_ID,
+  });
+}
+
+async function signNativePayload(
+  payload: NativeReplayAttestationPayload,
+): Promise<ReturnType<typeof signedNativeReplayAttestationToRecord>> {
+  const payloadDigest = await nativeReplayAttestationPayloadDigest(payload);
+  const signature = new Uint8Array(
+    await globalThis.crypto.subtle.sign(
+      { name: "Ed25519" },
+      TEST_NATIVE_KEY_PAIR.privateKey,
+      testArrayBuffer(nativeReplayAttestationSigningBytes(payload)),
+    ),
+  );
+  const snapshot: SignedNativeReplayAttestation = {
+    schema: NATIVE_REPLAY_ATTESTATION_SCHEMA,
+    payload,
+    payload_sha256: payloadDigest,
+    signature: {
+      algorithm: "Ed25519",
+      key_id: TEST_NATIVE_KEY_ID,
+      public_key_hex: TEST_NATIVE_PUBLIC_KEY_HEX,
+      signature_hex: testBytesToHex(signature),
+    },
+  };
+  return signedNativeReplayAttestationToRecord({
+    snapshot,
+    expectedKeyId: TEST_NATIVE_KEY_ID,
+  });
+}
+
+async function signedNativeReplayPair() {
+  const beforePayload: NativeReplayAttestationPayload = {
+    schema: NATIVE_REPLAY_ATTESTATION_SCHEMA,
+    collected_at_unix_ms: Date.parse("2026-09-27T00:00:00Z"),
+    release: {
+      repository: "rchain-community/rchain-rust",
+      commit: RELEASE_COMMIT,
+      binary_sha256: RELEASE_BINARY,
+    },
+    subject: {
+      id: "native-state:test",
+      label: "Pinned Rust replay",
+    },
+    replay: {
+      expected_digest: TEST_STATE_DIGEST,
+      observed_digest: TEST_STATE_DIGEST,
+      input_digests: [TEST_INPUT_DIGEST],
+    },
+  };
+  const before = await signNativePayload(beforePayload);
+
+  const afterPayload: NativeReplayAttestationPayload = {
+    ...beforePayload,
+    collected_at_unix_ms: Date.parse("2026-09-27T00:00:01Z"),
+    recovery: {
+      previous_record_digest: before.integrity.recordDigest,
+      pre_process_id: "proc-before",
+      recovered_process_id: "proc-after",
+      pre_disk_id: "disk-before",
+      recovered_disk_id: "disk-after",
+      checkpoint_digest: TEST_CHECKPOINT_DIGEST,
+      checkpoint_trusted: true,
+    },
+  };
+  const after = await signNativePayload(afterPayload);
+  return { before, after };
+}
+
+function promotionChecks(native: Awaited<ReturnType<typeof signedNativeReplayPair>>) {
+  return [
+    possibilityPass(),
+    conformanceCheckFromRealityRecord({
+      id: "conformance_exact_replay",
+      description: "Pinned signed implementation replay matched the expected digest.",
+      record: native.before,
+    }),
+    recoveryCheckFromRecordChain({
+      id: "recovery_restart_state",
+      description: "Signed recovered state remained linked and identical across an independent process/disk restore.",
+      before: native.before,
+      after: native.after,
+    }),
+  ];
+}
 
 async function signedLiveRecord(collectedAt: string) {
   const payload: SignedSentinelAttestation["payload"] = {
@@ -330,26 +532,53 @@ test("synthetic evidence cannot promote a certificate through the live gate", ()
   assert.equal(verifyAssuranceCertificateIntegrity(certificate), true);
 });
 
-test("live reality + possibility + conformance + recovery can produce PASS", async () => {
+test("live + signed provenance + signed native replay can produce strict PASS", async () => {
   const live = await signedLiveRecord("2026-09-27T00:00:00Z");
+  const provenance = await signedBuildProvenance();
+  const native = await signedNativeReplayPair();
 
   const certificate = buildAssuranceCertificate({
-    issuedAt: "2026-09-27T00:00:01Z",
+    issuedAt: "2026-09-27T00:00:02Z",
     freshness: { maxObservationAgeMs: 60_000 },
     observerTrust: { authorizedKeyIds: [TEST_OBSERVER_KEY_ID] },
-    release: releaseIdentity(),
+    builderTrust: {
+      authorizedKeyIds: [TEST_BUILDER_KEY_ID],
+      authorizedBuilderIds: [TEST_BUILDER_ID],
+    },
+    nativeReplayTrust: { authorizedKeyIds: [TEST_NATIVE_KEY_ID] },
+    buildProvenance: provenance,
+    release: releaseIdentity(
+      "rchain-community/rchain-rust",
+      provenance.statementDigest,
+    ),
     network: {
       genesis: "genesis:test",
       networkId: "testnet",
       shardId: "root",
       epoch: 42,
     },
-    records: [{ label: "Sentinel live observation", sourceClass: "LIVE_OBSERVATION", record: live }],
-    checks: commonChecks(),
+    records: [
+      { label: "Sentinel live observation", sourceClass: "LIVE_OBSERVATION", record: live },
+      { label: "Native replay before recovery", sourceClass: "NATIVE_REPLAY", record: native.before },
+      { label: "Native replay after recovery", sourceClass: "NATIVE_REPLAY", record: native.after },
+    ],
+    checks: promotionChecks(native),
   });
 
   assert.equal(certificate.status, "PASS");
-  assert.equal(certificate.records[0]?.sourceClass, "LIVE_OBSERVATION");
+  assert.equal(certificate.buildProvenance?.runtimeVerified, true);
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_build_provenance")?.state,
+    "PASS",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_native_replay_signature")?.state,
+    "PASS",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_native_replay_authorization")?.state,
+    "PASS",
+  );
   assert.equal(verifyAssuranceCertificateIntegrity(certificate), true);
 });
 
@@ -1012,5 +1241,145 @@ test("observer trust key ids must use canonical sha256 fingerprints", () => {
         checks: [],
       }),
     /malformed key ids/,
+  );
+});
+
+
+test("matching unsigned native replay records cannot satisfy strict conformance or recovery", () => {
+  const native = nativeReplayPair();
+  const conformance = conformanceCheckFromRealityRecord({
+    id: "unsigned-conformance",
+    description: "unsigned local record",
+    record: native.before,
+  });
+  const recovery = recoveryCheckFromRecordChain({
+    id: "unsigned-recovery",
+    description: "unsigned local recovery chain",
+    before: native.before,
+    after: native.after,
+  });
+
+  assert.equal(conformance.state, "BLOCKED");
+  assert.equal(recovery.state, "BLOCKED");
+  assert.equal(conformance.metrics?.signatureVerified, false);
+  assert.equal(recovery.metrics?.signaturesVerified, false);
+});
+
+test("signed native checks cannot satisfy strict gates unless their records are certificate-bound", async () => {
+  const live = await signedLiveRecord("2026-09-27T00:20:00Z");
+  const provenance = await signedBuildProvenance();
+  const native = await signedNativeReplayPair();
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:20:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    observerTrust: { authorizedKeyIds: [TEST_OBSERVER_KEY_ID] },
+    builderTrust: {
+      authorizedKeyIds: [TEST_BUILDER_KEY_ID],
+      authorizedBuilderIds: [TEST_BUILDER_ID],
+    },
+    nativeReplayTrust: { authorizedKeyIds: [TEST_NATIVE_KEY_ID] },
+    buildProvenance: provenance,
+    release: releaseIdentity(
+      "rchain-community/rchain-rust",
+      provenance.statementDigest,
+    ),
+    network: {
+      genesis: "genesis:test",
+      networkId: "testnet",
+      shardId: "root",
+      epoch: 42,
+    },
+    records: [
+      { label: "Sentinel live", sourceClass: "LIVE_OBSERVATION", record: live },
+    ],
+    checks: promotionChecks(native),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_conformance")?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_recovery")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
+});
+
+test("a cloned provenance object loses runtime verification and fails closed", async () => {
+  const provenance = await signedBuildProvenance();
+  const cloned = structuredClone(provenance);
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:21:00Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    builderTrust: {
+      authorizedKeyIds: [TEST_BUILDER_KEY_ID],
+      authorizedBuilderIds: [TEST_BUILDER_ID],
+    },
+    buildProvenance: cloned,
+    release: releaseIdentity(
+      "rchain-community/rchain-rust",
+      provenance.statementDigest,
+    ),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [],
+    checks: [],
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "supply_chain_build_provenance")?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
+});
+
+test("cryptographically valid provenance from an unauthorized builder fails", async () => {
+  const provenance = await signedBuildProvenance();
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:22:00Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    builderTrust: {
+      authorizedKeyIds: [TEST_BUILDER_KEY_ID],
+      authorizedBuilderIds: ["https://example.invalid/other-builder"],
+    },
+    buildProvenance: provenance,
+    release: releaseIdentity(
+      "rchain-community/rchain-rust",
+      provenance.statementDigest,
+    ),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [],
+    checks: [],
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "supply_chain_build_provenance")?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
+});
+
+test("signed provenance must bind the exact statement digest declared by the release", async () => {
+  const provenance = await signedBuildProvenance();
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:23:00Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    builderTrust: {
+      authorizedKeyIds: [TEST_BUILDER_KEY_ID],
+      authorizedBuilderIds: [TEST_BUILDER_ID],
+    },
+    buildProvenance: provenance,
+    release: releaseIdentity(
+      "rchain-community/rchain-rust",
+      `sha256:${"0".repeat(64)}`,
+    ),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [],
+    checks: [],
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "supply_chain_build_provenance")?.state,
+    "FAIL",
   );
 });
