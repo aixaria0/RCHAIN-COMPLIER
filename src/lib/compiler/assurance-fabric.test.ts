@@ -10,6 +10,14 @@ import {
 } from "./sentinel-adapter.ts";
 import { searchWeightedPossibility } from "./possibility-plane.ts";
 import {
+  SENTINEL_ATTESTATION_SCHEMA,
+  sentinelAttestationPayloadDigest,
+  sentinelAttestationPublicKeyId,
+  sentinelAttestationSigningBytes,
+  signedSentinelAttestationToRecord,
+  type SignedSentinelAttestation,
+} from "./sentinel-signed-adapter.ts";
+import {
   buildAssuranceCertificate,
   conformanceCheckFromDigests,
   conformanceCheckFromRealityRecord,
@@ -120,6 +128,64 @@ const liveCrossNode: SentinelCrossNodeReport = {
     },
   ],
 };
+
+function testBytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function testArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(value.byteLength);
+  new Uint8Array(buffer).set(value);
+  return buffer;
+}
+
+const TEST_OBSERVER_KEY_PAIR = await globalThis.crypto.subtle.generateKey(
+  { name: "Ed25519" },
+  true,
+  ["sign", "verify"],
+) as CryptoKeyPair;
+const TEST_OBSERVER_PUBLIC_KEY = new Uint8Array(
+  await globalThis.crypto.subtle.exportKey("raw", TEST_OBSERVER_KEY_PAIR.publicKey),
+);
+const TEST_OBSERVER_PUBLIC_KEY_HEX = testBytesToHex(TEST_OBSERVER_PUBLIC_KEY);
+const TEST_OBSERVER_KEY_ID = await sentinelAttestationPublicKeyId(
+  TEST_OBSERVER_PUBLIC_KEY_HEX,
+);
+
+async function signedLiveRecord(collectedAt: string) {
+  const payload: SignedSentinelAttestation["payload"] = {
+    schema: SENTINEL_ATTESTATION_SCHEMA,
+    collected_at_unix_ms: Date.parse(collectedAt),
+    network: liveNetwork,
+    finalized_block: liveEvidence,
+    cross_node: liveCrossNode,
+  };
+  const payloadDigest = await sentinelAttestationPayloadDigest(payload);
+  const signature = new Uint8Array(
+    await globalThis.crypto.subtle.sign(
+      { name: "Ed25519" },
+      TEST_OBSERVER_KEY_PAIR.privateKey,
+      testArrayBuffer(sentinelAttestationSigningBytes(payload)),
+    ),
+  );
+  const snapshot: SignedSentinelAttestation = {
+    schema: SENTINEL_ATTESTATION_SCHEMA,
+    payload,
+    payload_sha256: payloadDigest,
+    signature: {
+      algorithm: "Ed25519",
+      key_id: TEST_OBSERVER_KEY_ID,
+      public_key_hex: TEST_OBSERVER_PUBLIC_KEY_HEX,
+      signature_hex: testBytesToHex(signature),
+    },
+  };
+
+  return signedSentinelAttestationToRecord({
+    snapshot,
+    sentinelBaseUrl: "http://sentinel.example",
+    expectedKeyId: TEST_OBSERVER_KEY_ID,
+  });
+}
 
 function possibilityPass() {
   const result = searchWeightedPossibility<number>({
@@ -264,14 +330,8 @@ test("synthetic evidence cannot promote a certificate through the live gate", ()
   assert.equal(verifyAssuranceCertificateIntegrity(certificate), true);
 });
 
-test("live reality + possibility + conformance + recovery can produce PASS", () => {
-  const live = sentinelBundleToRecord({
-    sentinelBaseUrl: "http://sentinel.example",
-    collectedAt: "2026-09-27T00:00:00Z",
-    evidence: liveEvidence,
-    network: liveNetwork,
-    crossNode: liveCrossNode,
-  });
+test("live reality + possibility + conformance + recovery can produce PASS", async () => {
+  const live = await signedLiveRecord("2026-09-27T00:00:00Z");
 
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:01Z",
@@ -626,14 +686,8 @@ test("stale live evidence blocks promotion under the declared freshness budget",
   assert.equal(certificate.status, "BLOCKED");
 });
 
-test("future-dated live evidence fails freshness validation", () => {
-  const future = sentinelBundleToRecord({
-    sentinelBaseUrl: "http://sentinel.example",
-    collectedAt: "2026-09-27T00:10:00Z",
-    evidence: liveEvidence,
-    network: liveNetwork,
-    crossNode: liveCrossNode,
-  });
+test("future-dated live evidence fails freshness validation", async () => {
+  const future = await signedLiveRecord("2026-09-27T00:10:00Z");
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:09:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
@@ -893,4 +947,33 @@ test("recovery state mismatch becomes FAIL rather than BLOCKED", () => {
   });
 
   assert.equal(check.state, "FAIL");
+});
+
+
+test("unsigned live Sentinel evidence cannot satisfy the observer-signature gate", () => {
+  const unsigned = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:15:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+    crossNode: liveCrossNode,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:15:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "unsigned live", sourceClass: "LIVE_OBSERVATION", record: unsigned }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_observer_signature")?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_live_observation")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
 });
