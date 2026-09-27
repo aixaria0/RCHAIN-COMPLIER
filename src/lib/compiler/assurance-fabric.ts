@@ -1880,6 +1880,7 @@ export function verifyAssuranceCertificateSemantics(
 
   const trustedPlanePasses = certificate.checks.filter(
     (check) =>
+      !check.id.startsWith("gate_") &&
       check.state === "PASS" &&
       (check.plane === "POSSIBILITY" ||
         check.plane === "CONFORMANCE" ||
