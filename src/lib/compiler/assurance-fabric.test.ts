@@ -4,6 +4,7 @@ import { compileRealityRecord } from "./reality-record-adapter.ts";
 import { sealRealityRecord } from "./reality-record.ts";
 import {
   sentinelBundleToRecord,
+  type SentinelCrossNodeReport,
   type SentinelFinalizedBlockEvidence,
   type SentinelNetworkStatus,
 } from "./sentinel-adapter.ts";
@@ -55,6 +56,54 @@ const liveNetwork: SentinelNetworkStatus = {
     ready: true,
     current_epoch: 42,
   },
+};
+
+const liveCrossNode: SentinelCrossNodeReport = {
+  target_count: 2,
+  reachable_count: 2,
+  evidence_count: 2,
+  agreeing_nodes: 2,
+  quorum_required: 2,
+  quorum_observed: true,
+  agreement_ratio: 1,
+  common_finalized_height: 18492,
+  common_block_hash: "abc123",
+  height_agreement: true,
+  hash_agreement: true,
+  missing_height_nodes: 0,
+  missing_hash_nodes: 0,
+  conflicting_nodes: 0,
+  agreement: true,
+  status: "pass",
+  verification_basis: "two targets agree; not a stake-weighted Casper finality proof",
+  observations: [
+    {
+      node_url: "http://node-a:40403",
+      reachable: true,
+      finalized_height: 18492,
+      block_hash: "abc123",
+      payload_sha256: "deadbeef-a",
+      proposer: "val_0a17",
+      signature_present: true,
+      justification_present: true,
+      full_block_available: true,
+      full_block_hash_match: true,
+      node_reported_finalized: true,
+    },
+    {
+      node_url: "http://node-b:40403",
+      reachable: true,
+      finalized_height: 18492,
+      block_hash: "abc123",
+      payload_sha256: "deadbeef-b",
+      proposer: "val_0a17",
+      signature_present: true,
+      justification_present: true,
+      full_block_available: true,
+      full_block_hash_match: true,
+      node_reported_finalized: true,
+    },
+  ],
 };
 
 function possibilityPass() {
@@ -118,6 +167,7 @@ test("live reality + possibility + conformance + recovery can produce PASS", () 
     collectedAt: "2026-09-27T00:00:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -153,6 +203,7 @@ test("a divergent live Reality Record forces the certificate to FAIL", () => {
       canonical_mismatches: ["parent_hash"],
     },
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -178,6 +229,7 @@ test("certificate integrity detects post-seal tampering", () => {
     collectedAt: "2026-09-27T00:00:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:03Z",
@@ -248,6 +300,7 @@ test("non-critical or non-passing plane entries cannot satisfy a required gate",
     collectedAt: "2026-09-27T00:02:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:02:01Z",
@@ -311,6 +364,7 @@ test("a manually forged PASS cannot satisfy a required assurance plane", () => {
     collectedAt: "2026-09-27T00:04:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:04:01Z",
@@ -360,6 +414,7 @@ test("declared network identity must match the live Sentinel observation", () =>
     collectedAt: "2026-09-27T00:05:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:05:01Z",
@@ -395,6 +450,7 @@ test("live label is insufficient when Sentinel evidence is unavailable", () => {
       error: "RNode unavailable",
     },
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -427,6 +483,7 @@ test("unreachable network status cannot satisfy the live observation gate", () =
       reachable: false,
       error: "timeout",
     },
+    crossNode: liveCrossNode,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -452,6 +509,7 @@ test("stale live evidence blocks promotion under the declared freshness budget",
     collectedAt: "2026-09-27T00:00:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:10:00Z",
@@ -475,6 +533,7 @@ test("future-dated live evidence fails freshness validation", () => {
     collectedAt: "2026-09-27T00:10:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:09:00Z",
@@ -499,6 +558,7 @@ test("certificate identity changes with issuance scope and evidence", () => {
     collectedAt: "2026-09-27T00:08:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const base = {
     freshness: { maxObservationAgeMs: 60_000 },
@@ -526,6 +586,7 @@ test("policy validator rejects a weakened serialized certificate even independen
     collectedAt: "2026-09-27T00:09:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:09:01Z",
@@ -552,6 +613,7 @@ test("a source string alone cannot impersonate the Sentinel live adapter shape",
     collectedAt: "2026-09-27T00:11:00Z",
     evidence: liveEvidence,
     network: liveNetwork,
+    crossNode: liveCrossNode,
   });
   const { integrity: _integrity, state: _state, ...payload } = valid;
   const malformed = sealRealityRecord({
