@@ -65,6 +65,7 @@ export interface AssuranceRequirements {
   requireReleaseArtifactIdentity: boolean;
   requireLiveObservation: boolean;
   requireObserverSignature: boolean;
+  requireObserverAuthorization: boolean;
   requireNetworkIdentityBinding: boolean;
   requireFreshness: boolean;
   requirePossibility: boolean;
@@ -76,9 +77,14 @@ export interface AssuranceFreshnessPolicy {
   maxObservationAgeMs: number;
 }
 
+export interface AssuranceObserverTrust {
+  authorizedKeyIds: string[];
+}
+
 export interface AssuranceFabricInput {
   issuedAt: string;
   freshness: AssuranceFreshnessPolicy;
+  observerTrust?: AssuranceObserverTrust;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   records: AssuranceRecordInput[];
@@ -103,6 +109,7 @@ export interface AssuranceRecordReference {
   label: string;
   source: string;
   sourceClass: AssuranceSourceClass;
+  observerKeyId?: string;
   sourceClassVerified: boolean;
   state: RealityRecord["state"];
   digest: string;
@@ -118,6 +125,7 @@ export interface AssuranceCertificate {
     digest: string;
   };
   freshness: AssuranceFreshnessPolicy;
+  observerTrust: AssuranceObserverTrust;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   requirements: AssuranceRequirements;
@@ -141,6 +149,7 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireReleaseArtifactIdentity: true,
   requireLiveObservation: true,
   requireObserverSignature: true,
+  requireObserverAuthorization: true,
   requireNetworkIdentityBinding: true,
   requireFreshness: true,
   requirePossibility: true,
@@ -239,6 +248,7 @@ function canonicalCertificatePayload(
     issuedAt: certificate.issuedAt,
     policy: certificate.policy,
     freshness: certificate.freshness,
+    observerTrust: certificate.observerTrust,
     release: certificate.release,
     network: certificate.network,
     requirements: certificate.requirements,
@@ -260,6 +270,35 @@ const SOURCE_CLASS_BINDINGS: Record<AssuranceSourceClass, ReadonlySet<string>> =
 
 function sourceClassVerified(input: AssuranceRecordInput): boolean {
   return SOURCE_CLASS_BINDINGS[input.sourceClass].has(input.record.source);
+}
+
+function observerKeyId(record: RealityRecord): string | null {
+  const observation = record.observations.find(
+    (item) =>
+      item.type === "AttestationSignature" &&
+      item.source === "rchain-sentinel" &&
+      typeof item.data.keyId === "string",
+  );
+  return observation && typeof observation.data.keyId === "string"
+    ? observation.data.keyId
+    : null;
+}
+
+function normalizedObserverTrust(
+  input?: AssuranceObserverTrust,
+): AssuranceObserverTrust {
+  const authorizedKeyIds = [...new Set(input?.authorizedKeyIds ?? [])]
+    .map((keyId) => keyId.toLowerCase())
+    .sort();
+  const malformed = authorizedKeyIds.filter(
+    (keyId) => !/^sha256:[0-9a-f]{64}$/.test(keyId),
+  );
+  if (malformed.length > 0) {
+    throw new Error(
+      `observerTrust contains malformed key ids: ${malformed.join(", ")}`,
+    );
+  }
+  return { authorizedKeyIds };
 }
 
 function sentinelRecordShapeVerified(record: RealityRecord): boolean {
@@ -401,6 +440,7 @@ function realityChecks(records: AssuranceRecordInput[]): {
       label: input.label,
       source: input.record.source,
       sourceClass: input.sourceClass,
+      ...(observerKeyId(input.record) ? { observerKeyId: observerKeyId(input.record)! } : {}),
       sourceClassVerified: classificationVerified,
       state: input.record.state,
       digest: input.record.integrity.recordDigest,
@@ -497,6 +537,87 @@ function observedNetworkIdentity(
     }
   }
   return identities;
+}
+
+function observerAuthorizationCheck(
+  records: AssuranceRecordInput[],
+  trust: AssuranceObserverTrust,
+): AssuranceCheck {
+  if (trust.authorizedKeyIds.length === 0) {
+    return {
+      id: "reality_observer_authorization",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No authorized Sentinel observer key ids were declared for this certificate scope.",
+      evidence: [],
+    };
+  }
+
+  const verified = records
+    .filter(
+      (record) =>
+        record.sourceClass === "LIVE_OBSERVATION" &&
+        isCryptographicallyVerifiedSentinelRecord(record.record),
+    )
+    .map((record) => ({
+      record,
+      keyId: observerKeyId(record.record),
+    }));
+
+  const missingKeyId = verified.filter((item) => !item.keyId);
+  if (missingKeyId.length > 0) {
+    return {
+      id: "reality_observer_authorization",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "A cryptographically verified Sentinel record is missing its attested observer key id.",
+      evidence: missingKeyId.map((item) => item.record.record.integrity.recordDigest),
+    };
+  }
+
+  const unauthorized = verified.filter(
+    (item) => !trust.authorizedKeyIds.includes(item.keyId!.toLowerCase()),
+  );
+  if (unauthorized.length > 0) {
+    return {
+      id: "reality_observer_authorization",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "One or more cryptographically verified Sentinel records were signed by keys outside the declared authorization set.",
+      evidence: unauthorized.map(
+        (item) => `${item.record.record.integrity.recordDigest}:key=${item.keyId}`,
+      ),
+    };
+  }
+
+  if (verified.length === 0) {
+    return {
+      id: "reality_observer_authorization",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No cryptographically verified Sentinel observation is available to satisfy the declared observer authorization policy.",
+      evidence: trust.authorizedKeyIds.map((keyId) => `authorized-key:${keyId}`),
+    };
+  }
+
+  return {
+    id: "reality_observer_authorization",
+    plane: "REALITY",
+    state: "PASS",
+    critical: true,
+    description: "All cryptographically verified Sentinel observations use keys inside the declared authorization set.",
+    evidence: verified.map(
+      (item) => `${item.record.record.integrity.recordDigest}:key=${item.keyId}`,
+    ),
+    metrics: {
+      authorizedKeyCount: trust.authorizedKeyIds.length,
+      verifiedObserverCount: verified.length,
+    },
+  };
 }
 
 function networkIdentityBindingCheck(
@@ -735,8 +856,10 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   }
 
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
+  const observerTrust = normalizedObserverTrust(input.observerTrust);
   const reality = realityChecks(input.records);
   const releaseIdentity = releaseArtifactIdentityCheck(input.release);
+  const observerAuthorization = observerAuthorizationCheck(input.records, observerTrust);
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
   const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
   const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
@@ -816,6 +939,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
         : "No live Sentinel Reality Record has runtime proof of pinned-key Ed25519 verification.",
     ),
     requiredPlaneCheck(
+      "gate_observer_authorization",
+      "REALITY",
+      requirements.requireObserverAuthorization,
+      observerAuthorization.state === "PASS",
+      observerAuthorization.description,
+    ),
+    requiredPlaneCheck(
       "gate_network_identity",
       "REALITY",
       requirements.requireNetworkIdentityBinding,
@@ -852,7 +982,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [releaseIdentity, ...reality.checks, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, ...reality.checks, observerAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
@@ -867,6 +997,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     input.network.shardId ?? "",
     input.issuedAt,
     JSON.stringify(input.freshness),
+    ...observerTrust.authorizedKeyIds,
     ...reality.references.map((record) => record.digest).sort(),
     policy.digest,
   ]).slice(0, 32)}`;
@@ -878,6 +1009,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     issuedAt: input.issuedAt,
     policy,
     freshness: input.freshness,
+    observerTrust,
     release: input.release,
     network: input.network,
     requirements,
