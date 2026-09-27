@@ -15,7 +15,7 @@ function fixture(): CausalAssuranceEcosystemManifest {
       possibility: { producer: "RCHAIN-COMPLIER", schema: "verification-artifact/v1", digest: possibility, status: "PASS" },
       observation: { producer: "rchain-sentinel", schema: "causal-assurance-evidence/v2", digest: observation, status: "PASS", bindsTo: [possibility] },
       workbench: { producer: "rlsenti", schema: "assurance-workbench/v1", digest: workbench, status: "PASS", bindsTo: [possibility, observation] },
-      attestation: { producer: "Sovereign-Lattice", schema: "causal-assurance-attestation/v1", digest: attestation, status: "PASS", bindsTo: [workbench] },
+      attestation: { producer: "Sovereign-Lattice", schema: "causal-assurance-attestation/v2", digest: attestation, status: "PASS", bindsTo: [workbench] },
     },
   };
 }
