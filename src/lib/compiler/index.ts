@@ -12,6 +12,7 @@ export * from "./build-provenance-signed-adapter.ts";
 export * from "./possibility-plane.ts";
 export * from "./lexicographic-possibility.ts";
 export * from "./multi-objective-what-if.ts";
+export * from "./ecosystem-chain.ts";
 export * from "./verification-compiler.ts";
 export * from "./finite-state-verifier.ts";
 export * from "./assurance-fabric.ts";
