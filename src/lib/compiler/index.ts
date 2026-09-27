@@ -8,6 +8,7 @@ export * from "./sentinel-adapter.ts";
 export * from "./sentinel-signed-adapter.ts";
 export * from "./native-replay-signed-adapter.ts";
 export * from "./attestation-crypto.ts";
+export * from "./build-provenance-signed-adapter.ts";
 export * from "./possibility-plane.ts";
 export * from "./assurance-fabric.ts";
 export * from "./reality-calculus.ts";
