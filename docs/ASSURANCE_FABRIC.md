@@ -57,6 +57,28 @@ The returned artifact contains:
 
 This engine deliberately makes no pushdown-system or polynomial-time claim beyond the explicit graph it receives.
 
+### Direct Casper/CBC possibility search
+
+`searchReachableCasperCounterexample()` now applies the same quantitative search discipline directly to the concrete Casper DAG model rather than only consuming a precomputed report.
+
+The declared v1 search model is `reachability-valid-parent-deletions/v1`:
+
+- the baseline must be upstream-reachable, finalizing, and have distinct bonded-sender minimum-message coverage;
+- one transition removes one parent edge;
+- after every mutation, `seen` is re-derived recursively from the parent graph, independent of message-array order;
+- states that violate the upstream reachability/admissibility screen are discarded;
+- states that lose the minimum-message count or distinct bonded-sender coverage are pruned;
+- transition costs are explicit and non-negative;
+- the goal is the minimum-cost reachable history that preserves those admission/coverage conditions but flips finalization.
+
+The assurance adapter maps outcomes fail-closed:
+
+- `COUNTEREXAMPLE_FOUND` → `FAIL`;
+- `EXHAUSTED_NO_COUNTEREXAMPLE` → `PASS` **only within this declared mutation/search model**;
+- `LIMIT_REACHED` → `BLOCKED`.
+
+This is a concrete CBC counterexample search over the harness's causal DAG semantics. It is not a claim that every network behavior can be represented by parent deletion, nor is it a substitute for the pinned upstream Rust reproducer.
+
 ## Strict policy and non-bypassable producers
 
 The default policy is identified as `rchain-revival-strict/v1`. Core requirements are monotonic: callers may not turn a required gate off.
