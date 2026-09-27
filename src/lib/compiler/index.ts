@@ -11,6 +11,7 @@ export * from "./attestation-crypto.ts";
 export * from "./build-provenance-signed-adapter.ts";
 export * from "./possibility-plane.ts";
 export * from "./assurance-fabric.ts";
+export * from "./assurance-package.ts";
 export * from "./reality-calculus.ts";
 export * from "./proposition-calculus.ts";
 export * from "./reality-proof-core.ts";
