@@ -306,3 +306,28 @@ This workflow intentionally does **not** claim a SLSA Build level by itself. Bra
 `scripts/assurance-attestation-producer.ts replay` signs a pre-existing `rchain-native-replay-attestation/v1` payload. The strict verifier still validates all replay and recovery fields after signing, including release binding, process/disk separation, checkpoint membership, state equality, recovery-log/restore-tool digests, and record chaining.
 
 The producer does not invent a recovery result. A staging restore must first produce the actual digests and recovery manifest; without those runtime artifacts the Recovery plane remains BLOCKED.
+
+
+## Operational producers and CI
+
+The repository now has an operational build-provenance path rather than verifier-only code.
+
+`.github/workflows/assurance-provenance.yml` performs two distinct trust phases:
+
+1. **Pull requests** build and test the exact PR head, create a deterministic uncompressed release tarball from the real `.vercel/output`, and upload its SHA-256 manifest. No release signing secret or OIDC attestation authority is exposed to PR code.
+2. **Trusted main/tag or manual release runs** require the externally managed Ed25519 builder seed, produce the repository's signed in-toto/SLSA envelope over that exact tarball, then create a second GitHub artifact attestation using GitHub OIDC/Sigstore and immediately verify it with `gh attestation verify`.
+
+The custom Ed25519 provenance is the format consumed by the strict Assurance Fabric gate. The GitHub/Sigstore attestation is an additional independent supply-chain statement over the same artifact; it does not silently replace the configured builder-authorization policy.
+
+### Recovery producer
+
+The Node-only attestation producer also has a `recovery` command. It does not accept hand-entered hashes for the recovery artifacts. Instead it reads and hashes:
+
+- the exact RNode binary used for replay;
+- the checkpoint file;
+- the recovery log;
+- the restore tool.
+
+It then binds those SHA-256 values, the before/after state digests, the previous Reality Record digest, distinct process/disk identities, the checkpoint source, and ordered restore timestamps into a signed `rchain-native-replay-attestation/v1`.
+
+A recovery attestation still proves only what the signer observed and signed. The staging procedure must actually use independent process and disk resources; the producer refuses equal process or disk identifiers but cannot independently prove the physical infrastructure behind those identifiers.
