@@ -110,6 +110,22 @@ function payloadFixture(): SignedSentinelAttestation["payload"] {
         },
       ],
     },
+    failure_domains: [
+      {
+        node_url: "http://node-a:40403",
+        operator_id: "operator-a",
+        provider_id: "provider-a",
+        region: "region-a",
+        failure_domain_id: "domain-a",
+      },
+      {
+        node_url: "http://node-b:40403",
+        operator_id: "operator-b",
+        provider_id: "provider-b",
+        region: "region-b",
+        failure_domain_id: "domain-b",
+      },
+    ],
   };
 }
 
@@ -205,6 +221,17 @@ test("only a cryptographically verified signed snapshot receives runtime trust",
         observation.data.signatureVerified === true,
     ),
   );
+  assert.equal(
+    record.verification.find(
+      (check) => check.id === "verify_sentinel_failure_domain_declarations",
+    )?.state,
+    "VERIFIED",
+  );
+  const topology = record.observations.find(
+    (observation) => observation.type === "FailureDomainDeclarations",
+  );
+  assert.equal(topology?.data.distinctOperators, 2);
+  assert.equal(topology?.data.distinctFailureDomains, 2);
 });
 
 
@@ -245,4 +272,29 @@ test("fetch helper fails closed when the signed endpoint is unavailable", async 
       ),
     /HTTP 503/,
   );
+});
+
+
+test("rejects signed snapshots that do not exactly cover cross-node targets", async () => {
+  const { snapshot, keyId } = await signedFixture();
+  snapshot.payload.failure_domains = snapshot.payload.failure_domains.slice(0, 1);
+  snapshot.payload_sha256 = await sentinelAttestationPayloadDigest(snapshot.payload);
+
+  const result = await verifySignedSentinelAttestation(snapshot, keyId);
+  assert.equal(result.valid, false);
+  assert.match(result.reason, /failure-domain declarations/);
+});
+
+test("rejects signed snapshots that collapse targets into one declared operator/failure domain", async () => {
+  const { snapshot, keyId } = await signedFixture();
+  snapshot.payload.failure_domains[1] = {
+    ...snapshot.payload.failure_domains[1]!,
+    operator_id: snapshot.payload.failure_domains[0]!.operator_id,
+    failure_domain_id: snapshot.payload.failure_domains[0]!.failure_domain_id,
+  };
+  snapshot.payload_sha256 = await sentinelAttestationPayloadDigest(snapshot.payload);
+
+  const result = await verifySignedSentinelAttestation(snapshot, keyId);
+  assert.equal(result.valid, false);
+  assert.match(result.reason, /distinctOperators=1/);
 });
