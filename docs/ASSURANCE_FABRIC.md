@@ -37,6 +37,8 @@ Every Reality Record is explicitly classified:
 
 A synthetic record can support development and regression testing, but it never satisfies the live-observation gate.
 
+The source class is also checked against the adapter source. In v1, a record can satisfy `LIVE_OBSERVATION` only when it comes from an explicitly trusted live adapter source (`rchain-sentinel`). Relabeling a compiler fixture as live evidence fails the certificate.
+
 ## Weighted possibility search
 
 `searchWeightedPossibility()` performs deterministic Dijkstra search on an explicit finite state graph with non-negative transition costs.
@@ -58,9 +60,9 @@ This engine deliberately makes no pushdown-system or polynomial-time claim beyon
 Default promotion requirements are:
 
 - at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
-- at least one Possibility check;
-- at least one Conformance check;
-- at least one Recovery check.
+- at least one **critical PASS** Possibility check;
+- at least one **critical PASS** Conformance check;
+- at least one **critical PASS** Recovery check.
 
 Overall status:
 
@@ -68,7 +70,7 @@ Overall status:
 - otherwise any critical `BLOCKED` / `NOT_TESTED` -> `BLOCKED`
 - otherwise -> `PASS`
 
-Optional/non-critical work can remain `NOT_TESTED` without hiding a failed critical condition.
+Optional/non-critical work can remain `NOT_TESTED` without hiding a failed critical condition. A placeholder, non-critical, blocked, failed, or not-tested check does not satisfy a required plane gate.
 
 ## Intended integration
 
@@ -93,7 +95,9 @@ restart / restore --------------+----> RECOVERY
                        Assurance Certificate
 ```
 
-The certificate stores release identity, network/genesis identity, source-classified Reality Record digests, all gate results, and its own SHA-256 integrity digest.
+The certificate stores release identity, network/genesis identity, source-classified Reality Record digests, all gate results, and its own SHA-256 integrity digest. Certificate canonicalization sorts object keys recursively before hashing, so semantically identical metadata is not sensitive to object insertion order.
+
+Recovery checks are stricter than digest equality: the helper requires an independent process, independent disk, and a trusted checkpoint in addition to matching pre/post recovery digests. A same-runtime or same-disk "restore" is therefore BLOCKED rather than promoted.
 
 ## Review boundary
 
