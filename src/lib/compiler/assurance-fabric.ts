@@ -766,6 +766,30 @@ function realityChecks(records: AssuranceRecordInput[]): {
     });
 
     if (input.sourceClass === "LIVE_OBSERVATION") {
+      const challengeBound = isChallengeVerifiedSentinelRecord(input.record);
+      const attestation = input.record.observations.find(
+        (observation) =>
+          observation.type === "AttestationSignature" &&
+          observation.source === "rchain-sentinel",
+      );
+      const challengeNonce =
+        typeof attestation?.data.challengeNonce === "string"
+          ? attestation.data.challengeNonce
+          : null;
+      checks.push({
+        id: `reality_live_challenge:${input.record.id}`,
+        plane: "REALITY",
+        state: challengeBound ? "PASS" : "BLOCKED",
+        critical: true,
+        description: challengeBound
+          ? `${input.label}: signed Sentinel payload matched the verifier-selected anti-replay challenge.`
+          : `${input.label}: signed Sentinel payload was not runtime-bound to the verifier-selected anti-replay challenge.`,
+        evidence: [
+          input.record.integrity.recordDigest,
+          ...(challengeNonce ? [`challenge:${challengeNonce}`] : []),
+        ],
+      });
+
       const quality = liveEvidenceQuality(input);
       checks.push({
         id: `reality_live_quality:${input.record.id}`,
