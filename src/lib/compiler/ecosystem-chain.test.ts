@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sha256Artifact, validateEcosystemChain, type CausalAssuranceEcosystemManifest } from "./ecosystem-chain.ts";
+import { runTamperMatrix, sha256Artifact, validateEcosystemChain, type CausalAssuranceEcosystemManifest } from "./ecosystem-chain.ts";
 
 function fixture(): CausalAssuranceEcosystemManifest {
   const possibility = sha256Artifact("minimum-witness");
@@ -34,4 +34,13 @@ test("fails closed if any stage is not PASS", () => {
   const manifest = fixture();
   manifest.artifacts.workbench.status = "BLOCKED";
   assert.equal(validateEcosystemChain(manifest).status, "BLOCKED");
+});
+
+test("every declared cross-repository tamper boundary fails closed", () => {
+  const results = runTamperMatrix(fixture());
+  assert.deepEqual(
+    results.map((result) => result.boundary),
+    ["POSSIBILITY_DIGEST", "OBSERVATION_BINDING", "WORKBENCH_BINDING", "ATTESTATION_BINDING", "PROVENANCE_TRUST"],
+  );
+  assert.ok(results.every((result) => result.observed === "BLOCKED"));
 });
