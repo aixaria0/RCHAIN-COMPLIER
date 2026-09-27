@@ -205,6 +205,71 @@ function sourceClassVerified(input: AssuranceRecordInput): boolean {
   return true;
 }
 
+function liveEvidenceQuality(input: AssuranceRecordInput): {
+  valid: boolean;
+  description: string;
+  evidence: string[];
+} {
+  if (input.sourceClass !== "LIVE_OBSERVATION" || input.record.source !== "rchain-sentinel") {
+    return {
+      valid: false,
+      description: "Record is not a trusted rchain-sentinel live observation.",
+      evidence: [],
+    };
+  }
+
+  const verificationById = new Map(
+    input.record.verification.map((verification) => [verification.id, verification]),
+  );
+  const requiredVerificationIds = [
+    "verify_sentinel_payload_available",
+    "verify_sentinel_canonical_consistency",
+    "verify_sentinel_finality_hash",
+  ];
+  const missingOrUnverified = requiredVerificationIds.filter(
+    (id) => verificationById.get(id)?.state !== "VERIFIED",
+  );
+
+  const block = input.record.observations.find(
+    (observation) => observation.type === "FinalizedBlockEvidence",
+  );
+  const network = input.record.observations.find(
+    (observation) => observation.type === "NetworkStatus",
+  );
+  const blockData = block?.data ?? {};
+  const networkData = network?.data ?? {};
+
+  const blockEvidenceComplete =
+    blockData.available === true &&
+    blockData.fullBlockAvailable === true &&
+    blockData.finalityHashMatch === true &&
+    blockData.canonicalConsistency === true &&
+    blockData.nodeReportedFinalized === true;
+  const networkReachable = networkData.reachable === true;
+
+  const valid =
+    verifyRealityRecordIntegrity(input.record) &&
+    missingOrUnverified.length === 0 &&
+    blockEvidenceComplete &&
+    networkReachable;
+
+  const evidence = [
+    ...(block ? [block.id] : []),
+    ...(network ? [network.id] : []),
+    ...requiredVerificationIds.map(
+      (id) => `${id}:${verificationById.get(id)?.state ?? "MISSING"}`,
+    ),
+  ];
+
+  return {
+    valid,
+    description: valid
+      ? "Live Sentinel evidence is integrity-valid, network-reachable, canonically consistent, and node-finalized with a matching full-block identity."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}.`,
+    evidence,
+  };
+}
+
 function realityChecks(records: AssuranceRecordInput[]): {
   references: AssuranceRecordReference[];
   checks: AssuranceCheck[];
@@ -236,6 +301,18 @@ function realityChecks(records: AssuranceRecordInput[]): {
         : `${input.label}: source ${input.record.source} cannot be promoted as ${input.sourceClass}.`,
       evidence: [input.record.source],
     });
+
+    if (input.sourceClass === "LIVE_OBSERVATION") {
+      const quality = liveEvidenceQuality(input);
+      checks.push({
+        id: `reality_live_quality:${input.record.id}`,
+        plane: "REALITY",
+        state: quality.valid ? "PASS" : "BLOCKED",
+        critical: true,
+        description: quality.description,
+        evidence: quality.evidence,
+      });
+    }
 
     checks.push({
       id: `reality_integrity:${input.record.id}`,
@@ -456,13 +533,14 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     };
   });
 
-  const hasLiveObservation = reality.references.some(
-    (record) =>
-      record.sourceClass === "LIVE_OBSERVATION" &&
-      record.sourceClassVerified &&
-      record.integrityValid &&
-      record.state !== "DIVERGENT",
-  );
+  const hasLiveObservation = input.records.some((record) => {
+    if (
+      record.sourceClass !== "LIVE_OBSERVATION" ||
+      !sourceClassVerified(record) ||
+      !verifyRealityRecordIntegrity(record.record)
+    ) return false;
+    return liveEvidenceQuality(record).valid;
+  });
   const hasPossibility = suppliedChecks.some(
     (check) =>
       check.plane === "POSSIBILITY" &&
