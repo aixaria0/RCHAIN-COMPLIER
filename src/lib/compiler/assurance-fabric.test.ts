@@ -613,6 +613,11 @@ test("policy validator rejects a weakened serialized certificate even independen
   weakened.requirements.requireRecovery = false;
   assert.equal(verifyAssuranceCertificatePolicy(weakened), false);
   assert.equal(validateAssuranceCertificate(weakened).valid, false);
+
+  const stripped = structuredClone(certificate);
+  stripped.limitations = stripped.limitations.slice(1);
+  assert.equal(verifyAssuranceCertificatePolicy(stripped), false);
+  assert.equal(validateAssuranceCertificate(stripped).valid, false);
 });
 
 
