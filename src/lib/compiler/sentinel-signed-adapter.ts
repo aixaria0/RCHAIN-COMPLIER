@@ -45,6 +45,7 @@ export interface SignedSentinelAttestation {
   payload: {
     schema: typeof SENTINEL_ATTESTATION_SCHEMA;
     collected_at_unix_ms: number;
+    challenge_nonce: string;
     network: SentinelNetworkStatus;
     genesis: SentinelGenesisEvidence;
     finalized_block: SentinelFinalizedBlockEvidence;
@@ -167,9 +168,20 @@ function validateFailureDomainDeclarations(
   };
 }
 
+function isChallengeNonce(value: string): boolean {
+  return /^[0-9a-f]{64}$/.test(value);
+}
+
+function generateChallengeNonce(): string {
+  const bytes = new Uint8Array(32);
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export async function verifySignedSentinelAttestation(
   snapshot: SignedSentinelAttestation,
   expectedKeyId: string,
+  expectedChallengeNonce?: string,
 ): Promise<SentinelAttestationVerification> {
   if (snapshot.schema !== SENTINEL_ATTESTATION_SCHEMA) {
     return {
@@ -184,6 +196,25 @@ export async function verifySignedSentinelAttestation(
       valid: false,
       keyId: null,
       reason: "unexpected payload schema",
+      payloadDigest: null,
+    };
+  }
+  if (!isChallengeNonce(snapshot.payload.challenge_nonce)) {
+    return {
+      valid: false,
+      keyId: null,
+      reason: "Sentinel challenge nonce must be exactly 32 bytes of lowercase hexadecimal",
+      payloadDigest: null,
+    };
+  }
+  if (
+    expectedChallengeNonce !== undefined &&
+    snapshot.payload.challenge_nonce !== expectedChallengeNonce
+  ) {
+    return {
+      valid: false,
+      keyId: null,
+      reason: "signed Sentinel challenge nonce does not match the verifier request",
       payloadDigest: null,
     };
   }
@@ -222,10 +253,12 @@ export async function signedSentinelAttestationToRecord(args: {
   snapshot: SignedSentinelAttestation;
   sentinelBaseUrl: string;
   expectedKeyId: string;
+  expectedChallengeNonce?: string;
 }): Promise<RealityRecord> {
   const verification = await verifySignedSentinelAttestation(
     args.snapshot,
     args.expectedKeyId,
+    args.expectedChallengeNonce,
   );
   if (!verification.valid || !verification.keyId || !verification.payloadDigest) {
     throw new Error(`Sentinel attestation rejected: ${verification.reason}`);
@@ -312,6 +345,10 @@ export async function signedSentinelAttestationToRecord(args: {
           algorithm: args.snapshot.signature.algorithm,
           keyId: verification.keyId,
           payloadDigest: verification.payloadDigest,
+          challengeNonce: args.snapshot.payload.challenge_nonce,
+          challengeVerified:
+            args.expectedChallengeNonce === undefined ||
+            args.snapshot.payload.challenge_nonce === args.expectedChallengeNonce,
           signatureVerified: true,
         },
       },
@@ -402,12 +439,16 @@ export function isCryptographicallyVerifiedSentinelRecord(
 export async function fetchSignedSentinelRealityRecord(
   sentinelBaseUrl: string,
   expectedKeyId: string,
-  options: { fetchImpl?: typeof fetch } = {},
+  options: { fetchImpl?: typeof fetch; challengeNonce?: string } = {},
 ): Promise<RealityRecord> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const base = sentinelBaseUrl.replace(/\/+$/, "");
+  const challengeNonce = options.challengeNonce ?? generateChallengeNonce();
+  if (!isChallengeNonce(challengeNonce)) {
+    throw new Error("Sentinel challenge nonce must be exactly 32 bytes of lowercase hexadecimal");
+  }
   const response = await fetchImpl(
-    `${base}${SENTINEL_ENDPOINTS.attestationSnapshot}`,
+    `${base}${SENTINEL_ENDPOINTS.attestationSnapshot}?nonce=${encodeURIComponent(challengeNonce)}`,
   );
   if (!response.ok) {
     throw new Error(
@@ -420,5 +461,6 @@ export async function fetchSignedSentinelRealityRecord(
     snapshot,
     sentinelBaseUrl: base,
     expectedKeyId,
+    expectedChallengeNonce: challengeNonce,
   });
 }
