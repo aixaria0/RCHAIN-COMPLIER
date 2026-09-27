@@ -79,8 +79,8 @@ Default promotion requirements are:
 - a matching live Sentinel network identity (`networkId` + `shardId`);
 - promotion-grade live evidence inside the declared freshness budget;
 - at least one **trusted, critical PASS** Possibility check;
-- at least one **trusted, critical PASS** Conformance check;
-- at least one **trusted, critical PASS** Recovery check.
+- at least one **trusted, critical PASS** Conformance check derived from an integrity-valid `rchain-rust-native-replay` Reality Record;
+- at least one **trusted, critical PASS** Recovery check derived from a chained before/after native-replay record pair with stable subject identity, matching recovered state, distinct process/disk identifiers, and a trusted checkpoint.
 
 Overall status:
 
@@ -145,3 +145,12 @@ Every certificate carries explicit limitations inside the hashed payload. v1 sta
 - bounded possibility search applies only to its declared model/search scope.
 
 These limitations remain present even on a `PASS` certificate so consumers cannot infer stronger guarantees from the status than the evidence supports.
+
+
+## Record-bound conformance and recovery
+
+Free-form digest comparison helpers remain available for diagnostics, but they are intentionally **not** trusted producers under `rchain-revival-strict/v1` and therefore cannot satisfy the Conformance or Recovery promotion gates.
+
+Promotion-grade conformance is derived from a sealed `rchain-rust-native-replay` Reality Record whose replay is complete and reproduced. Promotion-grade recovery is derived from two integrity-valid native-replay records where the after-record links to the before-record digest, the subject identity is unchanged, recovered state matches the pre-recovery state, and the recovery context demonstrates a different process and disk plus a trusted checkpoint.
+
+This still does not authenticate who produced the native-replay record; signer authenticity remains an explicitly recorded limitation.
