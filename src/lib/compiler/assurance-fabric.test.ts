@@ -205,6 +205,8 @@ const TEST_NATIVE_KEY_ID = await nativeReplayAttestationPublicKeyId(
 const TEST_STATE_DIGEST = `sha256:${"d".repeat(64)}`;
 const TEST_INPUT_DIGEST = `sha256:${"e".repeat(64)}`;
 const TEST_CHECKPOINT_DIGEST = `sha256:${"f".repeat(64)}`;
+const TEST_RECOVERY_LOG_DIGEST = `sha256:${"3".repeat(64)}`;
+const TEST_RESTORE_TOOL_DIGEST = `sha256:${"4".repeat(64)}`;
 
 async function signedBuildProvenance() {
   const payload: BuildProvenanceAttestationPayload = {
@@ -323,6 +325,10 @@ async function signedNativeReplayPair() {
   const afterPayload: NativeReplayAttestationPayload = {
     ...beforePayload,
     collected_at_unix_ms: Date.parse("2026-09-27T00:00:01Z"),
+    replay: {
+      ...beforePayload.replay,
+      input_digests: [TEST_INPUT_DIGEST, TEST_CHECKPOINT_DIGEST],
+    },
     recovery: {
       previous_record_digest: before.integrity.recordDigest,
       pre_process_id: "proc-before",
@@ -331,6 +337,11 @@ async function signedNativeReplayPair() {
       recovered_disk_id: "disk-after",
       checkpoint_digest: TEST_CHECKPOINT_DIGEST,
       checkpoint_trusted: true,
+      checkpoint_source: "file:///staging/checkpoint-42.tar.zst",
+      recovery_log_digest: TEST_RECOVERY_LOG_DIGEST,
+      restore_tool_digest: TEST_RESTORE_TOOL_DIGEST,
+      started_at_unix_ms: Date.parse("2026-09-27T00:00:00Z"),
+      finished_at_unix_ms: Date.parse("2026-09-27T00:00:01Z"),
     },
   };
   const after = await signNativePayload(afterPayload);
