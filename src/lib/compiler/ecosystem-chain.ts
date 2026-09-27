@@ -12,7 +12,7 @@ export interface CrossRepoArtifact {
 }
 
 export interface CausalAssuranceEcosystemManifest {
-  schema: "causal-assurance-ecosystem/v1";
+  schema: "causal-assurance-ecosystem/v2";
   runId: string;
   subject: { kind: string; id: string };
   artifacts: {
@@ -60,7 +60,7 @@ export function validateEcosystemChain(
   policy: EcosystemValidationPolicy = {},
 ): { status: "PASS" | "BLOCKED"; reason: string } {
   if (
-    manifest.schema !== "causal-assurance-ecosystem/v1"
+    manifest.schema !== "causal-assurance-ecosystem/v2"
     || !manifest.runId
     || !manifest.subject.kind
     || !manifest.subject.id
