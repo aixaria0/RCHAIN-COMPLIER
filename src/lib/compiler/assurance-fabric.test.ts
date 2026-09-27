@@ -19,6 +19,19 @@ import {
   verifyAssuranceCertificatePolicy,
 } from "./assurance-fabric.ts";
 
+const RELEASE_COMMIT = "a".repeat(40);
+const RELEASE_BINARY = `sha256:${"b".repeat(64)}`;
+const RELEASE_PROVENANCE = `sha256:${"c".repeat(64)}`;
+
+function releaseIdentity(repository = "rchain-community/rchain-rust") {
+  return {
+    repository,
+    commit: RELEASE_COMMIT,
+    binaryDigest: RELEASE_BINARY,
+    buildProvenance: RELEASE_PROVENANCE,
+  };
+}
+
 const liveEvidence: SentinelFinalizedBlockEvidence = {
   available: true,
   raw: { blockHash: "abc123", height: 18492 },
@@ -147,7 +160,7 @@ test("synthetic evidence cannot promote a certificate through the live gate", ()
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "aixaria0/RCHAIN-COMPLIER", commit: "deadbeef" },
+    release: releaseIdentity("aixaria0/RCHAIN-COMPLIER"),
     network: { genesis: "genesis:test" },
     records: [{ label: "synthetic fixture", sourceClass: "SYNTHETIC", record: synthetic }],
     checks: commonChecks(),
@@ -173,11 +186,7 @@ test("live reality + possibility + conformance + recovery can produce PASS", () 
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: {
-      repository: "rchain-community/rchain-rust",
-      commit: "pinned-rust-commit",
-      binaryDigest: "sha256:binary",
-    },
+    release: releaseIdentity(),
     network: {
       genesis: "genesis:test",
       networkId: "testnet",
@@ -209,7 +218,7 @@ test("a divergent live Reality Record forces the certificate to FAIL", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:02Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test" },
     records: [{ label: "divergent live observation", sourceClass: "LIVE_OBSERVATION", record: divergent }],
     checks: commonChecks(),
@@ -234,7 +243,7 @@ test("certificate integrity detects post-seal tampering", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:03Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: commonChecks(),
@@ -280,7 +289,7 @@ test("mislabeling a synthetic record as LIVE_OBSERVATION fails closed", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:01:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "aixaria0/RCHAIN-COMPLIER", commit: "deadbeef" },
+    release: releaseIdentity("aixaria0/RCHAIN-COMPLIER"),
     network: { genesis: "genesis:test" },
     records: [{ label: "spoofed live source", sourceClass: "LIVE_OBSERVATION", record: synthetic }],
     checks: commonChecks(),
@@ -305,7 +314,7 @@ test("non-critical or non-passing plane entries cannot satisfy a required gate",
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:02:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: [
@@ -348,7 +357,7 @@ test("strict revival policy cannot be weakened by the caller", () => {
       buildAssuranceCertificate({
         issuedAt: "2026-09-27T00:03:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
-        release: { repository: "aixaria0/RCHAIN-COMPLIER", commit: "deadbeef" },
+        release: releaseIdentity("aixaria0/RCHAIN-COMPLIER"),
         network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
         records: [],
         checks: [],
@@ -369,7 +378,7 @@ test("a manually forged PASS cannot satisfy a required assurance plane", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:04:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: [
@@ -419,7 +428,7 @@ test("declared network identity must match the live Sentinel observation", () =>
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:05:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "wrong-network", shardId: "root" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: commonChecks(),
@@ -456,7 +465,7 @@ test("live label is insufficient when Sentinel evidence is unavailable", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:06:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "unavailable live source", sourceClass: "LIVE_OBSERVATION", record: unavailable }],
     checks: commonChecks(),
@@ -489,7 +498,7 @@ test("unreachable network status cannot satisfy the live observation gate", () =
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:07:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "unreachable live source", sourceClass: "LIVE_OBSERVATION", record: unreachable }],
     checks: commonChecks(),
@@ -514,7 +523,7 @@ test("stale live evidence blocks promotion under the declared freshness budget",
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:10:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "stale live", sourceClass: "LIVE_OBSERVATION", record: stale }],
     checks: commonChecks(),
@@ -538,7 +547,7 @@ test("future-dated live evidence fails freshness validation", () => {
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:09:00Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "future live", sourceClass: "LIVE_OBSERVATION", record: future }],
     checks: commonChecks(),
@@ -562,7 +571,7 @@ test("certificate identity changes with issuance scope and evidence", () => {
   });
   const base = {
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION" as const, record: live }],
     checks: commonChecks(),
@@ -591,7 +600,7 @@ test("policy validator rejects a weakened serialized certificate even independen
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:09:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: commonChecks(),
@@ -627,7 +636,7 @@ test("a source string alone cannot impersonate the Sentinel live adapter shape",
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:11:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
-    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    release: releaseIdentity(),
     network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
     records: [{ label: "malformed live", sourceClass: "LIVE_OBSERVATION", record: malformed }],
     checks: commonChecks(),
@@ -642,4 +651,37 @@ test("a source string alone cannot impersonate the Sentinel live adapter shape",
     "BLOCKED",
   );
   assert.equal(certificate.status, "BLOCKED");
+});
+
+
+test("missing binary or provenance identity blocks strict promotion", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:12:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+    crossNode: liveCrossNode,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:12:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: {
+      repository: "rchain-community/rchain-rust",
+      commit: RELEASE_COMMIT,
+    },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "supply_chain_release_identity")?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_release_artifact_identity")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
+  assert.ok(certificate.limitations.some((item) => item.includes("not signer authenticity")));
 });
