@@ -42,6 +42,12 @@ export interface AssuranceReleaseIdentity {
   commit: string;
   binaryDigest?: string;
   buildProvenance?: string;
+  provenance?: {
+    sourceCommit: string;
+    subjectDigest: string;
+    builderId: string;
+    invocationId?: string;
+  };
 }
 
 export interface AssuranceNetworkIdentity {
@@ -1341,6 +1347,40 @@ function requiredPlaneCheck(
   };
 }
 
+function liveNetworkIdentityMatches(
+  record: AssuranceRecordInput,
+  network: AssuranceNetworkIdentity,
+): boolean {
+  if (record.sourceClass !== "LIVE_OBSERVATION" || record.record.source !== "rchain-sentinel") {
+    return false;
+  }
+  const networkObservations = record.record.observations.filter(
+    (observation) => observation.source === "rchain-sentinel" && observation.type === "NetworkStatus",
+  );
+  return networkObservations.some((observation) => {
+    const rnode = observation.data.rnode as
+      | { network_id?: string | null; shard_id?: string | null; current_epoch?: number | null }
+      | null
+      | undefined;
+    if (!rnode) return false;
+    if (network.networkId && rnode.network_id !== network.networkId) return false;
+    if (network.shardId && rnode.shard_id !== network.shardId) return false;
+    if (network.epoch !== undefined && String(rnode.current_epoch) !== String(network.epoch)) return false;
+    return Boolean(network.networkId || network.shardId || network.epoch !== undefined);
+  });
+}
+
+function buildProvenanceValid(release: AssuranceReleaseIdentity): boolean {
+  const provenance = release.provenance;
+  if (!provenance) return false;
+  if (!release.binaryDigest) return false;
+  return (
+    provenance.sourceCommit === release.commit &&
+    provenance.subjectDigest === release.binaryDigest &&
+    provenance.builderId.length > 0
+  );
+}
+
 function summarize(checks: AssuranceCheck[]): AssuranceCertificate["summary"] {
   return {
     pass: checks.filter((check) => check.state === "PASS").length,
@@ -1538,6 +1578,24 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       requirements.requireFreshness,
       freshness.state === "PASS",
       freshness.description,
+    ),
+    requiredPlaneCheck(
+      "gate_network_identity",
+      "REALITY",
+      requirements.requireNetworkIdentityBinding,
+      networkIdentityBound,
+      networkIdentityBound
+        ? "Declared network identity is bound to a live Sentinel NetworkStatus observation."
+        : "Declared network identity is not bound to a matching live Sentinel NetworkStatus observation.",
+    ),
+    requiredPlaneCheck(
+      "gate_build_provenance",
+      "CONFORMANCE",
+      requirements.requireBuildProvenance,
+      provenanceValid,
+      provenanceValid
+        ? "Build provenance binds the declared source commit to the declared binary digest."
+        : "Build provenance is missing or does not bind source commit to binary digest.",
     ),
     requiredPlaneCheck(
       "gate_possibility",
