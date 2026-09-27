@@ -76,14 +76,37 @@ export function removeParentAndRecomputeSeen(
   }));
 
   const byId = new Map(messages.map((message) => [message.id, message]));
-  for (const message of messages) {
-    const seen = new Set<string>([message.id]);
+  const memo = new Map<string, string[]>();
+  const visiting = new Set<string>();
+
+  const deriveSeen = (id: string): string[] => {
+    const cached = memo.get(id);
+    if (cached) return cached;
+
+    if (visiting.has(id)) {
+      throw new Error(`cannot derive seen set for cyclic DAG at message ${id}`);
+    }
+    const message = byId.get(id);
+    if (!message) {
+      throw new Error(`cannot derive seen set for missing message ${id}`);
+    }
+
+    visiting.add(id);
+    const seen = new Set<string>([id]);
     for (const currentParentId of message.parents) {
       const parent = byId.get(currentParentId);
       if (!parent) continue;
-      for (const seenId of parent.seen) seen.add(seenId);
+      for (const seenId of deriveSeen(parent.id)) seen.add(seenId);
     }
-    message.seen = [...seen].sort();
+    visiting.delete(id);
+
+    const derived = [...seen].sort();
+    memo.set(id, derived);
+    return derived;
+  };
+
+  for (const message of messages) {
+    message.seen = deriveSeen(message.id);
   }
 
   return {
