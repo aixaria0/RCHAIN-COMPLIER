@@ -44,7 +44,12 @@ export function canonicalPackageRoot(pkg: PortableAssurancePackage): string {
 
 export function signedPackageSignerKeyId(publicKeyPem: string): string {
   const der = createPublicKey(publicKeyPem).export({ type: "spki", format: "der" });
-  return sha256Bytes(der);
+  const ed25519SpkiPrefix = Buffer.from("302a300506032b6570032100", "hex");
+  if (der.length !== ed25519SpkiPrefix.length + 32 || !der.subarray(0, ed25519SpkiPrefix.length).equals(ed25519SpkiPrefix)) {
+    throw new Error("public key is not canonical Ed25519 SPKI");
+  }
+  // Match the repository-wide attestation convention: key id = SHA-256(raw 32-byte Ed25519 public key).
+  return sha256Bytes(der.subarray(ed25519SpkiPrefix.length));
 }
 
 function signatureMaterial(packageRoot: string, keyId: string): Buffer {
