@@ -50,7 +50,9 @@ function canonicalize(value: unknown): unknown {
   return value;
 }
 
-function canonicalPayloadBytes(payload: SignedSentinelAttestation["payload"]): Uint8Array {
+export function sentinelAttestationPayloadBytes(
+  payload: SignedSentinelAttestation["payload"],
+): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(canonicalize(payload)));
 }
 
@@ -84,6 +86,28 @@ function bytesToHex(value: ArrayBuffer | Uint8Array): string {
 async function sha256(value: Uint8Array): Promise<string> {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", value);
   return `sha256:${bytesToHex(digest)}`;
+}
+
+export function sentinelAttestationSigningBytes(
+  payload: SignedSentinelAttestation["payload"],
+): Uint8Array {
+  return signingMessage(sentinelAttestationPayloadBytes(payload));
+}
+
+export async function sentinelAttestationPublicKeyId(
+  publicKeyHex: string,
+): Promise<string> {
+  const publicKey = hexToBytes(publicKeyHex);
+  if (publicKey.length !== 32) {
+    throw new Error("Ed25519 public key must contain exactly 32 bytes");
+  }
+  return sha256(publicKey);
+}
+
+export async function sentinelAttestationPayloadDigest(
+  payload: SignedSentinelAttestation["payload"],
+): Promise<string> {
+  return sha256(sentinelAttestationPayloadBytes(payload));
 }
 
 function signingMessage(payloadBytes: Uint8Array): Uint8Array {
@@ -130,7 +154,7 @@ export async function verifySignedSentinelAttestation(
       return { valid: false, keyId, reason: "Sentinel signer key id is not the pinned expected key", payloadDigest: null };
     }
 
-    const payloadBytes = canonicalPayloadBytes(snapshot.payload);
+    const payloadBytes = sentinelAttestationPayloadBytes(snapshot.payload);
     const payloadDigest = await sha256(payloadBytes);
     if (payloadDigest.toLowerCase() !== snapshot.payload_sha256.toLowerCase()) {
       return { valid: false, keyId, reason: "canonical payload digest mismatch", payloadDigest };
