@@ -139,10 +139,7 @@ function dependencyMatchesRelease(
   if (typeof dependency.uri !== "string") return false;
   const normalizedUri = normalizeRepository(dependency.uri);
   const normalizedRepository = normalizeRepository(repository);
-  return (
-    normalizedUri === normalizedRepository ||
-    normalizedUri.includes(normalizedRepository)
-  );
+  return normalizedUri === normalizedRepository;
 }
 
 function validatePayload(
