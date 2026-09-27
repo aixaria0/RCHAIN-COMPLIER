@@ -336,6 +336,7 @@ test("live reality + possibility + conformance + recovery can produce PASS", asy
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:01Z",
     freshness: { maxObservationAgeMs: 60_000 },
+    observerTrust: { authorizedKeyIds: [TEST_OBSERVER_KEY_ID] },
     release: releaseIdentity(),
     network: {
       genesis: "genesis:test",
@@ -976,4 +977,40 @@ test("unsigned live Sentinel evidence cannot satisfy the observer-signature gate
     "BLOCKED",
   );
   assert.equal(certificate.status, "BLOCKED");
+});
+
+
+test("validly signed Sentinel evidence from an unauthorized observer key fails", async () => {
+  const live = await signedLiveRecord("2026-09-27T00:16:00Z");
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:16:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    observerTrust: { authorizedKeyIds: [`sha256:${"0".repeat(64)}`] },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "signed but unauthorized", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "reality_observer_authorization")?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
+});
+
+test("observer trust key ids must use canonical sha256 fingerprints", () => {
+  assert.throws(
+    () =>
+      buildAssuranceCertificate({
+        issuedAt: "2026-09-27T00:17:00Z",
+        freshness: { maxObservationAgeMs: 60_000 },
+        observerTrust: { authorizedKeyIds: ["not-a-key"] },
+        release: releaseIdentity(),
+        network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+        records: [],
+        checks: [],
+      }),
+    /malformed key ids/,
+  );
 });
