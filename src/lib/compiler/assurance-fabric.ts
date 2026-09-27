@@ -90,6 +90,7 @@ export interface AssuranceRecordReference {
   label: string;
   source: string;
   sourceClass: AssuranceSourceClass;
+  sourceClassVerified: boolean;
   state: RealityRecord["state"];
   digest: string;
   integrityValid: boolean;
@@ -124,10 +125,22 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireRecovery: true,
 };
 
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalize(item)]),
+    );
+  }
+  return value;
+}
+
 function canonicalCertificatePayload(
   certificate: Omit<AssuranceCertificate, "integrity">,
 ): string {
-  return JSON.stringify({
+  return JSON.stringify(canonicalize({
     schema: certificate.schema,
     id: certificate.id,
     issuedAt: certificate.issuedAt,
@@ -138,7 +151,19 @@ function canonicalCertificatePayload(
     checks: certificate.checks,
     status: certificate.status,
     summary: certificate.summary,
-  });
+  }));
+}
+
+const TRUSTED_LIVE_RECORD_SOURCES = new Set(["rchain-sentinel"]);
+
+function sourceClassVerified(input: AssuranceRecordInput): boolean {
+  if (input.sourceClass === "LIVE_OBSERVATION") {
+    return TRUSTED_LIVE_RECORD_SOURCES.has(input.record.source);
+  }
+  if (input.record.source === "rchain-reality-compiler") {
+    return input.sourceClass === "SYNTHETIC";
+  }
+  return true;
 }
 
 function realityChecks(records: AssuranceRecordInput[]): {
@@ -150,14 +175,27 @@ function realityChecks(records: AssuranceRecordInput[]): {
 
   for (const input of records) {
     const integrityValid = verifyRealityRecordIntegrity(input.record);
+    const classificationVerified = sourceClassVerified(input);
     references.push({
       id: input.record.id,
       label: input.label,
       source: input.record.source,
       sourceClass: input.sourceClass,
+      sourceClassVerified: classificationVerified,
       state: input.record.state,
       digest: input.record.integrity.recordDigest,
       integrityValid,
+    });
+
+    checks.push({
+      id: `reality_source_class:${input.record.id}`,
+      plane: "REALITY",
+      state: classificationVerified ? "PASS" : "FAIL",
+      critical: true,
+      description: classificationVerified
+        ? `${input.label}: evidence source classification is bound to an allowed adapter source.`
+        : `${input.label}: source ${input.record.source} cannot be promoted as ${input.sourceClass}.`,
+      evidence: [input.record.source],
     });
 
     checks.push({
@@ -256,12 +294,19 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   const hasLiveObservation = reality.references.some(
     (record) =>
       record.sourceClass === "LIVE_OBSERVATION" &&
+      record.sourceClassVerified &&
       record.integrityValid &&
       record.state !== "DIVERGENT",
   );
-  const hasPossibility = suppliedChecks.some((check) => check.plane === "POSSIBILITY");
-  const hasConformance = suppliedChecks.some((check) => check.plane === "CONFORMANCE");
-  const hasRecovery = suppliedChecks.some((check) => check.plane === "RECOVERY");
+  const hasPossibility = suppliedChecks.some(
+    (check) => check.plane === "POSSIBILITY" && check.critical && check.state === "PASS",
+  );
+  const hasConformance = suppliedChecks.some(
+    (check) => check.plane === "CONFORMANCE" && check.critical && check.state === "PASS",
+  );
+  const hasRecovery = suppliedChecks.some(
+    (check) => check.plane === "RECOVERY" && check.critical && check.state === "PASS",
+  );
 
   const gates: AssuranceCheck[] = [
     requiredPlaneCheck(
@@ -420,23 +465,37 @@ export function recoveryCheckFromDigests(args: {
   description: string;
   preRecoveryDigest?: string | null;
   recoveredDigest?: string | null;
+  independentProcess?: boolean;
+  independentDisk?: boolean;
+  checkpointTrusted?: boolean;
   critical?: boolean;
 }): AssuranceCheckInput {
   const complete = Boolean(args.preRecoveryDigest && args.recoveredDigest);
+  const methodologyComplete =
+    args.independentProcess === true &&
+    args.independentDisk === true &&
+    args.checkpointTrusted === true;
   const match = complete && args.preRecoveryDigest === args.recoveredDigest;
   return {
     id: args.id,
     plane: "RECOVERY",
-    state: !complete ? "BLOCKED" : match ? "PASS" : "FAIL",
+    state: !complete || !methodologyComplete ? "BLOCKED" : match ? "PASS" : "FAIL",
     critical: args.critical ?? true,
     description: args.description,
     evidence: [
       ...(args.preRecoveryDigest ? [`pre-recovery:${args.preRecoveryDigest}`] : []),
       ...(args.recoveredDigest ? [`recovered:${args.recoveredDigest}`] : []),
+      `independent-process:${args.independentProcess === true}`,
+      `independent-disk:${args.independentDisk === true}`,
+      `checkpoint-trusted:${args.checkpointTrusted === true}`,
     ],
     metrics: {
       match,
       complete,
+      methodologyComplete,
+      independentProcess: args.independentProcess === true,
+      independentDisk: args.independentDisk === true,
+      checkpointTrusted: args.checkpointTrusted === true,
     },
   };
 }
