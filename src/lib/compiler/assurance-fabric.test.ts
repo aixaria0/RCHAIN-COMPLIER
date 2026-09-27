@@ -273,7 +273,7 @@ async function signedBuildProvenance() {
 
 async function signNativePayload(
   payload: NativeReplayAttestationPayload,
-): Promise<ReturnType<typeof signedNativeReplayAttestationToRecord>> {
+): Promise<Awaited<ReturnType<typeof signedNativeReplayAttestationToRecord>>> {
   const payloadDigest = await nativeReplayAttestationPayloadDigest(payload);
   const signature = new Uint8Array(
     await globalThis.crypto.subtle.sign(
