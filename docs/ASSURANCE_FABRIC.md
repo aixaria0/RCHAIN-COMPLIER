@@ -178,3 +178,25 @@ The signed path is intentionally two-stage:
 Only after all checks pass does the adapter create a Reality Record and mark that in-memory record as cryptographically verified. Re-sealing, copying, deserializing, or manually adding `signatureVerified: true` does not recreate this runtime trust marker; the original signed snapshot must be reverified.
 
 This proves that the snapshot was signed by the holder of the pinned key. It still does not establish that the pinned key is organizationally authorized unless that authorization is managed outside this code.
+
+
+## Observer authorization set
+
+Cryptographic validity and authorization are separate checks.
+
+Each certificate can declare:
+
+```ts
+observerTrust: {
+  authorizedKeyIds: ["sha256:..."]
+}
+```
+
+The key IDs are normalized, validated, sorted, included in the certificate payload, and bound into the certificate identifier. A signed Sentinel record can satisfy strict promotion only if:
+
+1. its Ed25519 signature was verified at runtime against a pinned key;
+2. the attested key fingerprint appears in the certificate's declared authorization set.
+
+A valid signature from a key outside that set is a `FAIL`, not merely missing evidence. An empty authorization set is `BLOCKED`.
+
+This mechanism records the trust decision; it does not itself establish who has organizational authority to add a key to the set. That authority should be controlled by the process/key that signs the final Assurance Certificate.
