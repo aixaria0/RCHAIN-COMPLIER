@@ -279,3 +279,30 @@ Adding, deleting, replacing, or reordering evidence semantically outside the sig
 Certificate verification is deliberately stronger than recomputing its SHA-256 digest. A verifier also recomputes the check summary and derived status, rejects duplicate check identifiers, requires every strict-policy gate exactly once, and rejects PASS results for Possibility/Conformance/Recovery unless they retain trusted-producer metadata. A signed Assurance Package is promotion-grade only when the embedded certificate itself is `PASS`.
 
 Build provenance repository identity is exact after normalization. Substring/prefix matches are rejected, preventing a dependency URI such as an attacker-controlled repository path that merely contains the expected repository name from satisfying source binding.
+
+
+## Operational attestation producers
+
+The verifier path is paired with a Node-only producer so promotion-grade envelopes can be created from real artifacts without moving private-key handling into the browser application.
+
+### Build provenance producer
+
+`scripts/assurance-attestation-producer.ts build`:
+
+- hashes the exact build artifact with SHA-256;
+- constructs an in-toto `Statement/v1` using the SLSA provenance v1 predicate;
+- binds repository, 40-hex commit, artifact subject digest, builder identity, and invocation metadata;
+- signs the canonical `rchain-build-provenance-attestation/v1` payload with Ed25519;
+- emits the public key fingerprint, payload digest, and signed envelope expected by the strict verifier.
+
+The producer accepts a 32-byte Ed25519 seed through a protected `--key-file` (preferred) or `ASSURANCE_ED25519_PRIVATE_KEY_HEX`. It never generates or persists signing keys.
+
+`.github/workflows/assurance-provenance.yml` provides the hosted build path. It is manual and fail-closed, is restricted to `main` or a tag, executes typecheck/tests/build before provenance creation, creates a deterministic release archive, requires the externally configured builder key, removes temporary key material, and uploads the release bundle together with its signed provenance.
+
+This workflow intentionally does **not** claim a SLSA Build level by itself. Branch protection, workflow-change review, builder-key governance, and the security properties of the hosted build environment remain external controls. The format and source/artifact binding are verifiable; the organizational trust decision remains explicit.
+
+### Native replay / recovery producer
+
+`scripts/assurance-attestation-producer.ts replay` signs a pre-existing `rchain-native-replay-attestation/v1` payload. The strict verifier still validates all replay and recovery fields after signing, including release binding, process/disk separation, checkpoint membership, state equality, recovery-log/restore-tool digests, and record chaining.
+
+The producer does not invent a recovery result. A staging restore must first produce the actual digests and recovery manifest; without those runtime artifacts the Recovery plane remains BLOCKED.
