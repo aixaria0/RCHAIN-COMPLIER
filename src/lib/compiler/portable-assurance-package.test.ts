@@ -46,3 +46,17 @@ test("rebinding a valid artifact to the wrong predecessor fails closed", () => {
   assert.equal(result.valid, false);
   assert.match(result.reason, /binding mismatch/);
 });
+
+test("base portable package is valid without reviewer attestation", () => {
+  const pkg = fixture();
+  pkg.artifacts = pkg.artifacts.slice(0, 3);
+  const result = verifyPortableAssurancePackage(pkg);
+  assert.equal(result.valid, true);
+  assert.equal(result.recomputedDigests.length, 3);
+});
+
+test("portable package rejects any artifact after the single optional attestation", () => {
+  const pkg = fixture();
+  pkg.artifacts.push({ ...pkg.artifacts[3]!, bindsTo: [...pkg.artifacts[3]!.bindsTo] });
+  assert.equal(verifyPortableAssurancePackage(pkg).valid, false);
+});
