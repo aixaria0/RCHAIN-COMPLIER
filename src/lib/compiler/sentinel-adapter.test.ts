@@ -4,6 +4,7 @@ import {
   SENTINEL_ENDPOINTS,
   fetchSentinelBundle,
   sentinelBundleToRecord,
+  type SentinelCrossNodeReport,
   type SentinelFinalizedBlockEvidence,
   type SentinelNetworkStatus,
 } from "./sentinel-adapter.ts";
@@ -46,6 +47,54 @@ const network: SentinelNetworkStatus = {
     ready: true,
     current_epoch: 42,
   },
+};
+
+const crossNode: SentinelCrossNodeReport = {
+  target_count: 2,
+  reachable_count: 2,
+  evidence_count: 2,
+  agreeing_nodes: 2,
+  quorum_required: 2,
+  quorum_observed: true,
+  agreement_ratio: 1,
+  common_finalized_height: 18492,
+  common_block_hash: "abc123",
+  height_agreement: true,
+  hash_agreement: true,
+  missing_height_nodes: 0,
+  missing_hash_nodes: 0,
+  conflicting_nodes: 0,
+  agreement: true,
+  status: "pass",
+  verification_basis: "two targets agree; not a stake-weighted Casper finality proof",
+  observations: [
+    {
+      node_url: "http://node-a:40403",
+      reachable: true,
+      finalized_height: 18492,
+      block_hash: "abc123",
+      payload_sha256: "a",
+      proposer: "val_0a17",
+      signature_present: true,
+      justification_present: true,
+      full_block_available: true,
+      full_block_hash_match: true,
+      node_reported_finalized: true,
+    },
+    {
+      node_url: "http://node-b:40403",
+      reachable: true,
+      finalized_height: 18492,
+      block_hash: "abc123",
+      payload_sha256: "b",
+      proposer: "val_0a17",
+      signature_present: true,
+      justification_present: true,
+      full_block_available: true,
+      full_block_hash_match: true,
+      node_reported_finalized: true,
+    },
+  ],
 };
 
 test("maps a real Sentinel evidence shape into a portable Reality Record", () => {
@@ -91,8 +140,13 @@ test("fetches the documented Sentinel endpoints without requiring a live Sentine
   const fetchImpl: typeof fetch = async (input) => {
     const url = String(input);
     requested.push(url);
+    const body = url.endsWith(SENTINEL_ENDPOINTS.networkStatus)
+      ? network
+      : url.endsWith(SENTINEL_ENDPOINTS.crossNodeVerification)
+        ? crossNode
+        : evidence;
     return new Response(
-      JSON.stringify(url.endsWith(SENTINEL_ENDPOINTS.networkStatus) ? network : evidence),
+      JSON.stringify(body),
       { status: 200, headers: { "content-type": "application/json" } },
     );
   };
@@ -101,12 +155,61 @@ test("fetches the documented Sentinel endpoints without requiring a live Sentine
     fetchImpl,
     collectedAt: "2026-09-17T20:31:00Z",
     includeNetworkStatus: true,
+    includeCrossNodeVerification: true,
   });
 
   assert.deepEqual(requested, [
     `http://sentinel.example${SENTINEL_ENDPOINTS.finalizedBlockEvidence}`,
     `http://sentinel.example${SENTINEL_ENDPOINTS.networkStatus}`,
+    `http://sentinel.example${SENTINEL_ENDPOINTS.crossNodeVerification}`,
   ]);
   assert.equal(bundle.evidence.block_hash, "abc123");
   assert.equal(bundle.network?.rnode?.last_finalized_block_number, 18492);
+  assert.equal(bundle.crossNode?.agreement, true);
+});
+
+
+test("cross-node consistency becomes an explicit Reality verification", () => {
+  const record = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://localhost:8080",
+    collectedAt: "2026-09-17T20:32:00Z",
+    evidence,
+    network,
+    crossNode,
+  });
+
+  assert.equal(record.observations.length, 3);
+  assert.equal(
+    record.verification.find((check) => check.id === "verify_sentinel_cross_node_consistency")?.state,
+    "VERIFIED",
+  );
+  assert.ok(
+    record.transformations.some(
+      (item) => item.id === "transform_sentinel_cross_node_to_reality_observation",
+    ),
+  );
+  assert.equal(verifyRealityRecordIntegrity(record), true);
+});
+
+test("cross-node conflicts are divergent evidence", () => {
+  const record = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://localhost:8080",
+    collectedAt: "2026-09-17T20:33:00Z",
+    evidence,
+    network,
+    crossNode: {
+      ...crossNode,
+      agreement: false,
+      hash_agreement: false,
+      conflicting_nodes: 1,
+      status: "warn",
+      verification_basis: "conflicting finalized-block observations detected",
+    },
+  });
+
+  assert.equal(
+    record.verification.find((check) => check.id === "verify_sentinel_cross_node_consistency")?.state,
+    "DIVERGENT",
+  );
+  assert.equal(record.state, "DIVERGENT");
 });
