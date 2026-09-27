@@ -38,7 +38,9 @@
     "assurance:produce:recovery": "node --experimental-strip-types scripts/assurance-attestation-producer.ts recovery",
     "assurance:verify": "node --experimental-strip-types scripts/assurance-verify.ts",
     "test:verification-core": "node --experimental-strip-types --test src/lib/compiler/lexicographic-possibility.test.ts src/lib/compiler/verification-compiler.test.ts src/lib/compiler/quantitative-what-if.test.ts src/lib/compiler/verification-core-boundary.test.ts",
-    "demo:verification-core": "node --experimental-strip-types examples/verification-compiler-generic.ts"
+    "demo:verification-core": "node --experimental-strip-types examples/verification-compiler-generic.ts",
+    "typecheck:verification-core": "tsc -p tsconfig.verification-core.json --noEmit",
+    "lint:verification-core": "eslint src/lib/compiler/possibility-plane.ts src/lib/compiler/quantitative-what-if.ts src/lib/compiler/lexicographic-possibility.ts src/lib/compiler/verification-compiler.ts src/lib/compiler/finite-state-verifier.ts src/lib/compiler/possibility-plane.test.ts src/lib/compiler/quantitative-what-if.test.ts src/lib/compiler/lexicographic-possibility.test.ts src/lib/compiler/verification-compiler.test.ts src/lib/compiler/verification-core-boundary.test.ts src/lib/verification-core/index.ts examples/verification-compiler-generic.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
