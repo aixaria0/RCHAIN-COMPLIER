@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildCausallyValidDAG } from "./casper-concrete-dag.ts";
-import { searchReachableFinalizationFlip } from "./casper-reachable-perturbation-search.ts";
+import { removeParentAndRecomputeSeen, searchReachableFinalizationFlip } from "./casper-reachable-perturbation-search.ts";
+import { analyzeUpstreamReachability } from "./casper-upstream-reachability.ts";
 
 test("M11.3 finds a one-parent reachable finalization flip", () => {
   const results = searchReachableFinalizationFlip(buildCausallyValidDAG());
@@ -49,4 +50,21 @@ test("M11.3 perturbation search is deterministic", () => {
     first.map((result) => result.mutation),
     second.map((result) => result.mutation),
   );
+});
+
+
+test("seen-set derivation is independent of message array order", () => {
+  const baseline = buildCausallyValidDAG();
+  const shuffled = {
+    ...baseline,
+    messages: [...baseline.messages].reverse(),
+  };
+  const candidate = removeParentAndRecomputeSeen(shuffled, "a3", "b2");
+  const reachability = analyzeUpstreamReachability(candidate);
+
+  assert.equal(reachability.reachable, true);
+  const byId = new Map(candidate.messages.map((message) => [message.id, message]));
+  assert.deepEqual(byId.get("a3")?.seen, [
+    "a1", "a2", "a3", "b1", "c1", "c2", "d1", "d2", "g0", "g1", "g2", "g3",
+  ]);
 });
