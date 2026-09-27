@@ -55,14 +55,23 @@ The returned artifact contains:
 
 This engine deliberately makes no pushdown-system or polynomial-time claim beyond the explicit graph it receives.
 
+## Strict policy and non-bypassable producers
+
+The default policy is identified as `rchain-revival-strict/v1`. Core requirements are monotonic: callers may not turn a required gate off.
+
+Checks that can satisfy Possibility, Conformance, or Recovery are produced by trusted in-process helpers. A manually constructed `PASS` remains visible in the certificate but is downgraded to `BLOCKED` for promotion because it has no trusted producer attestation.
+
+The live Reality gate also binds the declared `networkId` and `shardId` to an integrity-valid Sentinel `NetworkStatus` observation. If the declaration conflicts with the observed network identity, the certificate fails. If the live observation does not expose enough network identity to compare, promotion is blocked.
+
 ## Fail-closed promotion
 
 Default promotion requirements are:
 
 - at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
-- at least one **critical PASS** Possibility check;
-- at least one **critical PASS** Conformance check;
-- at least one **critical PASS** Recovery check.
+- a matching live Sentinel network identity (`networkId` + `shardId`);
+- at least one **trusted, critical PASS** Possibility check;
+- at least one **trusted, critical PASS** Conformance check;
+- at least one **trusted, critical PASS** Recovery check.
 
 Overall status:
 
