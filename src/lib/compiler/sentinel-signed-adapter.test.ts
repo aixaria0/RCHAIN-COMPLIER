@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   SENTINEL_ATTESTATION_SCHEMA,
   fetchSignedSentinelRealityRecord,
+  isChallengeVerifiedSentinelRecord,
   isCryptographicallyVerifiedSentinelRecord,
   sentinelAttestationPayloadDigest,
   sentinelAttestationPublicKeyId,
@@ -22,10 +23,13 @@ function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+const CHALLENGE_NONCE = "ab".repeat(32);
+
 function payloadFixture(): SignedSentinelAttestation["payload"] {
   return {
     schema: SENTINEL_ATTESTATION_SCHEMA,
     collected_at_unix_ms: Date.parse("2026-09-27T01:00:00Z"),
+    challenge_nonce: CHALLENGE_NONCE,
     network: {
       reachable: true,
       node_url: "http://node-a:40403",
@@ -218,6 +222,7 @@ test("only a cryptographically verified signed snapshot receives runtime trust",
   });
 
   assert.equal(isCryptographicallyVerifiedSentinelRecord(record), true);
+  assert.equal(isChallengeVerifiedSentinelRecord(record), false);
   assert.equal(
     record.verification.find(
       (check) => check.id === "verify_sentinel_attestation_signature",
@@ -260,13 +265,14 @@ test("fetch helper verifies the pinned snapshot before returning a trusted Reali
   const record = await fetchSignedSentinelRealityRecord(
     "http://sentinel.example/",
     keyId,
-    { fetchImpl },
+    { fetchImpl, challengeNonce: CHALLENGE_NONCE },
   );
 
   assert.deepEqual(requested, [
-    "http://sentinel.example/api/attestation/snapshot",
+    `http://sentinel.example/api/attestation/snapshot?nonce=${CHALLENGE_NONCE}`,
   ]);
   assert.equal(isCryptographicallyVerifiedSentinelRecord(record), true);
+  assert.equal(isChallengeVerifiedSentinelRecord(record), true);
 });
 
 test("fetch helper fails closed when the signed endpoint is unavailable", async () => {
@@ -308,4 +314,37 @@ test("rejects signed snapshots that collapse targets into one declared operator/
   const result = await verifySignedSentinelAttestation(snapshot, keyId);
   assert.equal(result.valid, false);
   assert.match(result.reason, /distinctOperators=1/);
+});
+
+
+test("rejects a correctly signed snapshot replayed against a different verifier challenge", async () => {
+  const { snapshot, keyId } = await signedFixture();
+  const result = await verifySignedSentinelAttestation(
+    snapshot,
+    keyId,
+    "cd".repeat(32),
+  );
+
+  assert.equal(result.valid, false);
+  assert.match(result.reason, /challenge nonce does not match/);
+});
+
+test("fetch helper fails before network I/O for malformed challenge nonce", async () => {
+  const { keyId } = await signedFixture();
+  let called = false;
+  const fetchImpl: typeof fetch = async () => {
+    called = true;
+    return new Response("unexpected", { status: 500 });
+  };
+
+  await assert.rejects(
+    () =>
+      fetchSignedSentinelRealityRecord(
+        "http://sentinel.example",
+        keyId,
+        { fetchImpl, challengeNonce: "not-a-nonce" },
+      ),
+    /challenge nonce must be exactly 32 bytes/,
+  );
+  assert.equal(called, false);
 });
