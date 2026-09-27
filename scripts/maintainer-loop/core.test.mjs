@@ -49,6 +49,8 @@ test("healthy node boot verifies", () => {
   });
   assert.equal(result.state, "VERIFIED");
   assert.equal(result.firstDivergence, null);
+  assert.equal(result.record.replay.available, false);
+  assert.equal(result.record.replay.state, "NOT_APPLICABLE");
   assert.equal(verifyIntegrity(result.record), true);
 });
 
@@ -57,6 +59,9 @@ test("Sentinel read-only maintainer packet verifies end to end", async () => {
   const result = runScenario({ scenario: getScenario("MAINTAINER_HEALTH"), input });
   assert.equal(result.state, "VERIFIED");
   assert.equal(result.firstDivergence, null);
+  assert.equal(result.record.source, "http://rnode.example:40403");
+  assert.equal(result.record.observations[0].data.sourceContext.sourceSha, "fixture");
+  assert.equal(result.record.replay.state, "NOT_APPLICABLE");
   assert.equal(verifyIntegrity(result.record), true);
 });
 
