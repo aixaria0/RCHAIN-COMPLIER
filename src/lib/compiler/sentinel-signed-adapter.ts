@@ -1,4 +1,12 @@
 import {
+  attestationPayloadDigest,
+  attestationPublicKeyId,
+  attestationSigningBytes,
+  canonicalAttestationPayloadBytes,
+  verifyPinnedEd25519Attestation,
+  type PinnedEd25519Verification,
+} from "./attestation-crypto.ts";
+import {
   sealRealityRecord,
   type RealityRecord,
 } from "./reality-record.ts";
@@ -30,171 +38,73 @@ export interface SignedSentinelAttestation {
   };
 }
 
-export interface SentinelAttestationVerification {
-  valid: boolean;
-  keyId: string | null;
-  reason: string;
-  payloadDigest: string | null;
-}
+export type SentinelAttestationVerification = PinnedEd25519Verification;
 
 const verifiedSignedRecords = new WeakSet<RealityRecord>();
-
-function canonicalize(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalize);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, item]) => [key, canonicalize(item)]),
-    );
-  }
-  return value;
-}
 
 export function sentinelAttestationPayloadBytes(
   payload: SignedSentinelAttestation["payload"],
 ): Uint8Array {
-  return new TextEncoder().encode(JSON.stringify(canonicalize(payload)));
-}
-
-function concatBytes(...parts: Uint8Array[]): Uint8Array {
-  const length = parts.reduce((sum, part) => sum + part.length, 0);
-  const output = new Uint8Array(length);
-  let offset = 0;
-  for (const part of parts) {
-    output.set(part, offset);
-    offset += part.length;
-  }
-  return output;
-}
-
-function hexToBytes(value: string): Uint8Array {
-  if (value.length % 2 !== 0 || !/^[0-9a-f]*$/i.test(value)) {
-    throw new Error("invalid hexadecimal input");
-  }
-  const output = new Uint8Array(value.length / 2);
-  for (let index = 0; index < output.length; index += 1) {
-    output[index] = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
-  }
-  return output;
-}
-
-function toArrayBuffer(value: Uint8Array): ArrayBuffer {
-  const buffer = new ArrayBuffer(value.byteLength);
-  new Uint8Array(buffer).set(value);
-  return buffer;
-}
-
-function bytesToHex(value: ArrayBuffer | Uint8Array): string {
-  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-async function sha256(value: Uint8Array): Promise<string> {
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", toArrayBuffer(value));
-  return `sha256:${bytesToHex(digest)}`;
+  return canonicalAttestationPayloadBytes(payload);
 }
 
 export function sentinelAttestationSigningBytes(
   payload: SignedSentinelAttestation["payload"],
 ): Uint8Array {
-  return signingMessage(sentinelAttestationPayloadBytes(payload));
+  return attestationSigningBytes(SENTINEL_ATTESTATION_SCHEMA, payload);
 }
 
-export async function sentinelAttestationPublicKeyId(
+export function sentinelAttestationPublicKeyId(
   publicKeyHex: string,
 ): Promise<string> {
-  const publicKey = hexToBytes(publicKeyHex);
-  if (publicKey.length !== 32) {
-    throw new Error("Ed25519 public key must contain exactly 32 bytes");
-  }
-  return sha256(publicKey);
+  return attestationPublicKeyId(publicKeyHex);
 }
 
-export async function sentinelAttestationPayloadDigest(
+export function sentinelAttestationPayloadDigest(
   payload: SignedSentinelAttestation["payload"],
 ): Promise<string> {
-  return sha256(sentinelAttestationPayloadBytes(payload));
-}
-
-function signingMessage(payloadBytes: Uint8Array): Uint8Array {
-  return concatBytes(
-    new TextEncoder().encode(`${SENTINEL_ATTESTATION_SCHEMA}\n`),
-    payloadBytes,
-  );
+  return attestationPayloadDigest(payload);
 }
 
 export async function verifySignedSentinelAttestation(
   snapshot: SignedSentinelAttestation,
   expectedKeyId: string,
 ): Promise<SentinelAttestationVerification> {
-  try {
-    if (snapshot.schema !== SENTINEL_ATTESTATION_SCHEMA) {
-      return { valid: false, keyId: null, reason: "unexpected envelope schema", payloadDigest: null };
-    }
-    if (snapshot.payload.schema !== SENTINEL_ATTESTATION_SCHEMA) {
-      return { valid: false, keyId: null, reason: "unexpected payload schema", payloadDigest: null };
-    }
-    if (snapshot.signature.algorithm !== "Ed25519") {
-      return { valid: false, keyId: null, reason: "unexpected signature algorithm", payloadDigest: null };
-    }
-    if (!/^sha256:[0-9a-f]{64}$/i.test(expectedKeyId)) {
-      return { valid: false, keyId: null, reason: "expected key id is not a sha256 fingerprint", payloadDigest: null };
-    }
-
-    const publicKey = hexToBytes(snapshot.signature.public_key_hex);
-    const signature = hexToBytes(snapshot.signature.signature_hex);
-    if (publicKey.length !== 32 || signature.length !== 64) {
-      return {
-        valid: false,
-        keyId: null,
-        reason: "invalid Ed25519 public-key or signature length",
-        payloadDigest: null,
-      };
-    }
-
-    const keyId = await sha256(publicKey);
-    if (keyId.toLowerCase() !== snapshot.signature.key_id.toLowerCase()) {
-      return { valid: false, keyId, reason: "public key fingerprint does not match envelope key_id", payloadDigest: null };
-    }
-    if (keyId.toLowerCase() !== expectedKeyId.toLowerCase()) {
-      return { valid: false, keyId, reason: "Sentinel signer key id is not the pinned expected key", payloadDigest: null };
-    }
-
-    const payloadBytes = sentinelAttestationPayloadBytes(snapshot.payload);
-    const payloadDigest = await sha256(payloadBytes);
-    if (payloadDigest.toLowerCase() !== snapshot.payload_sha256.toLowerCase()) {
-      return { valid: false, keyId, reason: "canonical payload digest mismatch", payloadDigest };
-    }
-
-    const cryptoKey = await globalThis.crypto.subtle.importKey(
-      "raw",
-      toArrayBuffer(publicKey),
-      { name: "Ed25519" },
-      false,
-      ["verify"],
-    );
-    const signatureValid = await globalThis.crypto.subtle.verify(
-      { name: "Ed25519" },
-      cryptoKey,
-      toArrayBuffer(signature),
-      toArrayBuffer(signingMessage(payloadBytes)),
-    );
-
-    return {
-      valid: signatureValid,
-      keyId,
-      reason: signatureValid ? "Ed25519 signature and pinned key id verified" : "Ed25519 signature verification failed",
-      payloadDigest,
-    };
-  } catch (error) {
+  if (snapshot.schema !== SENTINEL_ATTESTATION_SCHEMA) {
     return {
       valid: false,
       keyId: null,
-      reason: error instanceof Error ? error.message : "Sentinel attestation verification failed",
+      reason: "unexpected envelope schema",
       payloadDigest: null,
     };
   }
+  if (snapshot.payload.schema !== SENTINEL_ATTESTATION_SCHEMA) {
+    return {
+      valid: false,
+      keyId: null,
+      reason: "unexpected payload schema",
+      payloadDigest: null,
+    };
+  }
+
+  const result = await verifyPinnedEd25519Attestation({
+    schema: SENTINEL_ATTESTATION_SCHEMA,
+    payload: snapshot.payload,
+    declaredPayloadDigest: snapshot.payload_sha256,
+    algorithm: snapshot.signature.algorithm,
+    declaredKeyId: snapshot.signature.key_id,
+    publicKeyHex: snapshot.signature.public_key_hex,
+    signatureHex: snapshot.signature.signature_hex,
+    expectedKeyId,
+  });
+
+  return {
+    ...result,
+    reason:
+      result.valid
+        ? "Ed25519 Sentinel signature and pinned key id verified"
+        : result.reason.replace("attestation signer", "Sentinel signer"),
+  };
 }
 
 export async function signedSentinelAttestationToRecord(args: {
@@ -275,10 +185,11 @@ export async function signedSentinelAttestationToRecord(args: {
   return record;
 }
 
-export function isCryptographicallyVerifiedSentinelRecord(record: RealityRecord): boolean {
+export function isCryptographicallyVerifiedSentinelRecord(
+  record: RealityRecord,
+): boolean {
   return verifiedSignedRecords.has(record);
 }
-
 
 export async function fetchSignedSentinelRealityRecord(
   sentinelBaseUrl: string,
@@ -287,7 +198,9 @@ export async function fetchSignedSentinelRealityRecord(
 ): Promise<RealityRecord> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const base = sentinelBaseUrl.replace(/\/+$/, "");
-  const response = await fetchImpl(`${base}${SENTINEL_ENDPOINTS.attestationSnapshot}`);
+  const response = await fetchImpl(
+    `${base}${SENTINEL_ENDPOINTS.attestationSnapshot}`,
+  );
   if (!response.ok) {
     throw new Error(
       `Sentinel attestation endpoint returned HTTP ${response.status}`,
