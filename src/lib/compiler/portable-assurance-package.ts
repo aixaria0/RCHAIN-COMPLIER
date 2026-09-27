@@ -1,6 +1,6 @@
 import { sha256Artifact } from "./ecosystem-chain.ts";
 
-export const PORTABLE_ASSURANCE_PACKAGE_SCHEMA = "causal-assurance-portable-package/v1" as const;
+export const PORTABLE_ASSURANCE_PACKAGE_SCHEMA = "causal-assurance-portable-package/v2" as const;
 
 export type PortableArtifactRole = "WITNESS" | "EVIDENCE" | "WORKBENCH" | "ATTESTATION";
 
