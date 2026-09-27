@@ -331,3 +331,12 @@ The Node-only attestation producer also has a `recovery` command. It does not ac
 It then binds those SHA-256 values, the before/after state digests, the previous Reality Record digest, distinct process/disk identities, the checkpoint source, and ordered restore timestamps into a signed `rchain-native-replay-attestation/v1`.
 
 A recovery attestation still proves only what the signer observed and signed. The staging procedure must actually use independent process and disk resources; the producer refuses equal process or disk identifiers but cannot independently prove the physical infrastructure behind those identifiers.
+
+
+### Concrete recovery producer
+
+`assurance-attestation-producer.ts recovery` is the staging-side path for promotion-grade Recovery evidence. It reads and hashes the exact RNode binary, checkpoint archive, recovery log, and restore tool rather than accepting those artifact identities as operator-entered digest strings.
+
+The signed payload binds those SHA-256 identities to the repository and commit, stable subject, previous Reality Record digest, distinct pre/recovered process and disk identities, checkpoint source, ordered timestamps, and expected/observed replay state. The checkpoint digest is inserted into the replay input set automatically.
+
+The producer does not perform or simulate a restore. It can only attest artifacts produced by an authorized staging recovery run. Without those artifacts and an authorized replay signing key, the strict Recovery gate remains `BLOCKED`.
