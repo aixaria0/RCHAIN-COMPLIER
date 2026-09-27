@@ -1764,8 +1764,8 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       requirements.requireRecovery,
       hasRecovery,
       hasRecovery
-        ? "Critical recovery PASS is backed by signed native replay evidence with an independent process/disk and previous-record linkage."
-        : "Recovery requires a critical PASS plus signed native replay recovery evidence bound to a previous Reality Record.",
+        ? "Critical recovery PASS is backed by signed native replay evidence with previous-record linkage, independent process/disk, checkpoint-bound replay input, and signed recovery artifact digests."
+        : "Recovery requires signed native replay recovery evidence with previous-record linkage, independent process/disk, checkpoint-bound replay input, and complete restore/log artifact digests.",
     ),
   ];
 
@@ -2011,15 +2011,54 @@ export function recoveryCheckFromRecordChain(args: {
   const recoveredDiskId =
     typeof recoveryData.recoveredDiskId === "string" ? recoveryData.recoveredDiskId : null;
   const checkpointTrusted = recoveryData.checkpointTrusted === true;
+  const checkpointDigest =
+    typeof recoveryData.checkpointDigest === "string"
+      ? recoveryData.checkpointDigest
+      : null;
+  const checkpointSource =
+    typeof recoveryData.checkpointSource === "string"
+      ? recoveryData.checkpointSource
+      : null;
+  const recoveryLogDigest =
+    typeof recoveryData.recoveryLogDigest === "string"
+      ? recoveryData.recoveryLogDigest
+      : null;
+  const restoreToolDigest =
+    typeof recoveryData.restoreToolDigest === "string"
+      ? recoveryData.restoreToolDigest
+      : null;
+  const startedAtUnixMs =
+    typeof recoveryData.startedAtUnixMs === "number"
+      ? recoveryData.startedAtUnixMs
+      : null;
+  const finishedAtUnixMs =
+    typeof recoveryData.finishedAtUnixMs === "number"
+      ? recoveryData.finishedAtUnixMs
+      : null;
   const independentProcess =
     Boolean(preProcessId && recoveredProcessId) && preProcessId !== recoveredProcessId;
   const independentDisk =
     Boolean(preDiskId && recoveredDiskId) && preDiskId !== recoveredDiskId;
+  const sha256Pattern = /^sha256:[0-9a-f]{64}$/i;
+  const checkpointBoundToReplay =
+    Boolean(checkpointDigest) &&
+    after.replay.inputIds.includes(checkpointDigest!);
+  const recoveryArtifactsComplete =
+    Boolean(checkpointSource?.trim()) &&
+    Boolean(checkpointDigest && sha256Pattern.test(checkpointDigest)) &&
+    Boolean(recoveryLogDigest && sha256Pattern.test(recoveryLogDigest)) &&
+    Boolean(restoreToolDigest && sha256Pattern.test(restoreToolDigest)) &&
+    checkpointBoundToReplay &&
+    Number.isSafeInteger(startedAtUnixMs) &&
+    Number.isSafeInteger(finishedAtUnixMs) &&
+    (startedAtUnixMs ?? 0) > 0 &&
+    (finishedAtUnixMs ?? -1) >= (startedAtUnixMs ?? 0);
   const methodologyComplete =
     Boolean(recoveryObservation) &&
     independentProcess &&
     independentDisk &&
-    checkpointTrusted;
+    checkpointTrusted &&
+    recoveryArtifactsComplete;
 
   const complete =
     sourceValid &&
@@ -2056,6 +2095,14 @@ export function recoveryCheckFromRecordChain(args: {
       `independent-process:${independentProcess}`,
       `independent-disk:${independentDisk}`,
       `checkpoint-trusted:${checkpointTrusted}`,
+      `checkpoint-bound-to-replay:${checkpointBoundToReplay}`,
+      `recovery-artifacts-complete:${recoveryArtifactsComplete}`,
+      ...(checkpointDigest ? [`checkpoint:${checkpointDigest}`] : []),
+      ...(checkpointSource ? [`checkpoint-source:${checkpointSource}`] : []),
+      ...(recoveryLogDigest ? [`recovery-log:${recoveryLogDigest}`] : []),
+      ...(restoreToolDigest ? [`restore-tool:${restoreToolDigest}`] : []),
+      ...(startedAtUnixMs !== null ? [`recovery-started:${startedAtUnixMs}`] : []),
+      ...(finishedAtUnixMs !== null ? [`recovery-finished:${finishedAtUnixMs}`] : []),
     ],
     metrics: {
       sourceValid,
@@ -2071,6 +2118,14 @@ export function recoveryCheckFromRecordChain(args: {
       independentProcess,
       independentDisk,
       checkpointTrusted,
+      checkpointBoundToReplay,
+      recoveryArtifactsComplete,
+      checkpointDigest: checkpointDigest ?? "",
+      checkpointSource: checkpointSource ?? "",
+      recoveryLogDigest: recoveryLogDigest ?? "",
+      restoreToolDigest: restoreToolDigest ?? "",
+      startedAtUnixMs: startedAtUnixMs ?? 0,
+      finishedAtUnixMs: finishedAtUnixMs ?? 0,
     },
   }, "reality-record-recovery/v1");
 }
