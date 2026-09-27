@@ -826,3 +826,71 @@ test("free-form digest helpers remain diagnostic and cannot satisfy strict promo
   );
   assert.equal(certificate.status, "BLOCKED");
 });
+
+
+test("recovery record chain must preserve digest linkage", () => {
+  const native = nativeReplayPair();
+  const { integrity: _integrity, state: _state, ...afterPayload } = native.after;
+  const unlinkedAfter = sealRealityRecord(afterPayload);
+
+  const check = recoveryCheckFromRecordChain({
+    id: "broken-recovery-chain",
+    description: "after-record lost previousDigest linkage",
+    before: native.before,
+    after: unlinkedAfter,
+  });
+
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:14:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+    crossNode: liveCrossNode,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:14:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: [
+      possibilityPass(),
+      conformanceCheckFromRealityRecord({
+        id: "conformance",
+        description: "native replay",
+        record: native.before,
+      }),
+      check,
+    ],
+  });
+
+  assert.equal(check.state, "BLOCKED");
+  assert.equal(
+    certificate.checks.find((item) => item.id === "gate_recovery")?.state,
+    "BLOCKED",
+  );
+});
+
+test("recovery state mismatch becomes FAIL rather than BLOCKED", () => {
+  const native = nativeReplayPair();
+  const { integrity: _integrity, state: _state, ...afterPayload } = native.after;
+  const mismatchedAfter = sealRealityRecord(
+    {
+      ...afterPayload,
+      replay: {
+        ...afterPayload.replay,
+        observedDigest: "state:different",
+      },
+    },
+    native.before.integrity.recordDigest,
+  );
+
+  const check = recoveryCheckFromRecordChain({
+    id: "recovery-state-mismatch",
+    description: "recovered state differs from pre-recovery state",
+    before: native.before,
+    after: mismatchedAfter,
+  });
+
+  assert.equal(check.state, "FAIL");
+});
