@@ -38,6 +38,11 @@ export interface NativeReplayAttestationPayload {
     recovered_disk_id: string;
     checkpoint_digest: string;
     checkpoint_trusted: boolean;
+    checkpoint_source: string;
+    recovery_log_digest: string;
+    restore_tool_digest: string;
+    started_at_unix_ms: number;
+    finished_at_unix_ms: number;
   };
 }
 
@@ -112,8 +117,28 @@ function validatePayload(payload: NativeReplayAttestationPayload): string | null
     if (!isSha256(recovery.checkpoint_digest)) {
       return "recovery checkpoint_digest must be a sha256 fingerprint";
     }
+    if (!payload.replay.input_digests.includes(recovery.checkpoint_digest)) {
+      return "recovery checkpoint_digest must be included in replay input_digests";
+    }
     if (recovery.checkpoint_trusted !== true) {
       return "recovery checkpoint must be explicitly trusted by the native replay signer";
+    }
+    if (!recovery.checkpoint_source.trim()) {
+      return "recovery checkpoint_source is required";
+    }
+    if (!isSha256(recovery.recovery_log_digest)) {
+      return "recovery recovery_log_digest must be a sha256 fingerprint";
+    }
+    if (!isSha256(recovery.restore_tool_digest)) {
+      return "recovery restore_tool_digest must be a sha256 fingerprint";
+    }
+    if (
+      !Number.isSafeInteger(recovery.started_at_unix_ms) ||
+      !Number.isSafeInteger(recovery.finished_at_unix_ms) ||
+      recovery.started_at_unix_ms <= 0 ||
+      recovery.finished_at_unix_ms < recovery.started_at_unix_ms
+    ) {
+      return "recovery timestamps must be positive integer unix-ms values with finished >= started";
     }
   }
 
@@ -241,6 +266,14 @@ export async function signedNativeReplayAttestationToRecord(args: {
               recoveredDiskId: payload.recovery.recovered_disk_id,
               checkpointDigest: payload.recovery.checkpoint_digest,
               checkpointTrusted: payload.recovery.checkpoint_trusted,
+              checkpointSource: payload.recovery.checkpoint_source,
+              recoveryLogDigest: payload.recovery.recovery_log_digest,
+              restoreToolDigest: payload.recovery.restore_tool_digest,
+              startedAtUnixMs: payload.recovery.started_at_unix_ms,
+              finishedAtUnixMs: payload.recovery.finished_at_unix_ms,
+              durationMs:
+                payload.recovery.finished_at_unix_ms -
+                payload.recovery.started_at_unix_ms,
             },
           },
         ]
@@ -313,6 +346,15 @@ export async function signedNativeReplayAttestationToRecord(args: {
             : "Native replay state digest diverges from the expected digest.",
           evidenceIds: [evidenceId],
         },
+        ...(payload.recovery
+          ? [{
+              id: "verify_native_recovery_manifest",
+              predicate: "signed recovery manifest binds checkpoint input, independent process/disk ids, restore tool/log digests, trusted checkpoint source, and ordered timestamps",
+              state: "VERIFIED" as const,
+              message: "Signed native recovery manifest is complete and bound to the replay inputs.",
+              evidenceIds: [evidenceId],
+            }]
+          : []),
       ],
       replay: {
         available: true,
