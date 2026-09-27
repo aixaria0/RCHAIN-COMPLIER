@@ -185,7 +185,12 @@ function trustedCheck(
 }
 
 function isTrustedCheck(input: AssuranceCheckInput): boolean {
-  return (input as Partial<TrustedAssuranceCheckInput>)[TRUSTED_CHECK_ATTESTATION] === true;
+  const attested =
+    (input as Partial<TrustedAssuranceCheckInput>)[TRUSTED_CHECK_ATTESTATION] === true;
+  const producerAllowed =
+    typeof input.producer === "string" &&
+    (TRUSTED_CHECK_PRODUCERS as readonly string[]).includes(input.producer);
+  return attested && producerAllowed;
 }
 
 function strictPolicyDescriptor(): Record<string, unknown> {
