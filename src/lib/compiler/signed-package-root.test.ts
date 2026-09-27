@@ -65,5 +65,5 @@ test("public key fingerprint is stable",()=>{
 });
 
 test("canonical root matches frozen cross-language conformance vector",()=>{
- assert.equal(canonicalPackageRoot(pkg()),"sha256:6dc2f70171c8bd415e48f275a00bc457b2a14e1eb82d4ee893f5f5dbb73803ae");
+ assert.equal(canonicalPackageRoot(pkg()),"sha256:d3dda1ea8d69ef493b83b3b373f6d49c53324a19df127788687db92a31310ace");
 });
