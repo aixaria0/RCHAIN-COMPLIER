@@ -29,6 +29,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Capture build start time
+        shell: bash
+        run: echo "ASSURANCE_BUILD_STARTED_ON=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: npm ci
 
@@ -75,7 +79,7 @@ jobs:
             --subject-name rchain-reality-compiler-build.tgz \
             --builder-id "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/assurance-provenance.yml" \
             --invocation-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" \
-            --started-on "${{ github.event.repository.updated_at }}" \
+            --started-on "$ASSURANCE_BUILD_STARTED_ON" \
             --finished-on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --key-file "$RUNNER_TEMP/assurance-builder-ed25519.hex" \
             --output rchain-build-provenance.json
