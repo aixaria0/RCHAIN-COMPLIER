@@ -7,7 +7,6 @@ import {
   createSignedBuildProvenanceAttestation,
   createSignedNativeReplayAttestation,
   createSignedRecoveryReplayAttestation,
-  createSignedRecoveryReplayAttestation,
   sha256File,
 } from "./attestation-producer-node.ts";
 import {
