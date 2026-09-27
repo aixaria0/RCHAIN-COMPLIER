@@ -6,7 +6,7 @@ import type {
 
 export const AETHERFORGE_SOURCE = {
   repository: "aixaria0/aetherforge",
-  commit: "256fd5a83978e865a7ebcc516eb9956c642b5968",
+  commit: "f264c530a39acf029070eee077eec96518a84055",
   file: "src/lib/physics.ts",
   blobSha: "4bde80996a058a3c454c2c24654aea00e9873da8",
 } as const;
