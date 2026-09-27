@@ -63,6 +63,9 @@ function commonChecks() {
       description: "Recovered state digest matched the pre-restart finalized state.",
       preRecoveryDigest: "state:abc",
       recoveredDigest: "state:abc",
+      independentProcess: true,
+      independentDisk: true,
+      checkpointTrusted: true,
     }),
   ];
 }
@@ -169,8 +172,84 @@ test("digest helpers block missing evidence and fail mismatches", () => {
     description: "state changed across recovery",
     preRecoveryDigest: "before",
     recoveredDigest: "after",
+    independentProcess: true,
+    independentDisk: true,
+    checkpointTrusted: true,
+  });
+  const weakMethod = recoveryCheckFromDigests({
+    id: "recovery_same_runtime",
+    description: "digest matched but restore did not use independent process/disk",
+    preRecoveryDigest: "same",
+    recoveredDigest: "same",
+    independentProcess: false,
+    independentDisk: false,
+    checkpointTrusted: true,
   });
 
   assert.equal(incomplete.state, "BLOCKED");
   assert.equal(mismatch.state, "FAIL");
+  assert.equal(weakMethod.state, "BLOCKED");
+});
+
+
+test("mislabeling a synthetic record as LIVE_OBSERVATION fails closed", () => {
+  const synthetic = compileRealityRecord("hello-rho", "none");
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:01:00Z",
+    release: { repository: "aixaria0/RCHAIN-COMPLIER", commit: "deadbeef" },
+    network: { genesis: "genesis:test" },
+    records: [{ label: "spoofed live source", sourceClass: "LIVE_OBSERVATION", record: synthetic }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(certificate.status, "FAIL");
+  assert.equal(certificate.records[0]?.sourceClassVerified, false);
+  assert.equal(
+    certificate.checks.find((check) => check.id.startsWith("reality_source_class:"))?.state,
+    "FAIL",
+  );
+});
+
+test("non-critical or non-passing plane entries cannot satisfy a required gate", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:02:00Z",
+    evidence: liveEvidence,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:02:01Z",
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: [
+      {
+        id: "weak_possibility_marker",
+        plane: "POSSIBILITY",
+        state: "NOT_TESTED",
+        critical: false,
+        description: "placeholder only",
+      },
+      conformanceCheckFromDigests({
+        id: "conformance",
+        description: "matching conformance",
+        expectedDigest: "x",
+        observedDigest: "x",
+      }),
+      recoveryCheckFromDigests({
+        id: "recovery",
+        description: "valid recovery",
+        preRecoveryDigest: "x",
+        recoveredDigest: "x",
+        independentProcess: true,
+        independentDisk: true,
+        checkpointTrusted: true,
+      }),
+    ],
+  });
+
+  assert.equal(certificate.status, "BLOCKED");
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_possibility")?.state,
+    "BLOCKED",
+  );
 });
