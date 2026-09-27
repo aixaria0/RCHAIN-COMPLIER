@@ -76,6 +76,7 @@ export interface AssuranceRequirements {
   requireNativeReplaySignature: boolean;
   requireNativeReplayAuthorization: boolean;
   requireLiveObservation: boolean;
+  requireFailureDomainDeclarations: boolean;
   requireObserverSignature: boolean;
   requireObserverAuthorization: boolean;
   requireNetworkIdentityBinding: boolean;
@@ -192,6 +193,7 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireNativeReplaySignature: true,
   requireNativeReplayAuthorization: true,
   requireLiveObservation: true,
+  requireFailureDomainDeclarations: true,
   requireObserverSignature: true,
   requireObserverAuthorization: true,
   requireNetworkIdentityBinding: true,
@@ -209,7 +211,7 @@ const MANDATORY_LIMITATIONS = [
   "a verified build-provenance signature proves possession of the pinned builder key and binds the signed SLSA statement to the declared source/artifact; it does not prove the trusted build platform behaved honestly outside that trust assumption",
   "builder authorization is an explicit certificate policy declaration; organizational authority for that authorization remains external",
   "native replay signatures prove possession of pinned replay keys and bind replay/recovery claims to those signed payloads; they do not independently prove the replay host was uncompromised",
-  "cross-node consistency does not prove operator or failure-domain independence",
+  "signed failure-domain declarations make claimed operator/provider/region topology tamper-evident but do not independently corroborate that the declarations are true",
   "cross-node consistency is not a stake-weighted Casper finality proof",
   "bounded possibility search proves only the declared model and search scope",
   "signed observation timestamps are tamper-evident but freshness still depends on observer clock accuracy",
@@ -258,6 +260,13 @@ function strictPolicyDescriptor(): Record<string, unknown> {
     id: STRICT_POLICY_ID,
     requirements: DEFAULT_REQUIREMENTS,
     minimumCrossNodeTargets: MIN_CROSS_NODE_TARGETS,
+    failureDomainPolicy: {
+      signedDeclarationsRequired: true,
+      exactTargetCoverageRequired: true,
+      minimumDistinctOperators: 2,
+      minimumDistinctFailureDomains: 2,
+      providerAndRegionMustBeDeclared: true,
+    },
     nativeReplay: {
       attestationSchema: "rchain-native-replay-attestation/v1",
       signatureRequired: true,
@@ -557,18 +566,24 @@ function sentinelRecordShapeVerified(record: RealityRecord): boolean {
       observation.type === "CrossNodeReport" &&
       observation.source === "rchain-sentinel",
   );
+  const failureDomains = record.observations.find(
+    (observation) =>
+      observation.type === "FailureDomainDeclarations" &&
+      observation.source === "rchain-sentinel",
+  );
   const attestation = record.observations.find(
     (observation) =>
       observation.type === "AttestationSignature" &&
       observation.source === "rchain-sentinel",
   );
-  if (!block || !network || !crossNode || !attestation) return false;
+  if (!block || !network || !crossNode || !failureDomains || !attestation) return false;
 
   const transformationIds = new Set(record.transformations.map((item) => item.id));
   return (
     transformationIds.has("transform_sentinel_finalized_block_to_reality_observation") &&
     transformationIds.has("transform_sentinel_network_status_to_reality_observation") &&
     transformationIds.has("transform_sentinel_cross_node_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_failure_domains_to_verified_observation") &&
     transformationIds.has("transform_sentinel_attestation_to_verified_observation") &&
     transformationIds.has("transform_sentinel_observations_to_verification")
   );
@@ -599,6 +614,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     "verify_sentinel_canonical_consistency",
     "verify_sentinel_finality_hash",
     "verify_sentinel_cross_node_consistency",
+    "verify_sentinel_failure_domain_declarations",
     "verify_sentinel_attestation_signature",
   ];
   const missingOrUnverified = requiredVerificationIds.filter(
@@ -614,9 +630,13 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const crossNode = input.record.observations.find(
     (observation) => observation.type === "CrossNodeReport",
   );
+  const failureDomains = input.record.observations.find(
+    (observation) => observation.type === "FailureDomainDeclarations",
+  );
   const blockData = block?.data ?? {};
   const networkData = network?.data ?? {};
   const crossNodeData = crossNode?.data ?? {};
+  const failureDomainData = failureDomains?.data ?? {};
 
   const observerSignatureVerified =
     isCryptographicallyVerifiedSentinelRecord(input.record);
@@ -635,6 +655,16 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     crossNodeData.conflictingNodes === 0 &&
     crossNodeData.hashAgreement === true &&
     crossNodeData.heightAgreement === true;
+  const failureDomainsDocumented =
+    failureDomainData.declarationValidation === true &&
+    failureDomainData.exactCoverage === true &&
+    failureDomainData.targetCountConsistent === true &&
+    typeof failureDomainData.declarationCount === "number" &&
+    failureDomainData.declarationCount >= MIN_CROSS_NODE_TARGETS &&
+    typeof failureDomainData.distinctOperators === "number" &&
+    failureDomainData.distinctOperators >= 2 &&
+    typeof failureDomainData.distinctFailureDomains === "number" &&
+    failureDomainData.distinctFailureDomains >= 2;
 
   const valid =
     verifyRealityRecordIntegrity(input.record) &&
@@ -642,12 +672,14 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     blockEvidenceComplete &&
     networkReachable &&
     crossNodeConsistent &&
+    failureDomainsDocumented &&
     observerSignatureVerified;
 
   const evidence = [
     ...(block ? [block.id] : []),
     ...(network ? [network.id] : []),
     ...(crossNode ? [crossNode.id] : []),
+    ...(failureDomains ? [failureDomains.id] : []),
     ...requiredVerificationIds.map(
       (id) => `${id}:${verificationById.get(id)?.state ?? "MISSING"}`,
     ),
@@ -656,8 +688,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   return {
     valid,
     description: valid
-      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, canonically consistent, node-finalized, and cross-node consistent across at least two targets."
-      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}, observerSignatureVerified=${observerSignatureVerified}.`,
+      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, canonically consistent, node-finalized, cross-node consistent, and carries signed failure-domain declarations covering at least two distinct operators/failure domains."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}, failureDomainsDocumented=${failureDomainsDocumented}, observerSignatureVerified=${observerSignatureVerified}.`,
     evidence,
   };
 }
@@ -873,6 +905,103 @@ function observerAuthorizationCheck(
     metrics: {
       authorizedKeyCount: trust.authorizedKeyIds.length,
       verifiedObserverCount: verified.length,
+    },
+  };
+}
+
+function failureDomainDeclarationsCheck(
+  records: AssuranceRecordInput[],
+): AssuranceCheck {
+  const candidates = records
+    .filter(
+      (record) =>
+        record.sourceClass === "LIVE_OBSERVATION" &&
+        sourceClassVerified(record) &&
+        verifyRealityRecordIntegrity(record.record) &&
+        isCryptographicallyVerifiedSentinelRecord(record.record),
+    )
+    .map((record) => {
+      const observation = record.record.observations.find(
+        (item) => item.type === "FailureDomainDeclarations",
+      );
+      const verification = record.record.verification.find(
+        (item) => item.id === "verify_sentinel_failure_domain_declarations",
+      );
+      return { record, observation, verification };
+    });
+
+  if (candidates.length === 0) {
+    return {
+      id: "reality_failure_domain_declarations",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No signed Sentinel live record is available for failure-domain declaration review.",
+      evidence: [],
+    };
+  }
+
+  const valid = candidates.filter(({ observation, verification }) => {
+    const data = observation?.data ?? {};
+    return (
+      verification?.state === "VERIFIED" &&
+      data.declarationValidation === true &&
+      data.exactCoverage === true &&
+      data.targetCountConsistent === true &&
+      typeof data.declarationCount === "number" &&
+      data.declarationCount >= MIN_CROSS_NODE_TARGETS &&
+      typeof data.distinctOperators === "number" &&
+      data.distinctOperators >= 2 &&
+      typeof data.distinctFailureDomains === "number" &&
+      data.distinctFailureDomains >= 2
+    );
+  });
+
+  if (valid.length === 0) {
+    return {
+      id: "reality_failure_domain_declarations",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "Signed Sentinel evidence does not document exact target coverage with at least two distinct operators and failure-domain ids.",
+      evidence: candidates.map(({ record }) => record.record.integrity.recordDigest),
+    };
+  }
+
+  const observations = valid.flatMap(({ observation }) => observation ? [observation] : []);
+  const operatorCount = Math.max(
+    ...observations.map((item) =>
+      typeof item.data.distinctOperators === "number" ? item.data.distinctOperators : 0,
+    ),
+  );
+  const providerCount = Math.max(
+    ...observations.map((item) =>
+      typeof item.data.distinctProviders === "number" ? item.data.distinctProviders : 0,
+    ),
+  );
+  const regionCount = Math.max(
+    ...observations.map((item) =>
+      typeof item.data.distinctRegions === "number" ? item.data.distinctRegions : 0,
+    ),
+  );
+  const failureDomainCount = Math.max(
+    ...observations.map((item) =>
+      typeof item.data.distinctFailureDomains === "number" ? item.data.distinctFailureDomains : 0,
+    ),
+  );
+
+  return {
+    id: "reality_failure_domain_declarations",
+    plane: "REALITY",
+    state: "PASS",
+    critical: true,
+    description: "Signed Sentinel topology declarations exactly cover the observed target set and document multiple operators/failure domains. This records the declaration; it does not independently prove the metadata.",
+    evidence: observations.map((item) => item.id),
+    metrics: {
+      distinctOperators: operatorCount,
+      distinctProviders: providerCount,
+      distinctRegions: regionCount,
+      distinctFailureDomains: failureDomainCount,
     },
   };
 }
@@ -1266,6 +1395,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   );
   const buildProvenanceRef = buildProvenanceReference(input.buildProvenance);
   const observerAuthorization = observerAuthorizationCheck(input.records, observerTrust);
+  const failureDomains = failureDomainDeclarationsCheck(input.records);
   const nativeReplayAuthorization = nativeReplayAuthorizationCheck(
     input.records,
     nativeReplayTrust,
@@ -1373,6 +1503,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
         : "No integrity-valid, non-divergent live observation is present. Synthetic evidence cannot satisfy this gate.",
     ),
     requiredPlaneCheck(
+      "gate_failure_domain_declarations",
+      "REALITY",
+      requirements.requireFailureDomainDeclarations,
+      failureDomains.state === "PASS",
+      failureDomains.description,
+    ),
+    requiredPlaneCheck(
       "gate_observer_signature",
       "REALITY",
       requirements.requireObserverSignature,
@@ -1425,7 +1562,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, nativeReplayAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, failureDomains, nativeReplayAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
