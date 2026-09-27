@@ -53,8 +53,12 @@ test("base chain may pass without optional reviewer attestation", () => {
 });
 
 test("verification outcomes never promote inconclusive work to PASS", () => {
-  assert.equal(assuranceStatusFromVerificationOutcome("UNREACHABLE_IN_MODEL"), "PASS");
-  assert.equal(assuranceStatusFromVerificationOutcome("WITNESS_FOUND"), "FAIL");
-  assert.equal(assuranceStatusFromVerificationOutcome("LIMIT_REACHED"), "BLOCKED");
-  assert.equal(assuranceStatusFromVerificationOutcome("INCONCLUSIVE"), "BLOCKED");
+  assert.equal(assuranceStatusFromVerificationOutcome("UNREACHABLE_IN_MODEL"), "BLOCKED");
+  assert.equal(assuranceStatusFromVerificationOutcome("WITNESS_FOUND"), "BLOCKED");
+  assert.equal(assuranceStatusFromVerificationOutcome("UNREACHABLE_IN_MODEL", "VIOLATION"), "PASS");
+  assert.equal(assuranceStatusFromVerificationOutcome("WITNESS_FOUND", "VIOLATION"), "FAIL");
+  assert.equal(assuranceStatusFromVerificationOutcome("WITNESS_FOUND", "SUPPORT"), "PASS");
+  assert.equal(assuranceStatusFromVerificationOutcome("UNREACHABLE_IN_MODEL", "SUPPORT"), "FAIL");
+  assert.equal(assuranceStatusFromVerificationOutcome("LIMIT_REACHED", "VIOLATION"), "BLOCKED");
+  assert.equal(assuranceStatusFromVerificationOutcome("INCONCLUSIVE", "SUPPORT"), "BLOCKED");
 });
