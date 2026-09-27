@@ -19,7 +19,7 @@ import {
 import type { WeightedPossibilityResult } from "./possibility-plane.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
 
-export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY";
+export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
 export type AssuranceGateState = "PASS" | "FAIL" | "BLOCKED" | "NOT_TESTED";
 export type AssuranceSourceClass =
   | "SYNTHETIC"
@@ -61,6 +61,7 @@ export interface AssuranceCheckInput {
 }
 
 export interface AssuranceRequirements {
+  requireReleaseArtifactIdentity: boolean;
   requireLiveObservation: boolean;
   requireNetworkIdentityBinding: boolean;
   requireFreshness: boolean;
@@ -118,6 +119,7 @@ export interface AssuranceCertificate {
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
   requirements: AssuranceRequirements;
+  limitations: string[];
   records: AssuranceRecordReference[];
   checks: AssuranceCheck[];
   status: AssuranceGateState;
@@ -134,6 +136,7 @@ export interface AssuranceCertificate {
 }
 
 const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
+  requireReleaseArtifactIdentity: true,
   requireLiveObservation: true,
   requireNetworkIdentityBinding: true,
   requireFreshness: true,
@@ -199,6 +202,7 @@ function canonicalCertificatePayload(
     release: certificate.release,
     network: certificate.network,
     requirements: certificate.requirements,
+    limitations: certificate.limitations,
     records: certificate.records,
     checks: certificate.checks,
     status: certificate.status,
@@ -513,6 +517,35 @@ function networkIdentityBindingCheck(
   };
 }
 
+function releaseArtifactIdentityCheck(
+  release: AssuranceReleaseIdentity,
+): AssuranceCheck {
+  const commitValid = /^[0-9a-f]{40}$/i.test(release.commit);
+  const binaryValid = /^sha256:[0-9a-f]{64}$/i.test(release.binaryDigest ?? "");
+  const provenanceValid = /^sha256:[0-9a-f]{64}$/i.test(release.buildProvenance ?? "");
+  const complete = commitValid && binaryValid && provenanceValid;
+
+  return {
+    id: "supply_chain_release_identity",
+    plane: "SUPPLY_CHAIN",
+    state: complete ? "PASS" : "BLOCKED",
+    critical: true,
+    description: complete
+      ? "Release source commit, binary SHA-256 identity, and build-provenance statement digest are declared in canonical formats. This does not authenticate the builder or provenance signature."
+      : "Release artifact identity is incomplete: a 40-hex commit, sha256 binary digest, and sha256 provenance-statement digest are required.",
+    evidence: [
+      `commit:${release.commit}`,
+      ...(release.binaryDigest ? [`binary:${release.binaryDigest}`] : []),
+      ...(release.buildProvenance ? [`provenance:${release.buildProvenance}`] : []),
+    ],
+    metrics: {
+      commitValid,
+      binaryValid,
+      provenanceValid,
+    },
+  };
+}
+
 function freshnessCheck(
   records: AssuranceRecordInput[],
   issuedAt: string,
@@ -652,6 +685,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
 
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
   const reality = realityChecks(input.records);
+  const releaseIdentity = releaseArtifactIdentityCheck(input.release);
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
   const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
   const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
@@ -699,6 +733,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
 
   const gates: AssuranceCheck[] = [
     requiredPlaneCheck(
+      "gate_release_artifact_identity",
+      "SUPPLY_CHAIN",
+      requirements.requireReleaseArtifactIdentity,
+      releaseIdentity.state === "PASS",
+      releaseIdentity.description,
+    ),
+    requiredPlaneCheck(
       "gate_live_observation",
       "REALITY",
       requirements.requireLiveObservation,
@@ -744,7 +785,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [...reality.checks, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, ...reality.checks, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
@@ -762,6 +803,14 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ...reality.references.map((record) => record.digest).sort(),
     policy.digest,
   ]).slice(0, 32)}`;
+  const limitations = [
+    "certificate SHA-256 integrity is not signer authenticity",
+    "declared build-provenance digest is not cryptographic verification of the builder or provenance signature",
+    "cross-node consistency does not prove operator or failure-domain independence",
+    "cross-node consistency is not a stake-weighted Casper finality proof",
+    "bounded possibility search proves only the declared model and search scope",
+  ];
+
   const payload: Omit<AssuranceCertificate, "integrity"> = {
     schema: "rchain-assurance-certificate/v1",
     id,
@@ -771,6 +820,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     release: input.release,
     network: input.network,
     requirements,
+    limitations,
     records: reality.references,
     checks,
     status,
