@@ -67,3 +67,26 @@ test("public key fingerprint is stable",()=>{
 test("canonical root matches frozen cross-language conformance vector",()=>{
  assert.equal(canonicalPackageRoot(pkg()),"sha256:d3dda1ea8d69ef493b83b3b373f6d49c53324a19df127788687db92a31310ace");
 });
+
+test("base three-artifact package can be rooted and signed",()=>{
+ const p=pkg();
+ p.artifacts=p.artifacts.slice(0,3);
+ const signed=signPackageRoot(p,keys());
+ assert.equal(verifySignedPackageRoot(p,signed,signed.keyId),true);
+});
+
+test("run and subject identity are bound by the signed root",()=>{
+ const p=pkg(), signed=signPackageRoot(p,keys());
+ const runMutated=structuredClone(p);
+ runMutated.runId="other-run";
+ assert.equal(verifySignedPackageRoot(runMutated,signed,signed.keyId),false);
+ const subjectMutated=structuredClone(p);
+ subjectMutated.subject="other-subject";
+ assert.equal(verifySignedPackageRoot(subjectMutated,signed,signed.keyId),false);
+});
+
+test("malformed or tampered signature fails closed",()=>{
+ const p=pkg(), signed=signPackageRoot(p,keys());
+ signed.signatureBase64="not-valid-signature";
+ assert.equal(verifySignedPackageRoot(p,signed,signed.keyId),false);
+});
