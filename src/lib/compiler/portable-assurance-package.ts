@@ -24,7 +24,8 @@ export interface PortablePackageVerification {
   recomputedDigests: string[];
 }
 
-const order: PortableArtifactRole[] = ["WITNESS", "EVIDENCE", "WORKBENCH", "ATTESTATION"];
+const baseOrder: PortableArtifactRole[] = ["WITNESS", "EVIDENCE", "WORKBENCH"];
+const attestedOrder: PortableArtifactRole[] = [...baseOrder, "ATTESTATION"];
 
 export function verifyPortableAssurancePackage(pkg: PortableAssurancePackage): PortablePackageVerification {
   const fail = (reason: string, recomputedDigests: string[] = []): PortablePackageVerification =>
@@ -33,7 +34,12 @@ export function verifyPortableAssurancePackage(pkg: PortableAssurancePackage): P
   if (pkg.schema !== PORTABLE_ASSURANCE_PACKAGE_SCHEMA || !pkg.runId.trim() || !pkg.subject.trim()) {
     return fail("invalid package identity");
   }
-  if (pkg.artifacts.length !== order.length) return fail("package must contain exactly four assurance artifacts");
+  const order = pkg.artifacts.length === baseOrder.length
+    ? baseOrder
+    : pkg.artifacts.length === attestedOrder.length
+      ? attestedOrder
+      : null;
+  if (!order) return fail("package must contain three base artifacts and at most one reviewer attestation");
 
   const recomputed: string[] = [];
   for (let i = 0; i < order.length; i += 1) {
@@ -43,10 +49,18 @@ export function verifyPortableAssurancePackage(pkg: PortableAssurancePackage): P
     recomputed.push(actual);
     if (actual !== artifact.sha256) return fail(`artifact digest mismatch: ${artifact.role}`, recomputed);
     const expectedBindings = recomputed.slice(0, -1);
-    if (artifact.bindsTo.length !== expectedBindings.length ||
-        artifact.bindsTo.some((digest, index) => digest !== expectedBindings[index])) {
+    if (
+      artifact.bindsTo.length !== expectedBindings.length
+      || artifact.bindsTo.some((digest, index) => digest !== expectedBindings[index])
+    ) {
       return fail(`artifact binding mismatch: ${artifact.role}`, recomputed);
     }
   }
-  return { valid: true, reason: "all artifact bytes, digests, ordering, and transitive bindings independently reverified", recomputedDigests: recomputed };
+  return {
+    valid: true,
+    reason: order.length === 4
+      ? "base artifacts and optional attestation independently reverified"
+      : "base artifact bytes, digests, ordering, and transitive bindings independently reverified",
+    recomputedDigests: recomputed,
+  };
 }
