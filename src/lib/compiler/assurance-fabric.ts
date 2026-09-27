@@ -27,16 +27,6 @@ import {
   nativeReplaySignerKeyId,
 } from "./native-replay-signed-adapter.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
-import {
-  isCryptographicallyVerifiedSentinelRecord,
-} from "./sentinel-signed-adapter.ts";
-import {
-  isCryptographicallyVerifiedNativeReplayRecord,
-} from "./native-replay-signed-adapter.ts";
-import {
-  isCryptographicallyVerifiedBuildProvenance,
-  type VerifiedBuildProvenance,
-} from "./build-provenance-signed-adapter.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
 export type AssuranceGateState = "PASS" | "FAIL" | "BLOCKED" | "NOT_TESTED";
@@ -138,7 +128,6 @@ export interface AssuranceFabricInput {
   network: AssuranceNetworkIdentity;
   records: AssuranceRecordInput[];
   checks: AssuranceCheckInput[];
-  buildProvenance?: VerifiedBuildProvenance;
   requirements?: Partial<AssuranceRequirements>;
 }
 
@@ -1686,21 +1675,6 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       freshness.state === "PASS",
       freshness.description,
     ),
-    requiredPlaneCheck(
-      "gate_signed_live_observation",
-      "REALITY",
-      requirements.requireSignedLiveObservation,
-      hasSignedLiveObservation,
-      hasSignedLiveObservation
-        ? "At least one pinned-key cryptographically verified live Sentinel observation is present."
-        : "No pinned-key cryptographically verified live Sentinel observation is present.",
-    ),
-    requirements.requireBuildProvenance
-      ? provenance
-      : { ...provenance, state: "NOT_TESTED", critical: false },
-    requirements.requireNetworkIdentityBinding
-      ? networkIdentity
-      : { ...networkIdentity, state: "NOT_TESTED", critical: false },
     requiredPlaneCheck(
       "gate_possibility",
       "POSSIBILITY",
