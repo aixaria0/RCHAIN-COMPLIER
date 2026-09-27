@@ -166,6 +166,7 @@ const MANDATORY_LIMITATIONS = [
   "cross-node consistency does not prove operator or failure-domain independence",
   "cross-node consistency is not a stake-weighted Casper finality proof",
   "bounded possibility search proves only the declared model and search scope",
+  "signed observation timestamps are tamper-evident but freshness still depends on observer clock accuracy",
 ] as const;
 const TRUSTED_CHECK_PRODUCERS = [
   "weighted-possibility-search/v1",
