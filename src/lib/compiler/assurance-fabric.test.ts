@@ -50,6 +50,7 @@ import {
   validateAssuranceCertificate,
   verifyAssuranceCertificateIntegrity,
   verifyAssuranceCertificatePolicy,
+  verifyAssuranceCertificateSemantics,
 } from "./assurance-fabric.ts";
 
 const RELEASE_COMMIT = "a".repeat(40);
@@ -1521,4 +1522,40 @@ test("incomplete direct Casper search is BLOCKED rather than a false PASS", () =
   assert.equal(result.status, "LIMIT_REACHED");
   assert.equal(check.state, "BLOCKED");
   assert.equal(check.metrics?.searchComplete, false);
+});
+
+
+test("certificate semantic verifier rejects forged summary/status and duplicate gate ids", () => {
+  const baseline = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:30:00Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [],
+    checks: [],
+  });
+
+  assert.equal(verifyAssuranceCertificateSemantics(baseline), true);
+
+  const forgedSummary = structuredClone(baseline);
+  forgedSummary.summary.pass += 1;
+  assert.equal(verifyAssuranceCertificateSemantics(forgedSummary), false);
+
+  const forgedStatus = structuredClone(baseline);
+  forgedStatus.status = "PASS";
+  assert.equal(verifyAssuranceCertificateSemantics(forgedStatus), false);
+
+  const duplicateGate = structuredClone(baseline);
+  duplicateGate.checks.push(
+    structuredClone(
+      duplicateGate.checks.find((check) => check.id === "gate_possibility")!,
+    ),
+  );
+  duplicateGate.summary = {
+    pass: duplicateGate.checks.filter((check) => check.state === "PASS").length,
+    fail: duplicateGate.checks.filter((check) => check.state === "FAIL").length,
+    blocked: duplicateGate.checks.filter((check) => check.state === "BLOCKED").length,
+    notTested: duplicateGate.checks.filter((check) => check.state === "NOT_TESTED").length,
+  };
+  assert.equal(verifyAssuranceCertificateSemantics(duplicateGate), false);
 });
