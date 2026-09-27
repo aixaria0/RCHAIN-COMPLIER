@@ -1713,14 +1713,18 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       "CONFORMANCE",
       requirements.requireConformance,
       hasConformance,
-      hasConformance ? "Conformance evidence is present." : "Conformance evidence is missing.",
+      hasConformance
+        ? "Critical conformance PASS is backed by a pinned signed native replay bound to the declared release."
+        : "Conformance requires a critical PASS plus a pinned signed native replay bound to the declared repository, commit, and binary.",
     ),
     requiredPlaneCheck(
       "gate_recovery",
       "RECOVERY",
       requirements.requireRecovery,
       hasRecovery,
-      hasRecovery ? "Recovery evidence is present." : "Recovery evidence is missing.",
+      hasRecovery
+        ? "Critical recovery PASS is backed by signed native replay evidence with an independent process/disk and previous-record linkage."
+        : "Recovery requires a critical PASS plus signed native replay recovery evidence bound to a previous Reality Record.",
     ),
   ];
 
