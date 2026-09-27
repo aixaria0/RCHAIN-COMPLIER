@@ -3,6 +3,7 @@ import {
   type RealityRecord,
 } from "./reality-record.ts";
 import {
+  SENTINEL_ENDPOINTS,
   sentinelBundleToRecord,
   type SentinelCrossNodeReport,
   type SentinelFinalizedBlockEvidence,
@@ -276,4 +277,27 @@ export async function signedSentinelAttestationToRecord(args: {
 
 export function isCryptographicallyVerifiedSentinelRecord(record: RealityRecord): boolean {
   return verifiedSignedRecords.has(record);
+}
+
+
+export async function fetchSignedSentinelRealityRecord(
+  sentinelBaseUrl: string,
+  expectedKeyId: string,
+  options: { fetchImpl?: typeof fetch } = {},
+): Promise<RealityRecord> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const base = sentinelBaseUrl.replace(/\/+$/, "");
+  const response = await fetchImpl(`${base}${SENTINEL_ENDPOINTS.attestationSnapshot}`);
+  if (!response.ok) {
+    throw new Error(
+      `Sentinel attestation endpoint returned HTTP ${response.status}`,
+    );
+  }
+
+  const snapshot = (await response.json()) as SignedSentinelAttestation;
+  return signedSentinelAttestationToRecord({
+    snapshot,
+    sentinelBaseUrl: base,
+    expectedKeyId,
+  });
 }
