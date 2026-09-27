@@ -27,6 +27,7 @@ import {
   nativeReplaySignerKeyId,
 } from "./native-replay-signed-adapter.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
+import type { CasperCounterexampleSearchResult } from "../cbc/casper-possibility-search.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
 export type AssuranceGateState = "PASS" | "FAIL" | "BLOCKED" | "NOT_TESTED";
@@ -221,6 +222,7 @@ const MANDATORY_LIMITATIONS = [
 const TRUSTED_CHECK_PRODUCERS = [
   "weighted-possibility-search/v1",
   "cbc-fragility-adapter/v1",
+  "casper-reachability-counterexample-search/v1",
   "reality-record-conformance/v1",
   "reality-record-recovery/v1",
 ] as const;
@@ -1884,6 +1886,58 @@ export function possibilityCheckFromSearch(args: {
   }, "weighted-possibility-search/v1");
 }
 
+
+export function possibilityCheckFromCasperCounterexampleSearch(args: {
+  id: string;
+  description: string;
+  result: CasperCounterexampleSearchResult;
+  critical?: boolean;
+}): AssuranceCheckInput {
+  const { result } = args;
+  const state: AssuranceGateState =
+    result.status === "COUNTEREXAMPLE_FOUND"
+      ? "FAIL"
+      : result.status === "LIMIT_REACHED"
+        ? "BLOCKED"
+        : "PASS";
+
+  return trustedCheck({
+    id: args.id,
+    plane: "POSSIBILITY",
+    state,
+    critical: args.critical ?? true,
+    description: args.description,
+    evidence: [
+      `search-model:${result.searchModel}`,
+      `status:${result.status}`,
+      ...result.mutations.map(
+        (mutation) =>
+          `remove-parent:${mutation.messageId}:${mutation.removedParentId}:cost=${mutation.cost}`,
+      ),
+      ...(result.candidateTrace
+        ? [
+            `candidate-supporting-stake:${result.candidateTrace.supportingStake}`,
+            `candidate-total-stake:${result.candidateTrace.totalStake}`,
+            `candidate-finalized:${result.candidateTrace.finalized}`,
+          ]
+        : []),
+    ],
+    metrics: {
+      counterexampleFound: result.status === "COUNTEREXAMPLE_FOUND",
+      searchComplete: result.status !== "LIMIT_REACHED",
+      exploredStates: result.exploredStates,
+      frontierPeak: result.frontierPeak,
+      minimumCost: result.minimumCost,
+      mutationCount: result.mutations.length,
+      baselineSupportingStake: result.baseline.supportingStake,
+      baselineTotalStake: result.baseline.totalStake,
+      candidateSupportingStake:
+        result.candidateTrace?.supportingStake ?? null,
+      candidateFinalized:
+        result.candidateTrace?.finalized ?? null,
+    },
+  }, "casper-reachability-counterexample-search/v1");
+}
 
 export function possibilityChecksFromFragilityReport(
   report: FragilityReport,
