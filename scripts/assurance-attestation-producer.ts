@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import {
   createSignedBuildProvenanceAttestation,
   createSignedNativeReplayAttestation,
+  createSignedRecoveryReplayAttestation,
 } from "../src/lib/compiler/attestation-producer-node.ts";
 
 function parseArgs(argv) {
@@ -37,6 +38,14 @@ async function readSeed(options) {
     : envSeed?.trim();
   if (!value) {
     throw new Error("no signing key configured; use --key-file (preferred) or ASSURANCE_ED25519_PRIVATE_KEY_HEX");
+  }
+  return value;
+}
+
+function requiredInteger(options, name) {
+  const value = Number(required(options, name));
+  if (!Number.isSafeInteger(value)) {
+    throw new Error(`--${name} must be a safe integer`);
   }
   return value;
 }
@@ -87,8 +96,45 @@ async function main() {
     return;
   }
 
+  if (command === "recovery") {
+    const inputDigests = options["input-digests"]
+      ? options["input-digests"]
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : [];
+
+    const envelope = await createSignedRecoveryReplayAttestation({
+      repository: required(options, "repository"),
+      commit: required(options, "commit"),
+      binaryPath: required(options, "binary"),
+      subjectId: required(options, "subject-id"),
+      subjectLabel: options["subject-label"],
+      expectedDigest: required(options, "expected-digest"),
+      observedDigest: required(options, "observed-digest"),
+      inputDigests,
+      checkpointPath: required(options, "checkpoint"),
+      checkpointSource: required(options, "checkpoint-source"),
+      recoveryLogPath: required(options, "recovery-log"),
+      restoreToolPath: required(options, "restore-tool"),
+      previousRecordDigest: required(options, "previous-record-digest"),
+      preProcessId: required(options, "pre-process-id"),
+      recoveredProcessId: required(options, "recovered-process-id"),
+      preDiskId: required(options, "pre-disk-id"),
+      recoveredDiskId: required(options, "recovered-disk-id"),
+      startedAtUnixMs: requiredInteger(options, "started-at-ms"),
+      finishedAtUnixMs: requiredInteger(options, "finished-at-ms"),
+      collectedAtUnixMs: options["collected-at-ms"]
+        ? requiredInteger(options, "collected-at-ms")
+        : undefined,
+      privateSeedHex,
+    });
+    await writeEnvelope(required(options, "output"), envelope);
+    return;
+  }
+
   throw new Error(
-    "usage: assurance-attestation-producer.ts <build|replay> [options]",
+    "usage: assurance-attestation-producer.ts <build|replay|recovery> [options]",
   );
 }
 
