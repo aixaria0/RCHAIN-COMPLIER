@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/lib/subjects/aetherforge.ts",
+    "src/lib/subjects/aetherforge.test.ts",
+    "examples/aetherforge-external-subject.ts"
+  ]
+}
