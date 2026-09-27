@@ -63,6 +63,8 @@ Checks that can satisfy Possibility, Conformance, or Recovery are produced by tr
 
 The live Reality gate also binds the declared `networkId` and `shardId` to an integrity-valid Sentinel `NetworkStatus` observation. If the declaration conflicts with the observed network identity, the certificate fails. If the live observation does not expose enough network identity to compare, promotion is blocked.
 
+A record is not considered promotion-grade merely because it is labeled live. The strict live gate also requires Sentinel's finalized-block payload to be available, the canonical full-block identity to match, the node to report finality, canonical consistency to pass, and the observed network endpoint to be reachable. Missing evidence is `BLOCKED`, not silently treated as success.
+
 ## Fail-closed promotion
 
 Default promotion requirements are:
