@@ -12,7 +12,9 @@ import {
   conformanceCheckFromDigests,
   possibilityCheckFromSearch,
   recoveryCheckFromDigests,
+  validateAssuranceCertificate,
   verifyAssuranceCertificateIntegrity,
+  verifyAssuranceCertificatePolicy,
 } from "./assurance-fabric.ts";
 
 const liveEvidence: SentinelFinalizedBlockEvidence = {
@@ -487,4 +489,57 @@ test("future-dated live evidence fails freshness validation", () => {
     "FAIL",
   );
   assert.equal(certificate.status, "FAIL");
+});
+
+
+test("certificate identity changes with issuance scope and evidence", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:08:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+  });
+  const base = {
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION" as const, record: live }],
+    checks: commonChecks(),
+  };
+  const first = buildAssuranceCertificate({
+    ...base,
+    issuedAt: "2026-09-27T00:08:01Z",
+  });
+  const second = buildAssuranceCertificate({
+    ...base,
+    issuedAt: "2026-09-27T00:08:02Z",
+  });
+
+  assert.notEqual(first.id, second.id);
+  assert.notEqual(first.integrity.certificateDigest, second.integrity.certificateDigest);
+});
+
+test("policy validator rejects a weakened serialized certificate even independently of policy claims", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:09:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:09:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(verifyAssuranceCertificatePolicy(certificate), true);
+  assert.equal(validateAssuranceCertificate(certificate).valid, true);
+
+  const weakened = structuredClone(certificate);
+  weakened.requirements.requireRecovery = false;
+  assert.equal(verifyAssuranceCertificatePolicy(weakened), false);
+  assert.equal(validateAssuranceCertificate(weakened).valid, false);
 });
