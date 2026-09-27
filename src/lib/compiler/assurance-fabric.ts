@@ -157,8 +157,8 @@ const MANDATORY_LIMITATIONS = [
 const TRUSTED_CHECK_PRODUCERS = [
   "weighted-possibility-search/v1",
   "cbc-fragility-adapter/v1",
-  "digest-conformance/v1",
-  "digest-recovery/v1",
+  "reality-record-conformance/v1",
+  "reality-record-recovery/v1",
 ] as const;
 const TRUSTED_CHECK_ATTESTATION = Symbol("rchain-assurance-trusted-check");
 
@@ -954,6 +954,146 @@ export function possibilityChecksFromFragilityReport(
   });
 }
 
+export function conformanceCheckFromRealityRecord(args: {
+  id: string;
+  description: string;
+  record: RealityRecord;
+  critical?: boolean;
+}): AssuranceCheckInput {
+  const record = args.record;
+  const sourceValid = record.source === "rchain-rust-native-replay";
+  const integrityValid = verifyRealityRecordIntegrity(record);
+  const complete =
+    record.replay.available &&
+    Boolean(record.replay.expectedDigest) &&
+    Boolean(record.replay.observedDigest);
+  const match =
+    complete &&
+    record.replay.expectedDigest === record.replay.observedDigest &&
+    record.replay.state === "REPRODUCED";
+  const state: AssuranceGateState =
+    !sourceValid || !integrityValid || !complete
+      ? "BLOCKED"
+      : match
+        ? "PASS"
+        : "FAIL";
+
+  return trustedCheck({
+    id: args.id,
+    plane: "CONFORMANCE",
+    state,
+    critical: args.critical ?? true,
+    description: args.description,
+    evidence: [
+      `record:${record.integrity.recordDigest}`,
+      `source:${record.source}`,
+      ...(record.replay.expectedDigest ? [`expected:${record.replay.expectedDigest}`] : []),
+      ...(record.replay.observedDigest ? [`observed:${record.replay.observedDigest}`] : []),
+    ],
+    metrics: {
+      sourceValid,
+      integrityValid,
+      complete,
+      match,
+    },
+  }, "reality-record-conformance/v1");
+}
+
+export function recoveryCheckFromRecordChain(args: {
+  id: string;
+  description: string;
+  before: RealityRecord;
+  after: RealityRecord;
+  critical?: boolean;
+}): AssuranceCheckInput {
+  const before = args.before;
+  const after = args.after;
+  const sourceValid =
+    before.source === "rchain-rust-native-replay" &&
+    after.source === "rchain-rust-native-replay";
+  const integrityValid =
+    verifyRealityRecordIntegrity(before) &&
+    verifyRealityRecordIntegrity(after);
+  const chainLinked = after.integrity.previousDigest === before.integrity.recordDigest;
+  const subjectStable = before.subject.id === after.subject.id;
+
+  const beforeDigest = before.replay.observedDigest;
+  const recoveredDigest = after.replay.observedDigest;
+  const stateComplete = Boolean(beforeDigest && recoveredDigest);
+  const stateMatch = stateComplete && beforeDigest === recoveredDigest;
+
+  const recoveryObservation = after.observations.find(
+    (observation) =>
+      observation.type === "RecoveryContext" &&
+      observation.source === "rchain-rust-native-replay",
+  );
+  const recoveryData = recoveryObservation?.data ?? {};
+  const preProcessId =
+    typeof recoveryData.preProcessId === "string" ? recoveryData.preProcessId : null;
+  const recoveredProcessId =
+    typeof recoveryData.recoveredProcessId === "string" ? recoveryData.recoveredProcessId : null;
+  const preDiskId =
+    typeof recoveryData.preDiskId === "string" ? recoveryData.preDiskId : null;
+  const recoveredDiskId =
+    typeof recoveryData.recoveredDiskId === "string" ? recoveryData.recoveredDiskId : null;
+  const checkpointTrusted = recoveryData.checkpointTrusted === true;
+  const independentProcess =
+    Boolean(preProcessId && recoveredProcessId) && preProcessId !== recoveredProcessId;
+  const independentDisk =
+    Boolean(preDiskId && recoveredDiskId) && preDiskId !== recoveredDiskId;
+  const methodologyComplete =
+    Boolean(recoveryObservation) &&
+    independentProcess &&
+    independentDisk &&
+    checkpointTrusted;
+
+  const complete =
+    sourceValid &&
+    integrityValid &&
+    chainLinked &&
+    subjectStable &&
+    stateComplete &&
+    methodologyComplete;
+  const state: AssuranceGateState =
+    !complete ? "BLOCKED" : stateMatch ? "PASS" : "FAIL";
+
+  return trustedCheck({
+    id: args.id,
+    plane: "RECOVERY",
+    state,
+    critical: args.critical ?? true,
+    description: args.description,
+    evidence: [
+      `before-record:${before.integrity.recordDigest}`,
+      `after-record:${after.integrity.recordDigest}`,
+      `chain-linked:${chainLinked}`,
+      `subject-stable:${subjectStable}`,
+      ...(beforeDigest ? [`pre-recovery:${beforeDigest}`] : []),
+      ...(recoveredDigest ? [`recovered:${recoveredDigest}`] : []),
+      `independent-process:${independentProcess}`,
+      `independent-disk:${independentDisk}`,
+      `checkpoint-trusted:${checkpointTrusted}`,
+    ],
+    metrics: {
+      sourceValid,
+      integrityValid,
+      chainLinked,
+      subjectStable,
+      stateComplete,
+      stateMatch,
+      methodologyComplete,
+      independentProcess,
+      independentDisk,
+      checkpointTrusted,
+    },
+  }, "reality-record-recovery/v1");
+}
+
+/**
+ * Diagnostic helper only. Free-form digest inputs are intentionally not a
+ * strict-policy trusted producer; use conformanceCheckFromRealityRecord() for
+ * promotion-grade conformance evidence.
+ */
 export function conformanceCheckFromDigests(args: {
   id: string;
   description: string;
@@ -980,6 +1120,11 @@ export function conformanceCheckFromDigests(args: {
   }, "digest-conformance/v1");
 }
 
+/**
+ * Diagnostic helper only. Free-form digest inputs are intentionally not a
+ * strict-policy trusted producer; use recoveryCheckFromRecordChain() for
+ * promotion-grade recovery evidence.
+ */
 export function recoveryCheckFromDigests(args: {
   id: string;
   description: string;
