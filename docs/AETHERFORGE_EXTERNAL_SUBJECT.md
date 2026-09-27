@@ -5,7 +5,7 @@ This fixture demonstrates that the protocol-neutral verification compiler can ev
 ## Source pin
 
 - Repository: `aixaria0/aetherforge`
-- Commit: `256fd5a83978e865a7ebcc516eb9956c642b5968`
+- Commit: `f264c530a39acf029070eee077eec96518a84055`
 - File: `src/lib/physics.ts`
 - Blob: `4bde80996a058a3c454c2c24654aea00e9873da8`
 
