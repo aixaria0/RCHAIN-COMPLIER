@@ -58,8 +58,8 @@ function evaluateCheck(check, observations) {
 }
 
 function deriveState(verification, replay) {
-  if (verification.some((v) => v.state === "DIVERGENT") || replay.state === "DIVERGENT") return "DIVERGENT";
-  if (verification.some((v) => v.state === "INCOMPLETE") || replay.state === "INCOMPLETE") return "INCOMPLETE";
+  if (verification.some((v) => v.state === "DIVERGENT") || (replay.available && replay.state === "DIVERGENT")) return "DIVERGENT";
+  if (verification.some((v) => v.state === "INCOMPLETE") || (replay.available && replay.state === "INCOMPLETE")) return "INCOMPLETE";
   if (replay.available && replay.state === "REPRODUCED") return "REPRODUCED";
   if (verification.length && verification.every((v) => v.state === "VERIFIED")) return "VERIFIED";
   return verification.length ? "CONSISTENT" : "OBSERVED";
@@ -102,13 +102,20 @@ export function verifyIntegrity(record) {
 
 export function runScenario({ scenario, input, previousDigest }) {
   const timestamp = input.observedAt ?? new Date(0).toISOString();
-  const source = input.source?.url ?? input.source?.repository ?? "maintainer-loop";
+  const source =
+    input.source?.url ??
+    input.source?.repository ??
+    input.source?.nodeUrl ??
+    "maintainer-loop";
   const observation = {
     id: `obs:${scenario.id}`,
     source,
     type: "maintainer-loop-input",
     timestamp,
-    data: input.observations ?? {},
+    data: {
+      ...(input.observations ?? {}),
+      sourceContext: input.source ?? null,
+    },
   };
 
   const rawVerification = scenario.checks.map((check) =>
@@ -136,7 +143,7 @@ export function runScenario({ scenario, input, previousDigest }) {
     ...(replayObservation?.expectedDigest ? { expectedDigest: replayObservation.expectedDigest } : {}),
     ...(replayObservation?.observedDigest ? { observedDigest: replayObservation.observedDigest } : {}),
     state: !scenario.replay
-      ? "REPRODUCED"
+      ? "NOT_APPLICABLE"
       : replayObservation?.matched === true
         ? "REPRODUCED"
         : replayObservation?.matched === false
