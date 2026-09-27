@@ -8,7 +8,7 @@ function fixture(): CausalAssuranceEcosystemManifest {
   const workbench = sha256Artifact("view:" + possibility + ":" + observation);
   const attestation = sha256Artifact("attest:" + workbench);
   return {
-    schema: "causal-assurance-ecosystem/v1",
+    schema: "causal-assurance-ecosystem/v2",
     runId: "fixture-001",
     subject: { kind: "finite-state-model", id: "dual-refinement-fixture" },
     artifacts: {
