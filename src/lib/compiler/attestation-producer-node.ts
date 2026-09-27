@@ -257,3 +257,135 @@ export function createSignedNativeReplayAttestation(args: {
     ...signed,
   };
 }
+
+
+function requireSha256(value: string, label: string): string {
+  if (!/^sha256:[0-9a-f]{64}$/i.test(value)) {
+    throw new Error(`${label} must be a sha256 fingerprint`);
+  }
+  return value.toLowerCase();
+}
+
+function requireRecordDigest(value: string): string {
+  if (!/^[0-9a-f]{64}$/i.test(value)) {
+    throw new Error("previousRecordDigest must be a 64-hex Reality Record digest");
+  }
+  return value.toLowerCase();
+}
+
+export async function createSignedRecoveryReplayAttestation(args: {
+  repository: string;
+  commit: string;
+  binaryPath: string;
+  subjectId: string;
+  subjectLabel?: string;
+  expectedDigest: string;
+  observedDigest: string;
+  inputDigests?: string[];
+  checkpointPath: string;
+  checkpointSource: string;
+  recoveryLogPath: string;
+  restoreToolPath: string;
+  previousRecordDigest: string;
+  preProcessId: string;
+  recoveredProcessId: string;
+  preDiskId: string;
+  recoveredDiskId: string;
+  startedAtUnixMs: number;
+  finishedAtUnixMs: number;
+  collectedAtUnixMs?: number;
+  privateSeedHex: string;
+}): Promise<SignedNativeReplayAttestation> {
+  const repository = requireRepository(args.repository);
+  const commit = requireCommit(args.commit);
+  if (!args.subjectId.trim()) throw new Error("subjectId is required");
+  if (!args.checkpointSource.trim()) throw new Error("checkpointSource is required");
+  if (!args.preProcessId.trim() || !args.recoveredProcessId.trim()) {
+    throw new Error("recovery process ids are required");
+  }
+  if (args.preProcessId === args.recoveredProcessId) {
+    throw new Error("recovery process ids must be distinct");
+  }
+  if (!args.preDiskId.trim() || !args.recoveredDiskId.trim()) {
+    throw new Error("recovery disk ids are required");
+  }
+  if (args.preDiskId === args.recoveredDiskId) {
+    throw new Error("recovery disk ids must be distinct");
+  }
+  if (
+    !Number.isSafeInteger(args.startedAtUnixMs) ||
+    !Number.isSafeInteger(args.finishedAtUnixMs) ||
+    args.startedAtUnixMs <= 0 ||
+    args.finishedAtUnixMs < args.startedAtUnixMs
+  ) {
+    throw new Error("recovery timestamps must be ordered positive unix-ms integers");
+  }
+
+  const [
+    binaryDigest,
+    checkpointDigest,
+    recoveryLogDigest,
+    restoreToolDigest,
+  ] = await Promise.all([
+    sha256File(args.binaryPath),
+    sha256File(args.checkpointPath),
+    sha256File(args.recoveryLogPath),
+    sha256File(args.restoreToolPath),
+  ]);
+
+  const inputDigests = Array.from(
+    new Set([
+      ...(args.inputDigests ?? []).map((value) =>
+        requireSha256(value, "input digest"),
+      ),
+      checkpointDigest,
+    ]),
+  );
+
+  const payload: NativeReplayAttestationPayload = {
+    schema: NATIVE_REPLAY_ATTESTATION_SCHEMA,
+    collected_at_unix_ms:
+      args.collectedAtUnixMs ?? args.finishedAtUnixMs,
+    release: {
+      repository,
+      commit,
+      binary_sha256: binaryDigest,
+    },
+    subject: {
+      id: args.subjectId,
+      ...(args.subjectLabel ? { label: args.subjectLabel } : {}),
+    },
+    replay: {
+      expected_digest: requireSha256(
+        args.expectedDigest,
+        "expectedDigest",
+      ),
+      observed_digest: requireSha256(
+        args.observedDigest,
+        "observedDigest",
+      ),
+      input_digests: inputDigests,
+    },
+    recovery: {
+      previous_record_digest: requireRecordDigest(
+        args.previousRecordDigest,
+      ),
+      pre_process_id: args.preProcessId,
+      recovered_process_id: args.recoveredProcessId,
+      pre_disk_id: args.preDiskId,
+      recovered_disk_id: args.recoveredDiskId,
+      checkpoint_digest: checkpointDigest,
+      checkpoint_trusted: true,
+      checkpoint_source: args.checkpointSource,
+      recovery_log_digest: recoveryLogDigest,
+      restore_tool_digest: restoreToolDigest,
+      started_at_unix_ms: args.startedAtUnixMs,
+      finished_at_unix_ms: args.finishedAtUnixMs,
+    },
+  };
+
+  return createSignedNativeReplayAttestation({
+    payload,
+    privateSeedHex: args.privateSeedHex,
+  });
+}
