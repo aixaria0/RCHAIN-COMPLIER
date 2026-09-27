@@ -56,6 +56,7 @@ import {
 const RELEASE_COMMIT = "a".repeat(40);
 const RELEASE_BINARY = `sha256:${"b".repeat(64)}`;
 const RELEASE_PROVENANCE = `sha256:${"c".repeat(64)}`;
+const TEST_SENTINEL_CHALLENGE = "ab".repeat(32);
 
 function releaseIdentity(
   repository = "rchain-community/rchain-rust",
@@ -373,6 +374,7 @@ async function signedLiveRecord(collectedAt: string) {
   const payload: SignedSentinelAttestation["payload"] = {
     schema: SENTINEL_ATTESTATION_SCHEMA,
     collected_at_unix_ms: Date.parse(collectedAt),
+    challenge_nonce: TEST_SENTINEL_CHALLENGE,
     network: liveNetwork,
     genesis: {
       configured_hash: "genesis:test",
@@ -428,6 +430,7 @@ async function signedLiveRecord(collectedAt: string) {
     snapshot,
     sentinelBaseUrl: "http://sentinel.example",
     expectedKeyId: TEST_OBSERVER_KEY_ID,
+    expectedChallengeNonce: TEST_SENTINEL_CHALLENGE,
   });
 }
 
