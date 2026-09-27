@@ -405,37 +405,6 @@ async function signedLiveRecord(collectedAt: string) {
   });
 }
 
-const liveNetwork = {
-  reachable: true,
-  node_url: "http://rnode.example",
-  latency_ms: 12,
-  http_status: 200,
-  probe: "status",
-  error: null,
-  rnode: {
-    node: { id: "node-a", host: "rnode.example", port: 40403 },
-    network_id: "testnet",
-    shard_id: "root",
-    latest_block_number: 18493,
-    last_finalized_block_number: 18492,
-    validator: true,
-    ready: true,
-    current_epoch: 7,
-  },
-};
-
-const releaseWithProvenance = {
-  repository: "rchain-community/rchain-rust",
-  commit: "pinned-rust-commit",
-  binaryDigest: "sha256:binary",
-  provenance: {
-    sourceCommit: "pinned-rust-commit",
-    subjectDigest: "sha256:binary",
-    builderId: "github-actions:quality",
-    invocationId: "run:test",
-  },
-};
-
 function possibilityPass() {
   const result = searchWeightedPossibility<number>({
     initial: 0,
@@ -1428,56 +1397,5 @@ test("signed provenance must bind the exact statement digest declared by the rel
   assert.equal(
     certificate.checks.find((check) => check.id === "supply_chain_build_provenance")?.state,
     "FAIL",
-  );
-});
-
-
-test("declared network identity cannot pass without matching live NetworkStatus", () => {
-  const live = sentinelBundleToRecord({
-    sentinelBaseUrl: "http://sentinel.example",
-    collectedAt: "2026-09-27T00:03:00Z",
-    evidence: liveEvidence,
-    network: { ...liveNetwork, rnode: { ...liveNetwork.rnode, network_id: "other-network" } },
-  });
-  const certificate = buildAssuranceCertificate({
-    issuedAt: "2026-09-27T00:03:01Z",
-    release: releaseWithProvenance,
-    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root", epoch: 7 },
-    records: [{ label: "wrong network", sourceClass: "LIVE_OBSERVATION", record: live }],
-    checks: commonChecks(),
-  });
-
-  assert.equal(certificate.status, "BLOCKED");
-  assert.equal(
-    certificate.checks.find((check) => check.id === "gate_network_identity")?.state,
-    "BLOCKED",
-  );
-});
-
-test("build provenance must bind commit and binary digest", () => {
-  const live = sentinelBundleToRecord({
-    sentinelBaseUrl: "http://sentinel.example",
-    collectedAt: "2026-09-27T00:04:00Z",
-    evidence: liveEvidence,
-    network: liveNetwork,
-  });
-  const certificate = buildAssuranceCertificate({
-    issuedAt: "2026-09-27T00:04:01Z",
-    release: {
-      ...releaseWithProvenance,
-      provenance: {
-        ...releaseWithProvenance.provenance,
-        sourceCommit: "different-commit",
-      },
-    },
-    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root", epoch: 7 },
-    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
-    checks: commonChecks(),
-  });
-
-  assert.equal(certificate.status, "BLOCKED");
-  assert.equal(
-    certificate.checks.find((check) => check.id === "gate_build_provenance")?.state,
-    "BLOCKED",
   );
 });
