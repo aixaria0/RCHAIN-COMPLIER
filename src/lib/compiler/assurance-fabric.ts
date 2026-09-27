@@ -17,6 +17,7 @@ import {
   type RealityRecord,
 } from "./reality-record.ts";
 import type { WeightedPossibilityResult } from "./possibility-plane.ts";
+import type { FragilityReport } from "../cbc/fragility-engine.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY";
 export type AssuranceGateState = "PASS" | "FAIL" | "BLOCKED" | "NOT_TESTED";
@@ -357,6 +358,85 @@ export function possibilityCheckFromSearch(args: {
       minimumCost: result.minimumCost,
       expected: args.expected,
       observed: result.status,
+    },
+  };
+}
+
+
+export function possibilityChecksFromFragilityReport(
+  report: FragilityReport,
+): AssuranceCheckInput[] {
+  return report.invariants.map((invariant) => {
+    const counterexamples = report.counterexamples.filter(
+      (counterexample) => counterexample.invariant === invariant.invariant,
+    );
+    return {
+      id: `cbc_fragility:${invariant.invariant}`,
+      plane: "POSSIBILITY",
+      state: invariant.satisfied ? "PASS" : "FAIL",
+      critical: true,
+      description: invariant.observation,
+      evidence: counterexamples.flatMap((counterexample) => [
+        `replay:${counterexample.replayDigest}`,
+        `transition:${counterexample.transition}`,
+        ...counterexample.conflictCore.map((item) => `conflict:${item}`),
+      ]),
+      metrics: {
+        reportDigest: report.digest,
+        counterexamples: counterexamples.length,
+      },
+    };
+  });
+}
+
+export function conformanceCheckFromDigests(args: {
+  id: string;
+  description: string;
+  expectedDigest?: string | null;
+  observedDigest?: string | null;
+  critical?: boolean;
+}): AssuranceCheckInput {
+  const complete = Boolean(args.expectedDigest && args.observedDigest);
+  const match = complete && args.expectedDigest === args.observedDigest;
+  return {
+    id: args.id,
+    plane: "CONFORMANCE",
+    state: !complete ? "BLOCKED" : match ? "PASS" : "FAIL",
+    critical: args.critical ?? true,
+    description: args.description,
+    evidence: [
+      ...(args.expectedDigest ? [`expected:${args.expectedDigest}`] : []),
+      ...(args.observedDigest ? [`observed:${args.observedDigest}`] : []),
+    ],
+    metrics: {
+      match,
+      complete,
+    },
+  };
+}
+
+export function recoveryCheckFromDigests(args: {
+  id: string;
+  description: string;
+  preRecoveryDigest?: string | null;
+  recoveredDigest?: string | null;
+  critical?: boolean;
+}): AssuranceCheckInput {
+  const complete = Boolean(args.preRecoveryDigest && args.recoveredDigest);
+  const match = complete && args.preRecoveryDigest === args.recoveredDigest;
+  return {
+    id: args.id,
+    plane: "RECOVERY",
+    state: !complete ? "BLOCKED" : match ? "PASS" : "FAIL",
+    critical: args.critical ?? true,
+    description: args.description,
+    evidence: [
+      ...(args.preRecoveryDigest ? [`pre-recovery:${args.preRecoveryDigest}`] : []),
+      ...(args.recoveredDigest ? [`recovered:${args.recoveredDigest}`] : []),
+    ],
+    metrics: {
+      match,
+      complete,
     },
   };
 }
