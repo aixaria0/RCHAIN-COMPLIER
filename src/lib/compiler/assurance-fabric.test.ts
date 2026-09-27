@@ -4,6 +4,7 @@ import { compileRealityRecord } from "./reality-record-adapter.ts";
 import {
   sentinelBundleToRecord,
   type SentinelFinalizedBlockEvidence,
+  type SentinelNetworkStatus,
 } from "./sentinel-adapter.ts";
 import { searchWeightedPossibility } from "./possibility-plane.ts";
 import {
@@ -32,6 +33,25 @@ const liveEvidence: SentinelFinalizedBlockEvidence = {
   canonical_mismatches: [],
   finality_error: null,
   error: null,
+};
+
+const liveNetwork: SentinelNetworkStatus = {
+  reachable: true,
+  node_url: "http://rnode.example:40403",
+  latency_ms: 7,
+  http_status: 200,
+  probe: "http://rnode.example:40403/api/status",
+  error: null,
+  rnode: {
+    node: { id: "node-a", host: "rnode.example", port: 40403 },
+    network_id: "testnet",
+    shard_id: "root",
+    latest_block_number: 18494,
+    last_finalized_block_number: 18492,
+    validator: true,
+    ready: true,
+    current_epoch: 42,
+  },
 };
 
 function possibilityPass() {
@@ -93,6 +113,7 @@ test("live reality + possibility + conformance + recovery can produce PASS", () 
     sentinelBaseUrl: "http://sentinel.example",
     collectedAt: "2026-09-27T00:00:00Z",
     evidence: liveEvidence,
+    network: liveNetwork,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -106,6 +127,7 @@ test("live reality + possibility + conformance + recovery can produce PASS", () 
       genesis: "genesis:test",
       networkId: "testnet",
       shardId: "root",
+      epoch: 42,
     },
     records: [{ label: "Sentinel live observation", sourceClass: "LIVE_OBSERVATION", record: live }],
     checks: commonChecks(),
@@ -125,6 +147,7 @@ test("a divergent live Reality Record forces the certificate to FAIL", () => {
       canonical_consistency: false,
       canonical_mismatches: ["parent_hash"],
     },
+    network: liveNetwork,
   });
 
   const certificate = buildAssuranceCertificate({
@@ -148,6 +171,7 @@ test("certificate integrity detects post-seal tampering", () => {
     sentinelBaseUrl: "http://sentinel.example",
     collectedAt: "2026-09-27T00:00:00Z",
     evidence: liveEvidence,
+    network: liveNetwork,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:00:03Z",
@@ -215,6 +239,7 @@ test("non-critical or non-passing plane entries cannot satisfy a required gate",
     sentinelBaseUrl: "http://sentinel.example",
     collectedAt: "2026-09-27T00:02:00Z",
     evidence: liveEvidence,
+    network: liveNetwork,
   });
   const certificate = buildAssuranceCertificate({
     issuedAt: "2026-09-27T00:02:01Z",
@@ -252,4 +277,90 @@ test("non-critical or non-passing plane entries cannot satisfy a required gate",
     certificate.checks.find((check) => check.id === "gate_possibility")?.state,
     "BLOCKED",
   );
+});
+
+
+test("strict revival policy cannot be weakened by the caller", () => {
+  assert.throws(
+    () =>
+      buildAssuranceCertificate({
+        issuedAt: "2026-09-27T00:03:00Z",
+        release: { repository: "aixaria0/RCHAIN-COMPLIER", commit: "deadbeef" },
+        network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+        records: [],
+        checks: [],
+        requirements: { requireLiveObservation: false },
+      }),
+    /requirements cannot be weakened/,
+  );
+});
+
+test("a manually forged PASS cannot satisfy a required assurance plane", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:04:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:04:01Z",
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: [
+      {
+        id: "forged-possibility-pass",
+        plane: "POSSIBILITY",
+        state: "PASS",
+        critical: true,
+        description: "caller asserted PASS without a trusted producer",
+      },
+      conformanceCheckFromDigests({
+        id: "conformance",
+        description: "matching conformance",
+        expectedDigest: "x",
+        observedDigest: "x",
+      }),
+      recoveryCheckFromDigests({
+        id: "recovery",
+        description: "valid recovery",
+        preRecoveryDigest: "x",
+        recoveredDigest: "x",
+        independentProcess: true,
+        independentDisk: true,
+        checkpointTrusted: true,
+      }),
+    ],
+  });
+
+  const forged = certificate.checks.find((check) => check.id === "forged-possibility-pass");
+  assert.equal(forged?.producerVerified, false);
+  assert.equal(forged?.state, "BLOCKED");
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_possibility")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
+});
+
+test("declared network identity must match the live Sentinel observation", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:05:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:05:01Z",
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "wrong-network", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "reality_network_identity")?.state,
+    "FAIL",
+  );
+  assert.equal(certificate.status, "FAIL");
 });
