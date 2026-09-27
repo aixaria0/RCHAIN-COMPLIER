@@ -37,3 +37,8 @@ test("valid artifact substitution from another package breaks root binding",()=>
  p.artifacts[2].bindsTo=[p.artifacts[0].sha256,d]; p.artifacts[3].bindsTo=[p.artifacts[0].sha256,d,p.artifacts[2].sha256];
  assert.equal(verifySignedPackageRoot(p,signed),false);
 });
+
+test("canonical root matches frozen cross-language conformance vector",()=>{
+ const p=pkg();
+ assert.equal(canonicalPackageRoot(p),"sha256:9a54828a8e0590a49b97884e0cbfb10e41c6a5e21b8d19fb7d0c6384a4547d75");
+});
