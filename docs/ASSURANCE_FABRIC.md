@@ -65,12 +65,15 @@ The live Reality gate also binds the declared `networkId` and `shardId` to an in
 
 A record is not considered promotion-grade merely because it is labeled live. The strict live gate also requires Sentinel's finalized-block payload to be available, the canonical full-block identity to match, the node to report finality, canonical consistency to pass, and the observed network endpoint to be reachable. Missing evidence is `BLOCKED`, not silently treated as success.
 
+Freshness is an explicit scoped policy, not a hard-coded project promise. The certificate requires the caller to declare `maxObservationAgeMs`; that budget is included in the certificate digest. Stale evidence is `BLOCKED`, while evidence timestamped after certificate issuance is `FAIL`. This makes freshness reviewable without inventing a universal latency or expiry target.
+
 ## Fail-closed promotion
 
 Default promotion requirements are:
 
 - at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
 - a matching live Sentinel network identity (`networkId` + `shardId`);
+- promotion-grade live evidence inside the declared freshness budget;
 - at least one **trusted, critical PASS** Possibility check;
 - at least one **trusted, critical PASS** Conformance check;
 - at least one **trusted, critical PASS** Recovery check.
