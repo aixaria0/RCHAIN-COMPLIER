@@ -39,6 +39,8 @@ const BINARY = `sha256:${"b".repeat(64)}`;
 const STATE = `sha256:${"c".repeat(64)}`;
 const INPUT = `sha256:${"d".repeat(64)}`;
 const CHECKPOINT = `sha256:${"e".repeat(64)}`;
+const RECOVERY_LOG = `sha256:${"1".repeat(64)}`;
+const RESTORE_TOOL = `sha256:${"2".repeat(64)}`;
 
 async function signedSnapshot(
   payload: NativeReplayAttestationPayload,
@@ -121,6 +123,10 @@ test("signed recovery after-record cryptographically binds the previous Reality 
       id: "native-state:test",
       label: "Pinned native replay after recovery",
     },
+    replay: {
+      ...beforePayload().replay,
+      input_digests: [INPUT, CHECKPOINT],
+    },
     recovery: {
       previous_record_digest: before.integrity.recordDigest,
       pre_process_id: "proc-before",
@@ -129,6 +135,11 @@ test("signed recovery after-record cryptographically binds the previous Reality 
       recovered_disk_id: "disk-after",
       checkpoint_digest: CHECKPOINT,
       checkpoint_trusted: true,
+      checkpoint_source: "file:///staging/checkpoint-42.tar.zst",
+      recovery_log_digest: RECOVERY_LOG,
+      restore_tool_digest: RESTORE_TOOL,
+      started_at_unix_ms: Date.parse("2026-09-27T01:10:30Z"),
+      finished_at_unix_ms: Date.parse("2026-09-27T01:10:55Z"),
     },
   };
   const after = await signedNativeReplayAttestationToRecord({
@@ -174,4 +185,71 @@ test("native replay payload validation rejects ambiguous digest formats before s
 
   assert.equal(verification.valid, false);
   assert.match(verification.reason, /expected_digest must be a sha256/);
+});
+
+
+test("recovery checkpoint must be an actual signed replay input", async () => {
+  const before = await signedNativeReplayAttestationToRecord({
+    snapshot: await signedSnapshot(beforePayload()),
+    expectedKeyId: KEY_ID,
+  });
+  const payload: NativeReplayAttestationPayload = {
+    ...beforePayload(),
+    recovery: {
+      previous_record_digest: before.integrity.recordDigest,
+      pre_process_id: "proc-before",
+      recovered_process_id: "proc-after",
+      pre_disk_id: "disk-before",
+      recovered_disk_id: "disk-after",
+      checkpoint_digest: CHECKPOINT,
+      checkpoint_trusted: true,
+      checkpoint_source: "file:///staging/checkpoint.tar.zst",
+      recovery_log_digest: RECOVERY_LOG,
+      restore_tool_digest: RESTORE_TOOL,
+      started_at_unix_ms: 1,
+      finished_at_unix_ms: 2,
+    },
+  };
+
+  const verification = await verifySignedNativeReplayAttestation(
+    await signedSnapshot(payload),
+    KEY_ID,
+  );
+  assert.equal(verification.valid, false);
+  assert.match(verification.reason, /included in replay input_digests/);
+});
+
+test("recovery artifact manifest rejects malformed log/tool identity", async () => {
+  const before = await signedNativeReplayAttestationToRecord({
+    snapshot: await signedSnapshot(beforePayload()),
+    expectedKeyId: KEY_ID,
+  });
+  const payload: NativeReplayAttestationPayload = {
+    ...beforePayload(),
+    replay: {
+      ...beforePayload().replay,
+      input_digests: [INPUT, CHECKPOINT],
+    },
+    recovery: {
+      previous_record_digest: before.integrity.recordDigest,
+      pre_process_id: "proc-before",
+      recovered_process_id: "proc-after",
+      pre_disk_id: "disk-before",
+      recovered_disk_id: "disk-after",
+      checkpoint_digest: CHECKPOINT,
+      checkpoint_trusted: true,
+      checkpoint_source: "file:///staging/checkpoint.tar.zst",
+      recovery_log_digest: "not-a-digest",
+      restore_tool_digest: RESTORE_TOOL,
+      started_at_unix_ms: 1,
+      finished_at_unix_ms: 2,
+    },
+  };
+
+  const verification = await verifySignedNativeReplayAttestation(
+    await signedSnapshot(payload),
+    KEY_ID,
+  );
+  assert.equal(verification.valid, false);
+  assert.match(verification.reason, /recovery_log_digest/);
 });
