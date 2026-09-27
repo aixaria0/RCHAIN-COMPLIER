@@ -11,6 +11,12 @@ import {
   type SignedSentinelAttestation,
 } from "./sentinel-signed-adapter.ts";
 
+function toArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(value.byteLength);
+  new Uint8Array(buffer).set(value);
+  return buffer;
+}
+
 function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -126,7 +132,7 @@ async function signedFixture(): Promise<{
     await globalThis.crypto.subtle.sign(
       { name: "Ed25519" },
       keyPair.privateKey,
-      sentinelAttestationSigningBytes(payload),
+      toArrayBuffer(sentinelAttestationSigningBytes(payload)),
     ),
   );
 
