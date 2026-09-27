@@ -97,6 +97,7 @@ const RECOVERY_LOG = `sha256:${"1".repeat(64)}`;
 const RESTORE_TOOL = `sha256:${"2".repeat(64)}`;
 const GENESIS = "genesis:test";
 const BUILDER_ID = "https://github.com/actions/runner";
+const SENTINEL_CHALLENGE = "ab".repeat(32);
 
 test("portable Assurance Package re-verifies every signed source and exact Reality Record set", async () => {
   const builderKey = await keyMaterial();
@@ -154,6 +155,7 @@ test("portable Assurance Package re-verifies every signed source and exact Reali
   const sentinelPayload: SignedSentinelAttestation["payload"] = {
     schema: SENTINEL_ATTESTATION_SCHEMA,
     collected_at_unix_ms: Date.parse("2026-09-27T00:00:00Z"),
+    challenge_nonce: SENTINEL_CHALLENGE,
     network: {
       reachable: true,
       node_url: "http://node-a:40403",
@@ -281,6 +283,7 @@ test("portable Assurance Package re-verifies every signed source and exact Reali
     snapshot: sentinelSnapshot,
     sentinelBaseUrl: "http://sentinel.example",
     expectedKeyId: observerKey.keyId,
+    expectedChallengeNonce: SENTINEL_CHALLENGE,
   });
 
   const beforePayload: NativeReplayAttestationPayload = {
