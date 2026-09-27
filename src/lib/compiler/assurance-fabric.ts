@@ -22,6 +22,10 @@ import {
   isCryptographicallyVerifiedBuildProvenance,
   type VerifiedBuildProvenance,
 } from "./build-provenance-signed-adapter.ts";
+import {
+  isCryptographicallyVerifiedNativeReplayRecord,
+  nativeReplaySignerKeyId,
+} from "./native-replay-signed-adapter.ts";
 import type { FragilityReport } from "../cbc/fragility-engine.ts";
 
 export type AssurancePlane = "POSSIBILITY" | "REALITY" | "CONFORMANCE" | "RECOVERY" | "SUPPLY_CHAIN";
@@ -69,6 +73,8 @@ export interface AssuranceRequirements {
   requireReleaseArtifactIdentity: boolean;
   requireBuildProvenanceVerification: boolean;
   requireBuilderAuthorization: boolean;
+  requireNativeReplaySignature: boolean;
+  requireNativeReplayAuthorization: boolean;
   requireLiveObservation: boolean;
   requireObserverSignature: boolean;
   requireObserverAuthorization: boolean;
@@ -92,6 +98,10 @@ export interface AssuranceBuilderTrust {
   authorizedBuilderIds: string[];
 }
 
+export interface AssuranceNativeReplayTrust {
+  authorizedKeyIds: string[];
+}
+
 export interface AssuranceBuildProvenanceReference {
   schema: string;
   repository: string;
@@ -110,6 +120,7 @@ export interface AssuranceFabricInput {
   freshness: AssuranceFreshnessPolicy;
   observerTrust?: AssuranceObserverTrust;
   builderTrust?: AssuranceBuilderTrust;
+  nativeReplayTrust?: AssuranceNativeReplayTrust;
   buildProvenance?: VerifiedBuildProvenance;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
@@ -153,6 +164,7 @@ export interface AssuranceCertificate {
   freshness: AssuranceFreshnessPolicy;
   observerTrust: AssuranceObserverTrust;
   builderTrust: AssuranceBuilderTrust;
+  nativeReplayTrust: AssuranceNativeReplayTrust;
   buildProvenance?: AssuranceBuildProvenanceReference;
   release: AssuranceReleaseIdentity;
   network: AssuranceNetworkIdentity;
@@ -177,6 +189,8 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireReleaseArtifactIdentity: true,
   requireBuildProvenanceVerification: true,
   requireBuilderAuthorization: true,
+  requireNativeReplaySignature: true,
+  requireNativeReplayAuthorization: true,
   requireLiveObservation: true,
   requireObserverSignature: true,
   requireObserverAuthorization: true,
@@ -194,6 +208,7 @@ const MANDATORY_LIMITATIONS = [
   "a verified Sentinel signature proves possession of the pinned observer key, not organizational authorization of that key",
   "a verified build-provenance signature proves possession of the pinned builder key and binds the signed SLSA statement to the declared source/artifact; it does not prove the trusted build platform behaved honestly outside that trust assumption",
   "builder authorization is an explicit certificate policy declaration; organizational authority for that authorization remains external",
+  "native replay signatures prove possession of pinned replay keys and bind replay/recovery claims to those signed payloads; they do not independently prove the replay host was uncompromised",
   "cross-node consistency does not prove operator or failure-domain independence",
   "cross-node consistency is not a stake-weighted Casper finality proof",
   "bounded possibility search proves only the declared model and search scope",
@@ -243,6 +258,11 @@ function strictPolicyDescriptor(): Record<string, unknown> {
     id: STRICT_POLICY_ID,
     requirements: DEFAULT_REQUIREMENTS,
     minimumCrossNodeTargets: MIN_CROSS_NODE_TARGETS,
+    nativeReplay: {
+      attestationSchema: "rchain-native-replay-attestation/v1",
+      signatureRequired: true,
+      certificateEvidenceBindingRequired: true,
+    },
     buildProvenance: {
       attestationSchema: "rchain-build-provenance-attestation/v1",
       statementType: "https://in-toto.io/Statement/v1",
@@ -287,6 +307,7 @@ function canonicalCertificatePayload(
     freshness: certificate.freshness,
     observerTrust: certificate.observerTrust,
     builderTrust: certificate.builderTrust,
+    nativeReplayTrust: certificate.nativeReplayTrust,
     buildProvenance: certificate.buildProvenance,
     release: certificate.release,
     network: certificate.network,
@@ -363,6 +384,23 @@ function normalizedBuilderTrust(
     .sort();
 
   return { authorizedKeyIds, authorizedBuilderIds };
+}
+
+function normalizedNativeReplayTrust(
+  input?: AssuranceNativeReplayTrust,
+): AssuranceNativeReplayTrust {
+  const authorizedKeyIds = [...new Set(input?.authorizedKeyIds ?? [])]
+    .map((keyId) => keyId.toLowerCase())
+    .sort();
+  const malformed = authorizedKeyIds.filter(
+    (keyId) => !/^sha256:[0-9a-f]{64}$/.test(keyId),
+  );
+  if (malformed.length > 0) {
+    throw new Error(
+      `nativeReplayTrust contains malformed key ids: ${malformed.join(", ")}`,
+    );
+  }
+  return { authorizedKeyIds };
 }
 
 function buildProvenanceReference(
@@ -669,6 +707,26 @@ function realityChecks(records: AssuranceRecordInput[]): {
       });
     }
 
+    if (input.sourceClass === "NATIVE_REPLAY") {
+      const signatureVerified =
+        isCryptographicallyVerifiedNativeReplayRecord(input.record);
+      const signerKeyId = nativeReplaySignerKeyId(input.record);
+      checks.push({
+        id: `reality_native_replay_signature:${input.record.id}`,
+        plane: "REALITY",
+        state: signatureVerified && signerKeyId ? "PASS" : "BLOCKED",
+        critical: true,
+        description:
+          signatureVerified && signerKeyId
+            ? `${input.label}: native replay attestation signature was verified against pinned key ${signerKeyId}.`
+            : `${input.label}: native replay record lacks runtime proof of pinned-key signature verification.`,
+        evidence: [
+          input.record.integrity.recordDigest,
+          ...(signerKeyId ? [`signer:${signerKeyId}`] : []),
+        ],
+      });
+    }
+
     checks.push({
       id: `reality_integrity:${input.record.id}`,
       plane: "REALITY",
@@ -817,6 +875,147 @@ function observerAuthorizationCheck(
       verifiedObserverCount: verified.length,
     },
   };
+}
+
+function nativeReplayAuthorizationCheck(
+  records: AssuranceRecordInput[],
+  trust: AssuranceNativeReplayTrust,
+): AssuranceCheck {
+  const declared = records.filter(
+    (record) => record.sourceClass === "NATIVE_REPLAY",
+  );
+  if (declared.length === 0) {
+    return {
+      id: "reality_native_replay_authorization",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No native replay Reality Records are included in the certificate evidence set.",
+      evidence: [],
+    };
+  }
+
+  const verified = declared
+    .filter(
+      (record) =>
+        sourceClassVerified(record) &&
+        verifyRealityRecordIntegrity(record.record) &&
+        isCryptographicallyVerifiedNativeReplayRecord(record.record),
+    )
+    .map((record) => ({
+      record,
+      keyId: nativeReplaySignerKeyId(record.record),
+    }));
+
+  if (verified.length === 0) {
+    return {
+      id: "reality_native_replay_authorization",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No cryptographically verified native replay record is available for authorization.",
+      evidence: declared.map((item) => item.record.integrity.recordDigest),
+    };
+  }
+
+  const missingKeyId = verified.filter((item) => !item.keyId);
+  if (missingKeyId.length > 0) {
+    return {
+      id: "reality_native_replay_authorization",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "A cryptographically verified native replay record is missing its signer key id.",
+      evidence: missingKeyId.map((item) => item.record.record.integrity.recordDigest),
+    };
+  }
+
+  if (trust.authorizedKeyIds.length === 0) {
+    return {
+      id: "reality_native_replay_authorization",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No authorized native replay signer key ids were declared.",
+      evidence: verified.map(
+        (item) => `${item.record.record.integrity.recordDigest}:key=${item.keyId}`,
+      ),
+    };
+  }
+
+  const unauthorized = verified.filter(
+    (item) => !trust.authorizedKeyIds.includes(item.keyId!.toLowerCase()),
+  );
+  if (unauthorized.length > 0) {
+    return {
+      id: "reality_native_replay_authorization",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "One or more signed native replay records use keys outside the declared authorization set.",
+      evidence: unauthorized.map(
+        (item) => `${item.record.record.integrity.recordDigest}:key=${item.keyId}`,
+      ),
+    };
+  }
+
+  return {
+    id: "reality_native_replay_authorization",
+    plane: "REALITY",
+    state: "PASS",
+    critical: true,
+    description: "All cryptographically verified native replay records use authorized signer keys.",
+    evidence: verified.map(
+      (item) => `${item.record.record.integrity.recordDigest}:key=${item.keyId}`,
+    ),
+    metrics: {
+      verifiedNativeReplayCount: verified.length,
+      authorizedNativeReplayKeyCount: trust.authorizedKeyIds.length,
+    },
+  };
+}
+
+function nativeReplayRecordDigestSet(
+  records: AssuranceRecordInput[],
+): ReadonlySet<string> {
+  return new Set(
+    records
+      .filter(
+        (record) =>
+          record.sourceClass === "NATIVE_REPLAY" &&
+          sourceClassVerified(record) &&
+          verifyRealityRecordIntegrity(record.record) &&
+          isCryptographicallyVerifiedNativeReplayRecord(record.record),
+      )
+      .map((record) => record.record.integrity.recordDigest),
+  );
+}
+
+function checkBoundToNativeReplayRecords(
+  check: AssuranceCheck,
+  records: AssuranceRecordInput[],
+): boolean {
+  const available = nativeReplayRecordDigestSet(records);
+  if (check.plane === "CONFORMANCE") {
+    const refs = check.evidence
+      .filter((item) => item.startsWith("record:"))
+      .map((item) => item.slice("record:".length));
+    return refs.length >= 1 && refs.every((digest) => available.has(digest));
+  }
+  if (check.plane === "RECOVERY") {
+    const before = check.evidence
+      .filter((item) => item.startsWith("before-record:"))
+      .map((item) => item.slice("before-record:".length));
+    const after = check.evidence
+      .filter((item) => item.startsWith("after-record:"))
+      .map((item) => item.slice("after-record:".length));
+    return (
+      before.length >= 1 &&
+      after.length >= 1 &&
+      [...before, ...after].every((digest) => available.has(digest))
+    );
+  }
+  return true;
 }
 
 function networkIdentityBindingCheck(
@@ -1057,6 +1256,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   const requirements = { ...DEFAULT_REQUIREMENTS, ...input.requirements };
   const observerTrust = normalizedObserverTrust(input.observerTrust);
   const builderTrust = normalizedBuilderTrust(input.builderTrust);
+  const nativeReplayTrust = normalizedNativeReplayTrust(input.nativeReplayTrust);
   const reality = realityChecks(input.records);
   const releaseIdentity = releaseArtifactIdentityCheck(input.release);
   const buildProvenance = buildProvenanceVerificationCheck(
@@ -1066,6 +1266,10 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   );
   const buildProvenanceRef = buildProvenanceReference(input.buildProvenance);
   const observerAuthorization = observerAuthorizationCheck(input.records, observerTrust);
+  const nativeReplayAuthorization = nativeReplayAuthorizationCheck(
+    input.records,
+    nativeReplayTrust,
+  );
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
   const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
   const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
@@ -1096,6 +1300,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       verifyRealityRecordIntegrity(record.record) &&
       isCryptographicallyVerifiedSentinelRecord(record.record),
   );
+  const hasNativeReplaySignature = input.records.some(
+    (record) =>
+      record.sourceClass === "NATIVE_REPLAY" &&
+      sourceClassVerified(record) &&
+      verifyRealityRecordIntegrity(record.record) &&
+      isCryptographicallyVerifiedNativeReplayRecord(record.record),
+  );
   const hasPossibility = suppliedChecks.some(
     (check) =>
       check.plane === "POSSIBILITY" &&
@@ -1108,14 +1319,16 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       check.plane === "CONFORMANCE" &&
       check.critical &&
       check.producerVerified &&
-      check.state === "PASS",
+      check.state === "PASS" &&
+      checkBoundToNativeReplayRecords(check, input.records),
   );
   const hasRecovery = suppliedChecks.some(
     (check) =>
       check.plane === "RECOVERY" &&
       check.critical &&
       check.producerVerified &&
-      check.state === "PASS",
+      check.state === "PASS" &&
+      checkBoundToNativeReplayRecords(check, input.records),
   );
 
   const gates: AssuranceCheck[] = [
@@ -1133,6 +1346,22 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
         requirements.requireBuilderAuthorization,
       buildProvenance.state === "PASS",
       buildProvenance.description,
+    ),
+    requiredPlaneCheck(
+      "gate_native_replay_signature",
+      "REALITY",
+      requirements.requireNativeReplaySignature,
+      hasNativeReplaySignature,
+      hasNativeReplaySignature
+        ? "At least one certificate-bound native replay record has runtime proof of pinned-key Ed25519 verification."
+        : "No certificate-bound native replay record has runtime proof of pinned-key Ed25519 verification.",
+    ),
+    requiredPlaneCheck(
+      "gate_native_replay_authorization",
+      "REALITY",
+      requirements.requireNativeReplayAuthorization,
+      nativeReplayAuthorization.state === "PASS",
+      nativeReplayAuthorization.description,
     ),
     requiredPlaneCheck(
       "gate_live_observation",
@@ -1196,7 +1425,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, nativeReplayAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
@@ -1214,6 +1443,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ...observerTrust.authorizedKeyIds,
     ...builderTrust.authorizedKeyIds,
     ...builderTrust.authorizedBuilderIds,
+    ...nativeReplayTrust.authorizedKeyIds,
     input.buildProvenance?.payloadDigest ?? "",
     ...reality.references.map((record) => record.digest).sort(),
     policy.digest,
@@ -1228,6 +1458,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     freshness: input.freshness,
     observerTrust,
     builderTrust,
+    nativeReplayTrust,
     ...(buildProvenanceRef ? { buildProvenance: buildProvenanceRef } : {}),
     release: input.release,
     network: input.network,
@@ -1345,6 +1576,8 @@ export function conformanceCheckFromRealityRecord(args: {
   const record = args.record;
   const sourceValid = record.source === "rchain-rust-native-replay";
   const integrityValid = verifyRealityRecordIntegrity(record);
+  const signatureVerified = isCryptographicallyVerifiedNativeReplayRecord(record);
+  const signerKeyId = nativeReplaySignerKeyId(record);
   const complete =
     record.replay.available &&
     Boolean(record.replay.expectedDigest) &&
@@ -1354,11 +1587,11 @@ export function conformanceCheckFromRealityRecord(args: {
     record.replay.expectedDigest === record.replay.observedDigest &&
     record.replay.state === "REPRODUCED";
   const state: AssuranceGateState =
-    !sourceValid || !integrityValid || !complete
-      ? "BLOCKED"
-      : match
-        ? "PASS"
-        : "FAIL";
+    complete && !match
+      ? "FAIL"
+      : !sourceValid || !integrityValid || !signatureVerified || !signerKeyId || !complete
+        ? "BLOCKED"
+        : "PASS";
 
   return trustedCheck({
     id: args.id,
@@ -1369,12 +1602,16 @@ export function conformanceCheckFromRealityRecord(args: {
     evidence: [
       `record:${record.integrity.recordDigest}`,
       `source:${record.source}`,
+      `signature-verified:${signatureVerified}`,
+      ...(signerKeyId ? [`signer:${signerKeyId}`] : []),
       ...(record.replay.expectedDigest ? [`expected:${record.replay.expectedDigest}`] : []),
       ...(record.replay.observedDigest ? [`observed:${record.replay.observedDigest}`] : []),
     ],
     metrics: {
       sourceValid,
       integrityValid,
+      signatureVerified,
+      signerKeyId: signerKeyId ?? "",
       complete,
       match,
     },
@@ -1393,6 +1630,17 @@ export function recoveryCheckFromRecordChain(args: {
   const sourceValid =
     before.source === "rchain-rust-native-replay" &&
     after.source === "rchain-rust-native-replay";
+  const beforeSignatureVerified =
+    isCryptographicallyVerifiedNativeReplayRecord(before);
+  const afterSignatureVerified =
+    isCryptographicallyVerifiedNativeReplayRecord(after);
+  const beforeSignerKeyId = nativeReplaySignerKeyId(before);
+  const afterSignerKeyId = nativeReplaySignerKeyId(after);
+  const signaturesVerified =
+    beforeSignatureVerified &&
+    afterSignatureVerified &&
+    Boolean(beforeSignerKeyId) &&
+    Boolean(afterSignerKeyId);
   const integrityValid =
     verifyRealityRecordIntegrity(before) &&
     verifyRealityRecordIntegrity(after);
@@ -1432,12 +1680,17 @@ export function recoveryCheckFromRecordChain(args: {
   const complete =
     sourceValid &&
     integrityValid &&
+    signaturesVerified &&
     chainLinked &&
     subjectStable &&
     stateComplete &&
     methodologyComplete;
   const state: AssuranceGateState =
-    !complete ? "BLOCKED" : stateMatch ? "PASS" : "FAIL";
+    stateComplete && !stateMatch
+      ? "FAIL"
+      : !complete
+        ? "BLOCKED"
+        : "PASS";
 
   return trustedCheck({
     id: args.id,
@@ -1450,6 +1703,10 @@ export function recoveryCheckFromRecordChain(args: {
       `after-record:${after.integrity.recordDigest}`,
       `chain-linked:${chainLinked}`,
       `subject-stable:${subjectStable}`,
+      `before-signature-verified:${beforeSignatureVerified}`,
+      `after-signature-verified:${afterSignatureVerified}`,
+      ...(beforeSignerKeyId ? [`before-signer:${beforeSignerKeyId}`] : []),
+      ...(afterSignerKeyId ? [`after-signer:${afterSignerKeyId}`] : []),
       ...(beforeDigest ? [`pre-recovery:${beforeDigest}`] : []),
       ...(recoveredDigest ? [`recovered:${recoveredDigest}`] : []),
       `independent-process:${independentProcess}`,
@@ -1459,6 +1716,9 @@ export function recoveryCheckFromRecordChain(args: {
     metrics: {
       sourceValid,
       integrityValid,
+      signaturesVerified,
+      beforeSignerKeyId: beforeSignerKeyId ?? "",
+      afterSignerKeyId: afterSignerKeyId ?? "",
       chainLinked,
       subjectStable,
       stateComplete,
