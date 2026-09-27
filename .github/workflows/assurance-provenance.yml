@@ -56,6 +56,25 @@ jobs:
           npm test
           npm run build
 
+      - name: Record provenance trust mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assurance-out
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            MODE="UNSIGNED_PR_BUILD"
+          else
+            MODE="ATTESTED_TRUSTED_BUILD"
+          fi
+          printf '%s\n' "$MODE" > assurance-out/PROVENANCE_TRUST_MODE
+          {
+            printf 'schema=causal-assurance-build-trust/v1\n'
+            printf 'mode=%s\n' "$MODE"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'source_commit=%s\n' "${{ github.event.pull_request.head.sha || github.sha }}"
+            printf 'event=%s\n' "$GITHUB_EVENT_NAME"
+          } > assurance-out/PROVENANCE_TRUST.txt
+
       - name: Create deterministic release bundle
         shell: bash
         run: |
@@ -72,6 +91,17 @@ jobs:
             .vercel/output package.json package-lock.json
           sha256sum assurance-out/rchain-reality-compiler-build.tar \
             > assurance-out/SHA256SUMS
+          sha256sum assurance-out/PROVENANCE_TRUST_MODE assurance-out/PROVENANCE_TRUST.txt \
+            >> assurance-out/SHA256SUMS
+
+      - name: Enforce PR trust boundary
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat assurance-out/PROVENANCE_TRUST_MODE)" = "UNSIGNED_PR_BUILD"
+          test ! -e assurance-out/rchain-build-provenance.json
+          echo "PR artifact is validated but intentionally unsigned; release attestation privileges remain unavailable."
 
       - name: Materialize builder signing seed
         if: ${{ github.event_name != 'pull_request' }}
