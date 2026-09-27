@@ -20,6 +20,14 @@ import {
 
 export const SENTINEL_ATTESTATION_SCHEMA = "rchain-sentinel-attestation/v1" as const;
 
+export interface SentinelFailureDomainDeclaration {
+  node_url: string;
+  operator_id: string;
+  provider_id: string;
+  region: string;
+  failure_domain_id: string;
+}
+
 export interface SignedSentinelAttestation {
   schema: typeof SENTINEL_ATTESTATION_SCHEMA;
   payload: {
@@ -28,6 +36,7 @@ export interface SignedSentinelAttestation {
     network: SentinelNetworkStatus;
     finalized_block: SentinelFinalizedBlockEvidence;
     cross_node: SentinelCrossNodeReport;
+    failure_domains: SentinelFailureDomainDeclaration[];
   };
   payload_sha256: string;
   signature: {
@@ -66,6 +75,85 @@ export function sentinelAttestationPayloadDigest(
   return attestationPayloadDigest(payload);
 }
 
+function normalizeNodeUrl(value: string): string {
+  return value.trim().replace(/\/+$/, "");
+}
+
+function validateFailureDomainDeclarations(
+  payload: SignedSentinelAttestation["payload"],
+): { valid: boolean; reason: string; metrics: Record<string, number | boolean> } {
+  const targetUrls = payload.cross_node.observations.map((item) =>
+    normalizeNodeUrl(item.node_url),
+  );
+  const targetSet = new Set(targetUrls);
+  const declarations = payload.failure_domains ?? [];
+  const declarationUrls = declarations.map((item) =>
+    normalizeNodeUrl(item.node_url),
+  );
+  const declarationSet = new Set(declarationUrls);
+
+  const fieldsComplete = declarations.every(
+    (item) =>
+      normalizeNodeUrl(item.node_url).length > 0 &&
+      item.operator_id.trim().length > 0 &&
+      item.provider_id.trim().length > 0 &&
+      item.region.trim().length > 0 &&
+      item.failure_domain_id.trim().length > 0,
+  );
+  const noDuplicateTargets =
+    declarationSet.size === declarationUrls.length &&
+    targetSet.size === targetUrls.length;
+  const exactCoverage =
+    targetSet.size === declarationSet.size &&
+    [...targetSet].every((url) => declarationSet.has(url));
+  const targetCountConsistent =
+    payload.cross_node.target_count === targetUrls.length &&
+    declarations.length === targetUrls.length;
+  const distinctOperators = new Set(
+    declarations.map((item) => item.operator_id.trim()),
+  ).size;
+  const distinctProviders = new Set(
+    declarations.map((item) => item.provider_id.trim()),
+  ).size;
+  const distinctRegions = new Set(
+    declarations.map((item) => item.region.trim()),
+  ).size;
+  const distinctFailureDomains = new Set(
+    declarations.map((item) => item.failure_domain_id.trim()),
+  ).size;
+  const minimumIndependentDeclarations =
+    declarations.length >= 2 &&
+    distinctOperators >= 2 &&
+    distinctFailureDomains >= 2;
+
+  const valid =
+    fieldsComplete &&
+    noDuplicateTargets &&
+    exactCoverage &&
+    targetCountConsistent &&
+    minimumIndependentDeclarations;
+
+  return {
+    valid,
+    reason: valid
+      ? "signed failure-domain declarations exactly cover all cross-node targets with at least two distinct operators and failure-domain ids"
+      : `invalid signed failure-domain declarations: fieldsComplete=${fieldsComplete}, noDuplicateTargets=${noDuplicateTargets}, exactCoverage=${exactCoverage}, targetCountConsistent=${targetCountConsistent}, declarations=${declarations.length}, distinctOperators=${distinctOperators}, distinctFailureDomains=${distinctFailureDomains}`,
+    metrics: {
+      declarationCount: declarations.length,
+      targetCount: targetUrls.length,
+      fieldsComplete,
+      noDuplicateTargets,
+      exactCoverage,
+      targetCountConsistent,
+      distinctOperators,
+      distinctProviders,
+      distinctRegions,
+      distinctFailureDomains,
+      minimumIndependentDeclarations,
+    },
+  };
+}
+
 export async function verifySignedSentinelAttestation(
   snapshot: SignedSentinelAttestation,
   expectedKeyId: string,
@@ -83,6 +171,16 @@ export async function verifySignedSentinelAttestation(
       valid: false,
       keyId: null,
       reason: "unexpected payload schema",
+      payloadDigest: null,
+    };
+  }
+
+  const failureDomains = validateFailureDomainDeclarations(snapshot.payload);
+  if (!failureDomains.valid) {
+    return {
+      valid: false,
+      keyId: null,
+      reason: failureDomains.reason,
       payloadDigest: null,
     };
   }
@@ -131,11 +229,28 @@ export async function signedSentinelAttestationToRecord(args: {
   const { integrity: _integrity, state: _state, ...payload } = base;
 
   const observationId = `sentinel-attestation:${verification.payloadDigest}`;
+  const failureDomainObservationId =
+    `sentinel-failure-domains:${verification.payloadDigest}`;
   const evidenceId = `evidence:${observationId}`;
+  const failureDomainEvidenceId =
+    `evidence:${failureDomainObservationId}`;
+  const failureDomainValidation =
+    validateFailureDomainDeclarations(args.snapshot.payload);
   const record = sealRealityRecord({
     ...payload,
     observations: [
       ...payload.observations,
+      {
+        id: failureDomainObservationId,
+        source: "rchain-sentinel",
+        type: "FailureDomainDeclarations",
+        timestamp: collectedAt,
+        data: {
+          declarations: args.snapshot.payload.failure_domains,
+          ...failureDomainValidation.metrics,
+          declarationValidation: failureDomainValidation.valid,
+        },
+      },
       {
         id: observationId,
         source: "rchain-sentinel",
@@ -153,6 +268,12 @@ export async function signedSentinelAttestationToRecord(args: {
     evidence: [
       ...payload.evidence,
       {
+        id: failureDomainEvidenceId,
+        observationIds: [failureDomainObservationId],
+        hash: verification.payloadDigest,
+        description: "Signed operator/provider/region/failure-domain declarations bound to the Sentinel cross-node target set.",
+      },
+      {
         id: evidenceId,
         observationIds: [observationId],
         hash: verification.payloadDigest,
@@ -161,6 +282,13 @@ export async function signedSentinelAttestationToRecord(args: {
     ],
     transformations: [
       ...payload.transformations,
+      {
+        id: "transform_sentinel_failure_domains_to_verified_observation",
+        name: "Signed failure-domain declarations → target-bound operational topology observation",
+        inputIds: [verification.payloadDigest],
+        outputIds: [failureDomainObservationId],
+        deterministic: true,
+      },
       {
         id: "transform_sentinel_attestation_to_verified_observation",
         name: "Signed Sentinel snapshot → pinned-key verified observation",
@@ -171,6 +299,13 @@ export async function signedSentinelAttestationToRecord(args: {
     ],
     verification: [
       ...payload.verification,
+      {
+        id: "verify_sentinel_failure_domain_declarations",
+        predicate: "signed failure-domain declarations exactly cover cross-node targets and document at least two operators/failure domains",
+        state: failureDomainValidation.valid ? "VERIFIED" : "DIVERGENT",
+        message: failureDomainValidation.reason,
+        evidenceIds: [failureDomainEvidenceId],
+      },
       {
         id: "verify_sentinel_attestation_signature",
         predicate: "Ed25519 signature verifies under the pinned Sentinel key id",
