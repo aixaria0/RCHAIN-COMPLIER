@@ -171,6 +171,10 @@ function isTrustedCheck(input: AssuranceCheckInput): boolean {
   return (input as Partial<TrustedAssuranceCheckInput>)[TRUSTED_CHECK_ATTESTATION] === true;
 }
 
+function strictPolicyDigest(): string {
+  return digest([JSON.stringify(DEFAULT_REQUIREMENTS)]);
+}
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === "object") {
@@ -695,16 +699,21 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
   const checks = [...reality.checks, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
+  const policy = {
+    id: STRICT_POLICY_ID,
+    digest: strictPolicyDigest(),
+  };
   const id = `assurance:${digest([
     input.release.repository,
     input.release.commit,
     input.network.genesis,
-  ]).slice(0, 20)}`;
-
-  const policy = {
-    id: STRICT_POLICY_ID,
-    digest: digest([JSON.stringify(DEFAULT_REQUIREMENTS)]),
-  };
+    input.network.networkId ?? "",
+    input.network.shardId ?? "",
+    input.issuedAt,
+    JSON.stringify(input.freshness),
+    ...reality.references.map((record) => record.digest).sort(),
+    policy.digest,
+  ]).slice(0, 32)}`;
   const payload: Omit<AssuranceCertificate, "integrity"> = {
     schema: "rchain-assurance-certificate/v1",
     id,
@@ -732,6 +741,28 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
 export function verifyAssuranceCertificateIntegrity(certificate: AssuranceCertificate): boolean {
   const { integrity: _integrity, ...payload } = certificate;
   return digest([canonicalCertificatePayload(payload)]) === certificate.integrity.certificateDigest;
+}
+
+export function verifyAssuranceCertificatePolicy(certificate: AssuranceCertificate): boolean {
+  if (certificate.policy.id !== STRICT_POLICY_ID) return false;
+  if (certificate.policy.digest !== strictPolicyDigest()) return false;
+  return (Object.keys(DEFAULT_REQUIREMENTS) as Array<keyof AssuranceRequirements>).every(
+    (key) => DEFAULT_REQUIREMENTS[key] !== true || certificate.requirements[key] === true,
+  );
+}
+
+export function validateAssuranceCertificate(certificate: AssuranceCertificate): {
+  valid: boolean;
+  integrity: boolean;
+  policy: boolean;
+} {
+  const integrity = verifyAssuranceCertificateIntegrity(certificate);
+  const policy = verifyAssuranceCertificatePolicy(certificate);
+  return {
+    valid: integrity && policy,
+    integrity,
+    policy,
+  };
 }
 
 export function possibilityCheckFromSearch(args: {
