@@ -169,3 +169,15 @@ test("tampering after signing invalidates the provenance signature", async () =>
   const result = await verifySignedBuildProvenanceAttestation(snapshot, KEY_ID);
   assert.equal(result.valid, false);
 });
+
+
+test("rejects provenance repository-prefix spoofing", async () => {
+  const broken = payload();
+  broken.statement.predicate.buildDefinition.resolvedDependencies![0]!.uri =
+    `git+https://github.com/attacker/${REPOSITORY}@refs/heads/dev`;
+  const snapshot = await signedSnapshot(broken);
+  const result = await verifySignedBuildProvenanceAttestation(snapshot, KEY_ID);
+
+  assert.equal(result.valid, false);
+  assert.match(result.reason, /resolvedDependencies/);
+});
