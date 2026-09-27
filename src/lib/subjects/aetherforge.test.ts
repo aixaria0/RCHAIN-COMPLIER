@@ -13,7 +13,7 @@ test("AETHER FORGE is accepted as a non-blockchain external subject", () => {
   assert.equal(result.selectedAdapterId, "aetherforge-numeric-conformance");
   assert.equal(result.artifact?.outcome, "UNREACHABLE_IN_MODEL");
   assert.equal(result.artifact?.scope.repository, "aixaria0/aetherforge");
-  assert.equal(result.artifact?.metrics?.sourceCommit, "256fd5a83978e865a7ebcc516eb9956c642b5968");
+  assert.equal(result.artifact?.metrics?.sourceCommit, "f264c530a39acf029070eee077eec96518a84055");
   assert.match(result.artifact?.limitations.join("\n") ?? "", /does not establish physical correctness/);
 });
 
