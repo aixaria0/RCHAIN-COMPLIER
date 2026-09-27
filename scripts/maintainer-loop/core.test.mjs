@@ -51,3 +51,36 @@ test("healthy node boot verifies", () => {
   assert.equal(result.firstDivergence, null);
   assert.equal(verifyIntegrity(result.record), true);
 });
+
+test("Sentinel read-only maintainer packet verifies end to end", async () => {
+  const input = await fixture("sentinel-maintainer-health.json");
+  const result = runScenario({ scenario: getScenario("MAINTAINER_HEALTH"), input });
+  assert.equal(result.state, "VERIFIED");
+  assert.equal(result.firstDivergence, null);
+  assert.equal(verifyIntegrity(result.record), true);
+});
+
+test("Sentinel canonical mismatch becomes the first semantic divergence", () => {
+  const result = runScenario({
+    scenario: getScenario("MAINTAINER_HEALTH"),
+    input: {
+      subject: { id: "canonical-mismatch" },
+      observations: {
+        health: {
+          statusReadable: true,
+          versionReadable: true,
+          capabilitiesReadable: true,
+          shardsReadable: true,
+          finalizedBlockAvailable: true,
+          canonicalConsistency: false,
+          nodeReportedFinalized: true,
+          bondStructureValid: true,
+          crossNodeAgreement: true
+        }
+      }
+    }
+  });
+  assert.equal(result.state, "DIVERGENT");
+  assert.equal(result.firstDivergence?.id, "verify:canonical_consistent");
+});
+
