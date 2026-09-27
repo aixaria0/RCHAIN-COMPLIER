@@ -65,7 +65,7 @@ Checks that can satisfy Possibility, Conformance, or Recovery are produced by tr
 
 The live Reality gate also binds the declared `networkId` and `shardId` to an integrity-valid Sentinel `NetworkStatus` observation. If the declaration conflicts with the observed network identity, the certificate fails. If the live observation does not expose enough network identity to compare, promotion is blocked.
 
-A record is not considered promotion-grade merely because it is labeled live. The strict live gate also requires Sentinel's finalized-block payload to be available, the canonical full-block identity to match, the node to report finality, canonical consistency to pass, the observed network endpoint to be reachable, and the Sentinel cross-node report to show consistent height/hash observations across at least two configured targets with no recorded conflict. Missing evidence is `BLOCKED`, not silently treated as success. Cross-node consistency is deliberately described only as endpoint consistency: two URLs are not automatically two independent operators or failure domains, and this check is not a stake-weighted Casper finality proof.
+A record is not considered promotion-grade merely because it is labeled live. Under `rchain-revival-strict/v1`, unsigned Sentinel records are diagnostic only and cannot satisfy either the live-observation gate or the observer-signature gate. The strict live gate also requires Sentinel's finalized-block payload to be available, the canonical full-block identity to match, the node to report finality, canonical consistency to pass, the observed network endpoint to be reachable, and the Sentinel cross-node report to show consistent height/hash observations across at least two configured targets with no recorded conflict. Missing evidence is `BLOCKED`, not silently treated as success. Cross-node consistency is deliberately described only as endpoint consistency: two URLs are not automatically two independent operators or failure domains, and this check is not a stake-weighted Casper finality proof.
 
 Freshness is an explicit scoped policy, not a hard-coded project promise. The certificate requires the caller to declare `maxObservationAgeMs`; that budget is included in the certificate digest. Stale evidence is `BLOCKED`, while evidence timestamped after certificate issuance is `FAIL`. This makes freshness reviewable without inventing a universal latency or expiry target.
 
@@ -76,6 +76,7 @@ Default promotion requirements are:
 - release artifact identity must include a canonical 40-hex source commit, a `sha256:` binary digest, and a `sha256:` digest for the build-provenance statement; this is identity completeness, not signature authentication;
 
 - at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
+- that live observation must originate from a `rchain-sentinel-attestation/v1` snapshot whose Ed25519 signature was verified at runtime against an explicitly pinned `keyId`;
 - a matching live Sentinel network identity (`networkId` + `shardId`);
 - promotion-grade live evidence inside the declared freshness budget;
 - at least one **trusted, critical PASS** Possibility check;
@@ -165,3 +166,15 @@ The envelope publishes the Ed25519 public key and a `sha256:` key fingerprint. V
 Private keys are never generated, stored, or committed by the Assurance Fabric. Key custody and reviewer authorization remain external operational responsibilities.
 
 This closes certificate tamper/authorship mechanics when a trusted key is pinned, but it does not retroactively authenticate unsigned Sentinel or native-replay observations contained in the certificate.
+
+
+## Signed Sentinel observation path
+
+The signed path is intentionally two-stage:
+
+1. `rchain-sentinel` produces `rchain-sentinel-attestation/v1`, signing the canonical network/finalized-block/cross-node snapshot with Ed25519.
+2. `sentinel-signed-adapter.ts` recomputes the canonical payload SHA-256, verifies the Ed25519 signature, verifies the public-key fingerprint, and requires that fingerprint to equal a caller-pinned expected `keyId`.
+
+Only after all checks pass does the adapter create a Reality Record and mark that in-memory record as cryptographically verified. Re-sealing, copying, deserializing, or manually adding `signatureVerified: true` does not recreate this runtime trust marker; the original signed snapshot must be reverified.
+
+This proves that the snapshot was signed by the holder of the pinned key. It still does not establish that the pinned key is organizationally authorized unless that authorization is managed outside this code.
