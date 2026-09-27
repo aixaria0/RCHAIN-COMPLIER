@@ -69,7 +69,7 @@ jobs:
             --numeric-owner \
             --format=posix \
             -cf assurance-out/rchain-reality-compiler-build.tar \
-            dist package.json package-lock.json
+            .vercel/output package.json package-lock.json
           sha256sum assurance-out/rchain-reality-compiler-build.tar \
             > assurance-out/SHA256SUMS
 
