@@ -34,7 +34,8 @@
     "demo:casper-duplicate-minimum": "node --experimental-strip-types examples/casper-duplicate-minimum-message.ts",
     "demo:assurance-fabric": "node --experimental-strip-types examples/assurance-fabric.ts",
     "assurance:produce:build": "node --experimental-strip-types scripts/assurance-attestation-producer.ts build",
-    "assurance:produce:replay": "node --experimental-strip-types scripts/assurance-attestation-producer.ts replay"
+    "assurance:produce:replay": "node --experimental-strip-types scripts/assurance-attestation-producer.ts replay",
+    "assurance:produce:recovery": "node --experimental-strip-types scripts/assurance-attestation-producer.ts recovery"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
