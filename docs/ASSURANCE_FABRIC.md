@@ -37,7 +37,9 @@ Every Reality Record is explicitly classified:
 
 A synthetic record can support development and regression testing, but it never satisfies the live-observation gate.
 
-The source class is also checked against the adapter source. In v1, a record can satisfy `LIVE_OBSERVATION` only when it comes from an explicitly trusted live adapter source (`rchain-sentinel`). Relabeling a compiler fixture as live evidence fails the certificate.
+The source class is also checked against an explicit source-class matrix. In v1, compiler fixtures bind to `SYNTHETIC`, Sentinel records bind to `LIVE_OBSERVATION`, and the reserved native-replay/formal-model/attestation classes have named adapter sources. Relabeling a compiler fixture as live evidence fails the certificate.
+
+For Sentinel, the source string alone is not sufficient. Promotion also checks the expected Sentinel record shape: subject kind, finalized-block observation, network-status observation, and the adapter transformation identifiers must all be present before the record is treated as promotion-grade live evidence. This is structural validation, not cryptographic signer authentication.
 
 ## Weighted possibility search
 
