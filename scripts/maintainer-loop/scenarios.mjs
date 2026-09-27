@@ -3,6 +3,23 @@ function check(id, label, path, op, expected = true) {
 }
 
 export const SCENARIOS = {
+  MAINTAINER_HEALTH: {
+    id: "MAINTAINER_HEALTH",
+    label: "Read-only RNode maintainer health surfaces agree",
+    replay: false,
+    checks: [
+      check("status_readable", "/api/status is readable", "health.statusReadable", "equals", true),
+      check("version_readable", "/version is readable", "health.versionReadable", "equals", true),
+      check("capabilities_readable", "/api/capabilities is readable", "health.capabilitiesReadable", "equals", true),
+      check("shards_readable", "/api/v1/shards is readable", "health.shardsReadable", "equals", true),
+      check("finalized_available", "last finalized block evidence is available", "health.finalizedBlockAvailable", "equals", true),
+      check("canonical_consistent", "canonical block response matches finalized-block fields", "health.canonicalConsistency", "equals", true),
+      check("node_finalized", "RNode asserts finality for the observed finalized block", "health.nodeReportedFinalized", "equals", true),
+      check("bonds_valid", "observed validator bond structure is valid", "health.bondStructureValid", "equals", true),
+      check("cross_node_agreement", "configured observers agree on the finalized result", "health.crossNodeAgreement", "equals", true),
+    ],
+  },
+
   NODE_BOOT: {
     id: "NODE_BOOT",
     label: "Booted artifact exposes the expected HTTP surface",
