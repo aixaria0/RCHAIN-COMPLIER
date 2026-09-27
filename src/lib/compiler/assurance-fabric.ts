@@ -75,6 +75,7 @@ export interface AssuranceRequirements {
   requireBuilderAuthorization: boolean;
   requireNativeReplaySignature: boolean;
   requireNativeReplayAuthorization: boolean;
+  requireNativeReplayReleaseBinding: boolean;
   requireLiveObservation: boolean;
   requireFailureDomainDeclarations: boolean;
   requireObserverSignature: boolean;
@@ -192,6 +193,7 @@ const DEFAULT_REQUIREMENTS: AssuranceRequirements = {
   requireBuilderAuthorization: true,
   requireNativeReplaySignature: true,
   requireNativeReplayAuthorization: true,
+  requireNativeReplayReleaseBinding: true,
   requireLiveObservation: true,
   requireFailureDomainDeclarations: true,
   requireObserverSignature: true,
@@ -271,6 +273,7 @@ function strictPolicyDescriptor(): Record<string, unknown> {
       attestationSchema: "rchain-native-replay-attestation/v1",
       signatureRequired: true,
       certificateEvidenceBindingRequired: true,
+      releaseIdentityBindingRequired: true,
     },
     buildProvenance: {
       attestationSchema: "rchain-build-provenance-attestation/v1",
@@ -1104,6 +1107,128 @@ function nativeReplayAuthorizationCheck(
   };
 }
 
+function nativeReplayReleaseBindingCheck(
+  records: AssuranceRecordInput[],
+  release: AssuranceReleaseIdentity,
+): AssuranceCheck {
+  const signed = records.filter(
+    (record) =>
+      record.sourceClass === "NATIVE_REPLAY" &&
+      sourceClassVerified(record) &&
+      verifyRealityRecordIntegrity(record.record) &&
+      isCryptographicallyVerifiedNativeReplayRecord(record.record),
+  );
+
+  if (signed.length === 0) {
+    return {
+      id: "reality_native_replay_release_binding",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "No cryptographically verified native replay record is available to bind the declared release identity.",
+      evidence: [],
+    };
+  }
+
+  if (!release.binaryDigest) {
+    return {
+      id: "reality_native_replay_release_binding",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "Release binary digest is required before native replay evidence can be bound to the release.",
+      evidence: signed.map((item) => item.record.integrity.recordDigest),
+    };
+  }
+
+  const observations = signed.map((item) => ({
+    record: item,
+    execution: item.record.observations.find(
+      (observation) =>
+        observation.type === "NativeReplayExecution" &&
+        observation.source === "rchain-rust-native-replay",
+    ),
+  }));
+
+  if (observations.some(({ execution }) => !execution)) {
+    return {
+      id: "reality_native_replay_release_binding",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "One or more signed native replay records are missing the NativeReplayExecution identity observation.",
+      evidence: observations
+        .filter(({ execution }) => !execution)
+        .map(({ record }) => record.record.integrity.recordDigest),
+    };
+  }
+
+  const comparisons = observations.map(({ record, execution }) => {
+    const data = execution!.data;
+    const repository =
+      typeof data.repository === "string" ? data.repository.trim().toLowerCase() : null;
+    const commit =
+      typeof data.commit === "string" ? data.commit.toLowerCase() : null;
+    const binaryDigest =
+      typeof data.binaryDigest === "string" ? data.binaryDigest.toLowerCase() : null;
+    return {
+      digest: record.record.integrity.recordDigest,
+      repository,
+      commit,
+      binaryDigest,
+      repositoryMatch: repository === release.repository.trim().toLowerCase(),
+      commitMatch: commit === release.commit.toLowerCase(),
+      binaryMatch: binaryDigest === release.binaryDigest!.toLowerCase(),
+    };
+  });
+
+  const incomplete = comparisons.filter(
+    (item) => !item.repository || !item.commit || !item.binaryDigest,
+  );
+  if (incomplete.length > 0) {
+    return {
+      id: "reality_native_replay_release_binding",
+      plane: "REALITY",
+      state: "BLOCKED",
+      critical: true,
+      description: "Signed native replay release identity is incomplete.",
+      evidence: incomplete.map((item) => item.digest),
+    };
+  }
+
+  const mismatches = comparisons.filter(
+    (item) =>
+      !item.repositoryMatch || !item.commitMatch || !item.binaryMatch,
+  );
+  if (mismatches.length > 0) {
+    return {
+      id: "reality_native_replay_release_binding",
+      plane: "REALITY",
+      state: "FAIL",
+      critical: true,
+      description: "Signed native replay evidence was produced for a different repository, commit, or binary than the declared release.",
+      evidence: mismatches.flatMap((item) => [
+        `record:${item.digest}`,
+        `repository-match:${item.repositoryMatch}`,
+        `commit-match:${item.commitMatch}`,
+        `binary-match:${item.binaryMatch}`,
+      ]),
+    };
+  }
+
+  return {
+    id: "reality_native_replay_release_binding",
+    plane: "REALITY",
+    state: "PASS",
+    critical: true,
+    description: "All cryptographically verified native replay records bind to the exact repository, commit, and binary digest declared by the release.",
+    evidence: comparisons.map((item) => `record:${item.digest}`),
+    metrics: {
+      boundNativeReplayRecords: comparisons.length,
+    },
+  };
+}
+
 function nativeReplayRecordDigestSet(
   records: AssuranceRecordInput[],
 ): ReadonlySet<string> {
@@ -1400,6 +1525,10 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     input.records,
     nativeReplayTrust,
   );
+  const nativeReplayReleaseBinding = nativeReplayReleaseBindingCheck(
+    input.records,
+    input.release,
+  );
   const networkIdentity = networkIdentityBindingCheck(input.records, input.network);
   const freshness = freshnessCheck(input.records, input.issuedAt, input.freshness);
   const suppliedChecks: AssuranceCheck[] = input.checks.map((check) => {
@@ -1494,6 +1623,13 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
       nativeReplayAuthorization.description,
     ),
     requiredPlaneCheck(
+      "gate_native_replay_release_binding",
+      "REALITY",
+      requirements.requireNativeReplayReleaseBinding,
+      nativeReplayReleaseBinding.state === "PASS",
+      nativeReplayReleaseBinding.description,
+    ),
+    requiredPlaneCheck(
       "gate_live_observation",
       "REALITY",
       requirements.requireLiveObservation,
@@ -1562,7 +1698,7 @@ export function buildAssuranceCertificate(input: AssuranceFabricInput): Assuranc
     ),
   ];
 
-  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, failureDomains, nativeReplayAuthorization, networkIdentity, freshness, ...suppliedChecks, ...gates];
+  const checks = [releaseIdentity, buildProvenance, ...reality.checks, observerAuthorization, failureDomains, nativeReplayAuthorization, nativeReplayReleaseBinding, networkIdentity, freshness, ...suppliedChecks, ...gates];
   const status = deriveStatus(checks);
   const summary = summarize(checks);
   const policy = {
