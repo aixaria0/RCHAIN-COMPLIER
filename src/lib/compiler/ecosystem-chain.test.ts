@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { runTamperMatrix, sha256Artifact, validateEcosystemChain, type CausalAssuranceEcosystemManifest } from "./ecosystem-chain.ts";
+import { assuranceStatusFromVerificationOutcome, runTamperMatrix, sha256Artifact, validateEcosystemChain, type CausalAssuranceEcosystemManifest } from "./ecosystem-chain.ts";
 
 function fixture(): CausalAssuranceEcosystemManifest {
   const possibility = sha256Artifact("minimum-witness");
@@ -13,7 +13,7 @@ function fixture(): CausalAssuranceEcosystemManifest {
     subject: { kind: "finite-state-model", id: "dual-refinement-fixture" },
     artifacts: {
       possibility: { producer: "RCHAIN-COMPLIER", schema: "verification-artifact/v1", digest: possibility, status: "PASS" },
-      observation: { producer: "rchain-sentinel", schema: "causal-assurance-evidence/v1", digest: observation, status: "PASS", bindsTo: [possibility] },
+      observation: { producer: "rchain-sentinel", schema: "causal-assurance-evidence/v2", digest: observation, status: "PASS", bindsTo: [possibility] },
       workbench: { producer: "rlsenti", schema: "assurance-workbench/v1", digest: workbench, status: "PASS", bindsTo: [possibility, observation] },
       attestation: { producer: "Sovereign-Lattice", schema: "causal-assurance-attestation/v1", digest: attestation, status: "PASS", bindsTo: [workbench] },
     },
@@ -43,4 +43,18 @@ test("every declared cross-repository tamper boundary fails closed", () => {
     ["POSSIBILITY_DIGEST", "OBSERVATION_BINDING", "WORKBENCH_BINDING", "ATTESTATION_BINDING", "PROVENANCE_TRUST"],
   );
   assert.ok(results.every((result) => result.observed === "BLOCKED"));
+});
+
+test("base chain may pass without optional reviewer attestation", () => {
+  const manifest = fixture();
+  delete manifest.artifacts.attestation;
+  assert.equal(validateEcosystemChain(manifest).status, "PASS");
+  assert.equal(validateEcosystemChain(manifest, { requireAttestation: true }).status, "BLOCKED");
+});
+
+test("verification outcomes never promote inconclusive work to PASS", () => {
+  assert.equal(assuranceStatusFromVerificationOutcome("UNREACHABLE_IN_MODEL"), "PASS");
+  assert.equal(assuranceStatusFromVerificationOutcome("WITNESS_FOUND"), "FAIL");
+  assert.equal(assuranceStatusFromVerificationOutcome("LIMIT_REACHED"), "BLOCKED");
+  assert.equal(assuranceStatusFromVerificationOutcome("INCONCLUSIVE"), "BLOCKED");
 });
