@@ -564,6 +564,11 @@ function sentinelRecordShapeVerified(record: RealityRecord): boolean {
       observation.type === "NetworkStatus" &&
       observation.source === "rchain-sentinel",
   );
+  const genesis = record.observations.find(
+    (observation) =>
+      observation.type === "GenesisEvidence" &&
+      observation.source === "rchain-sentinel",
+  );
   const crossNode = record.observations.find(
     (observation) =>
       observation.type === "CrossNodeReport" &&
@@ -579,12 +584,13 @@ function sentinelRecordShapeVerified(record: RealityRecord): boolean {
       observation.type === "AttestationSignature" &&
       observation.source === "rchain-sentinel",
   );
-  if (!block || !network || !crossNode || !failureDomains || !attestation) return false;
+  if (!block || !network || !genesis || !crossNode || !failureDomains || !attestation) return false;
 
   const transformationIds = new Set(record.transformations.map((item) => item.id));
   return (
     transformationIds.has("transform_sentinel_finalized_block_to_reality_observation") &&
     transformationIds.has("transform_sentinel_network_status_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_genesis_to_verified_observation") &&
     transformationIds.has("transform_sentinel_cross_node_to_reality_observation") &&
     transformationIds.has("transform_sentinel_failure_domains_to_verified_observation") &&
     transformationIds.has("transform_sentinel_attestation_to_verified_observation") &&
@@ -616,6 +622,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     "verify_sentinel_payload_available",
     "verify_sentinel_canonical_consistency",
     "verify_sentinel_finality_hash",
+    "verify_sentinel_genesis_identity",
     "verify_sentinel_cross_node_consistency",
     "verify_sentinel_failure_domain_declarations",
     "verify_sentinel_attestation_signature",
@@ -630,6 +637,9 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const network = input.record.observations.find(
     (observation) => observation.type === "NetworkStatus",
   );
+  const genesis = input.record.observations.find(
+    (observation) => observation.type === "GenesisEvidence",
+  );
   const crossNode = input.record.observations.find(
     (observation) => observation.type === "CrossNodeReport",
   );
@@ -638,6 +648,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   );
   const blockData = block?.data ?? {};
   const networkData = network?.data ?? {};
+  const genesisData = genesis?.data ?? {};
   const crossNodeData = crossNode?.data ?? {};
   const failureDomainData = failureDomains?.data ?? {};
 
@@ -651,6 +662,15 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     blockData.canonicalConsistency === true &&
     blockData.nodeReportedFinalized === true;
   const networkReachable = networkData.reachable === true;
+  const genesisVerified =
+    genesisData.genesisVerified === true &&
+    genesisData.available === true &&
+    genesisData.hashMatch === true &&
+    genesisData.heightZero === true &&
+    genesisData.observedHeight === 0 &&
+    typeof genesisData.configuredHash === "string" &&
+    typeof genesisData.observedHash === "string" &&
+    genesisData.configuredHash.toLowerCase() === genesisData.observedHash.toLowerCase();
   const crossNodeConsistent =
     typeof crossNodeData.targetCount === "number" &&
     crossNodeData.targetCount >= MIN_CROSS_NODE_TARGETS &&
@@ -674,6 +694,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     missingOrUnverified.length === 0 &&
     blockEvidenceComplete &&
     networkReachable &&
+    genesisVerified &&
     crossNodeConsistent &&
     failureDomainsDocumented &&
     observerSignatureVerified;
@@ -681,6 +702,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const evidence = [
     ...(block ? [block.id] : []),
     ...(network ? [network.id] : []),
+    ...(genesis ? [genesis.id] : []),
     ...(crossNode ? [crossNode.id] : []),
     ...(failureDomains ? [failureDomains.id] : []),
     ...requiredVerificationIds.map(
@@ -691,8 +713,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   return {
     valid,
     description: valid
-      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, canonically consistent, node-finalized, cross-node consistent, and carries signed failure-domain declarations covering at least two distinct operators/failure domains."
-      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}, failureDomainsDocumented=${failureDomainsDocumented}, observerSignatureVerified=${observerSignatureVerified}.`,
+      ? "Live Sentinel evidence is integrity-valid, pinned-key signed, network-reachable, RNode-genesis-verified, canonically consistent, node-finalized, cross-node consistent, and carries signed failure-domain declarations covering at least two distinct operators/failure domains."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, genesisVerified=${genesisVerified}, crossNodeConsistent=${crossNodeConsistent}, failureDomainsDocumented=${failureDomainsDocumented}, observerSignatureVerified=${observerSignatureVerified}.`,
     evidence,
   };
 }
@@ -801,14 +823,42 @@ function objectValue(value: unknown): Record<string, unknown> | null {
 
 function observedNetworkIdentity(
   records: AssuranceRecordInput[],
-): Array<{ networkId?: string; shardId?: string; epoch?: string | number; observationId: string }> {
-  const identities: Array<{ networkId?: string; shardId?: string; epoch?: string | number; observationId: string }> = [];
+): Array<{
+  networkId?: string;
+  shardId?: string;
+  epoch?: string | number;
+  genesisHash?: string;
+  observationId: string;
+  genesisObservationId?: string;
+}> {
+  const identities: Array<{
+    networkId?: string;
+    shardId?: string;
+    epoch?: string | number;
+    genesisHash?: string;
+    observationId: string;
+    genesisObservationId?: string;
+  }> = [];
+
   for (const input of records) {
     if (
       input.sourceClass !== "LIVE_OBSERVATION" ||
       !sourceClassVerified(input) ||
-      !verifyRealityRecordIntegrity(input.record)
+      !verifyRealityRecordIntegrity(input.record) ||
+      !isCryptographicallyVerifiedSentinelRecord(input.record)
     ) continue;
+
+    const genesis = input.record.observations.find(
+      (observation) =>
+        observation.type === "GenesisEvidence" &&
+        observation.source === "rchain-sentinel" &&
+        observation.data.genesisVerified === true &&
+        typeof observation.data.observedHash === "string",
+    );
+    const genesisHash =
+      genesis && typeof genesis.data.observedHash === "string"
+        ? genesis.data.observedHash
+        : undefined;
 
     for (const observation of input.record.observations) {
       if (observation.type !== "NetworkStatus") continue;
@@ -824,7 +874,9 @@ function observedNetworkIdentity(
         ...(networkId ? { networkId } : {}),
         ...(shardId ? { shardId } : {}),
         ...(epoch !== undefined ? { epoch } : {}),
+        ...(genesisHash ? { genesisHash } : {}),
         observationId: observation.id,
+        ...(genesis ? { genesisObservationId: genesis.id } : {}),
       });
     }
   }
@@ -1277,14 +1329,18 @@ function networkIdentityBindingCheck(
   expected: AssuranceNetworkIdentity,
 ): AssuranceCheck {
   const observed = observedNetworkIdentity(records);
-  const declaredComplete = Boolean(expected.networkId && expected.shardId);
+  const declaredComplete = Boolean(
+    expected.genesis &&
+    expected.networkId &&
+    expected.shardId,
+  );
   if (!declaredComplete) {
     return {
       id: "reality_network_identity",
       plane: "REALITY",
       state: "BLOCKED",
       critical: true,
-      description: "Network identity binding requires declared networkId and shardId in addition to genesis.",
+      description: "Network identity binding requires declared genesis, networkId, and shardId.",
       evidence: [],
     };
   }
@@ -1294,27 +1350,34 @@ function networkIdentityBindingCheck(
       plane: "REALITY",
       state: "BLOCKED",
       critical: true,
-      description: "No integrity-valid live NetworkStatus observation is available to bind the declared network identity.",
+      description: "No cryptographically verified live NetworkStatus + GenesisEvidence observation is available to bind the declared network identity.",
       evidence: [],
     };
   }
 
-  const comparable = observed.filter((identity) => identity.networkId && identity.shardId);
+  const comparable = observed.filter(
+    (identity) => identity.networkId && identity.shardId && identity.genesisHash,
+  );
   if (comparable.length === 0) {
     return {
       id: "reality_network_identity",
       plane: "REALITY",
       state: "BLOCKED",
       critical: true,
-      description: "Live NetworkStatus observations did not expose both network_id and shard_id.",
-      evidence: observed.map((identity) => identity.observationId),
+      description: "Live Sentinel evidence did not expose verified genesis hash together with network_id and shard_id.",
+      evidence: observed.flatMap((identity) => [
+        identity.observationId,
+        ...(identity.genesisObservationId ? [identity.genesisObservationId] : []),
+      ]),
     };
   }
 
-  const mismatches = comparable.filter((identity) =>
-    identity.networkId !== expected.networkId ||
-    identity.shardId !== expected.shardId ||
-    (expected.epoch !== undefined && identity.epoch !== expected.epoch)
+  const mismatches = comparable.filter(
+    (identity) =>
+      identity.networkId !== expected.networkId ||
+      identity.shardId !== expected.shardId ||
+      identity.genesisHash!.toLowerCase() !== expected.genesis.toLowerCase() ||
+      (expected.epoch !== undefined && identity.epoch !== expected.epoch),
   );
   if (mismatches.length > 0) {
     return {
@@ -1322,9 +1385,10 @@ function networkIdentityBindingCheck(
       plane: "REALITY",
       state: "FAIL",
       critical: true,
-      description: "Declared network identity conflicts with one or more live Sentinel observations.",
-      evidence: mismatches.map((identity) =>
-        `${identity.observationId}:network=${identity.networkId ?? "unknown"},shard=${identity.shardId ?? "unknown"},epoch=${identity.epoch ?? "unknown"}`
+      description: "Declared genesis/network/shard identity conflicts with one or more pinned-key live Sentinel observations.",
+      evidence: mismatches.map(
+        (identity) =>
+          `${identity.observationId}:genesis=${identity.genesisHash ?? "unknown"},network=${identity.networkId ?? "unknown"},shard=${identity.shardId ?? "unknown"},epoch=${identity.epoch ?? "unknown"}`,
       ),
     };
   }
@@ -1334,10 +1398,13 @@ function networkIdentityBindingCheck(
     plane: "REALITY",
     state: "PASS",
     critical: true,
-    description: "Declared networkId/shardId are bound to integrity-valid live Sentinel NetworkStatus observations.",
-    evidence: comparable.map((identity) =>
-      `${identity.observationId}:network=${identity.networkId},shard=${identity.shardId},epoch=${identity.epoch ?? "unknown"}`
-    ),
+    description: "Declared genesis/networkId/shardId are bound to pinned-key live Sentinel evidence; genesis was challenged through the RNode canonical block endpoint at height zero.",
+    evidence: comparable.flatMap((identity) => [
+      `${identity.observationId}:network=${identity.networkId},shard=${identity.shardId},epoch=${identity.epoch ?? "unknown"}`,
+      ...(identity.genesisObservationId
+        ? [`${identity.genesisObservationId}:genesis=${identity.genesisHash}`]
+        : []),
+    ]),
   };
 }
 
