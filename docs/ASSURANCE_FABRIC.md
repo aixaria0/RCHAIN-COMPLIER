@@ -39,7 +39,7 @@ A synthetic record can support development and regression testing, but it never 
 
 The source class is also checked against an explicit source-class matrix. In v1, compiler fixtures bind to `SYNTHETIC`, Sentinel records bind to `LIVE_OBSERVATION`, and the reserved native-replay/formal-model/attestation classes have named adapter sources. Relabeling a compiler fixture as live evidence fails the certificate.
 
-For Sentinel, the source string alone is not sufficient. Promotion also checks the expected Sentinel record shape: subject kind, finalized-block observation, network-status observation, and the adapter transformation identifiers must all be present before the record is treated as promotion-grade live evidence. This is structural validation, not cryptographic signer authentication.
+For Sentinel, the source string alone is not sufficient. Promotion requires the signed Sentinel adapter path. The adapter verifies the pinned Ed25519 key, reconstructs a Reality Record, and carries a process-local cryptographic trust marker. The promotion-grade shape now includes finalized-block evidence, network status, an RNode-challenged genesis witness, cross-node observations, signed failure-domain declarations, and the adapter transformation/verification chain. Relabeling or reconstructing equivalent JSON does not recreate that trust marker.
 
 ## Weighted possibility search
 
@@ -63,9 +63,9 @@ The default policy is identified as `rchain-revival-strict/v1`. Core requirement
 
 Checks that can satisfy Possibility, Conformance, or Recovery are produced by trusted in-process helpers. A manually constructed `PASS` remains visible in the certificate but is downgraded to `BLOCKED` for promotion because it has no trusted producer attestation.
 
-The live Reality gate also binds the declared `networkId` and `shardId` to an integrity-valid Sentinel `NetworkStatus` observation. If the declaration conflicts with the observed network identity, the certificate fails. If the live observation does not expose enough network identity to compare, promotion is blocked.
+The live Reality gate binds the declared `genesis`, `networkId`, `shardId`, and optional epoch to pinned-key Sentinel evidence. Genesis is not accepted as a copied configuration string: Sentinel challenges the configured genesis hash through the RNode canonical `/api/block/{hash}` path, requires the returned hash to match, and requires block height zero. A mismatch is `FAIL`; unavailable or incomplete evidence is `BLOCKED`.
 
-A record is not considered promotion-grade merely because it is labeled live. Under `rchain-revival-strict/v1`, unsigned Sentinel records are diagnostic only and cannot satisfy either the live-observation gate or the observer-signature gate. The strict live gate also requires Sentinel's finalized-block payload to be available, the canonical full-block identity to match, the node to report finality, canonical consistency to pass, the observed network endpoint to be reachable, and the Sentinel cross-node report to show consistent height/hash observations across at least two configured targets with no recorded conflict. Missing evidence is `BLOCKED`, not silently treated as success. Cross-node consistency is deliberately described only as endpoint consistency: two URLs are not automatically two independent operators or failure domains, and this check is not a stake-weighted Casper finality proof.
+A record is not considered promotion-grade merely because it is labeled live. Under `rchain-revival-strict/v1`, unsigned Sentinel records are diagnostic only. The strict live gate requires the finalized-block payload to be available, canonical block identity to match, node-reported finality, canonical consistency, a reachable observed endpoint, verified genesis identity, and consistent height/hash observations across at least two targets. The signed snapshot must also declare operator, provider, region, and failure-domain metadata for every configured target with exact coverage, no duplicates, at least two distinct operators, and at least two distinct failure-domain identifiers. These declarations are tamper-evident because they are inside the signed snapshot; they are still declarations and not independent proof that the operational entities are truly separate. Cross-node consistency remains distinct from stake-weighted Casper finality.
 
 Freshness is an explicit scoped policy, not a hard-coded project promise. The certificate requires the caller to declare `maxObservationAgeMs`; that budget is included in the certificate digest. Stale evidence is `BLOCKED`, while evidence timestamped after certificate issuance is `FAIL`. This makes freshness reviewable without inventing a universal latency or expiry target.
 
@@ -73,15 +73,15 @@ Freshness is an explicit scoped policy, not a hard-coded project promise. The ce
 
 Default promotion requirements are:
 
-- release artifact identity must include a canonical 40-hex source commit, a `sha256:` binary digest, and a `sha256:` digest for the build-provenance statement; this is identity completeness, not signature authentication;
-
-- at least one integrity-valid, non-divergent `LIVE_OBSERVATION`;
-- that live observation must originate from a `rchain-sentinel-attestation/v1` snapshot whose Ed25519 signature was verified at runtime against an explicitly pinned `keyId`;
-- a matching live Sentinel network identity (`networkId` + `shardId`);
-- promotion-grade live evidence inside the declared freshness budget;
+- a canonical 40-hex source commit, a `sha256:` binary digest, and a `sha256:` SLSA provenance-statement digest;
+- a `rchain-build-provenance-attestation/v1` envelope whose pinned Ed25519 signature is reverified, whose in-toto/SLSA statement binds the exact repository + commit + binary subject, and whose signer key and builder ID are both inside the certificate's authorization policy;
+- at least one integrity-valid, non-divergent `LIVE_OBSERVATION` produced from a pinned-key `rchain-sentinel-attestation/v1`;
+- an RNode-challenged genesis witness matching the declared genesis at height zero;
+- exact signed failure-domain declarations for the Sentinel target set, with at least two distinct operators and failure-domain identifiers;
+- a matching live Sentinel network identity (`networkId`, `shardId`, optional epoch) and live evidence inside the declared freshness budget;
 - at least one **trusted, critical PASS** Possibility check;
-- at least one **trusted, critical PASS** Conformance check derived from an integrity-valid `rchain-rust-native-replay` Reality Record;
-- at least one **trusted, critical PASS** Recovery check derived from a chained before/after native-replay record pair with stable subject identity, matching recovered state, distinct process/disk identifiers, and a trusted checkpoint.
+- at least one **trusted, critical PASS** Conformance check derived from a pinned-key signed native replay whose repository, commit, and binary digest match the exact release in the certificate;
+- at least one **trusted, critical PASS** Recovery check derived from a signed chained before/after native-replay pair with stable subject identity, matching recovered state, distinct process/disk identifiers, a checkpoint digest included in replay inputs, a declared checkpoint source, signed recovery-log and restore-tool digests, and ordered restore timestamps.
 
 Overall status:
 
@@ -116,7 +116,7 @@ restart / restore --------------+----> RECOVERY
 
 The certificate stores release identity, network/genesis identity, source-classified Reality Record digests, all gate results, and its own SHA-256 integrity digest. Its certificate ID is also bound to repository/commit, network identity, issuance time, freshness scope, strict-policy digest, and the sorted Reality Record digests, so two materially different evidence snapshots do not share the same logical certificate identifier. Certificate canonicalization sorts object keys recursively before hashing, so semantically identical metadata is not sensitive to object insertion order.
 
-Recovery checks are stricter than digest equality: the helper requires an independent process, independent disk, and a trusted checkpoint in addition to matching pre/post recovery digests. A same-runtime or same-disk "restore" is therefore BLOCKED rather than promoted.
+Recovery checks are stricter than digest equality. The signed recovery manifest must prove record chaining, stable subject identity, a different process and disk, a trusted checkpoint whose digest is one of the actual replay inputs, a checkpoint source, SHA-256 identities for the recovery log and restore tool, and ordered start/finish timestamps. A same-runtime restore, same-disk restore, hand-declared checkpoint that was not replayed, or incomplete restore manifest is `BLOCKED`; a complete state mismatch is `FAIL`.
 
 ## Review boundary
 
@@ -132,7 +132,7 @@ Consumers should run both:
 - `verifyAssuranceCertificateIntegrity()` — detects payload changes relative to the embedded SHA-256 digest.
 - `verifyAssuranceCertificatePolicy()` — confirms the certificate still carries the non-weakened `rchain-revival-strict/v1` requirements.
 
-`validateAssuranceCertificate()` combines both checks. These checks provide deterministic integrity and policy validation; they do **not** provide signer authenticity. Cryptographic observer/build signatures remain a separate trust layer.
+`validateAssuranceCertificate()` combines both checks. Certificate-only validation still does **not** recreate source-attestation authenticity after serialization. For an external trust decision, use the portable Assurance Package verifier described below: it re-verifies the reviewer signature and every original build, Sentinel, and native-replay attestation from scratch and checks that the reconstructed Reality Record digests exactly match the certificate.
 
 
 ## Machine-readable limitations
@@ -141,7 +141,7 @@ Every certificate carries explicit limitations inside the hashed payload. v1 sta
 
 - SHA-256 integrity is not signer authenticity;
 - build provenance authenticity depends on runtime verification of the pinned Ed25519 builder key plus the declared builder authorization set; this does not prove the trusted build platform itself was uncompromised;
-- cross-node consistency does not establish independent operators/failure domains;
+- signed failure-domain metadata records a tamper-evident declaration, not independent corroboration that the named operators/providers/regions are actually separate;
 - cross-node consistency is not a stake-weighted Casper finality proof;
 - bounded possibility search applies only to its declared model/search scope.
 
@@ -152,9 +152,9 @@ These limitations remain present even on a `PASS` certificate so consumers canno
 
 Free-form digest comparison helpers remain available for diagnostics, but they are intentionally **not** trusted producers under `rchain-revival-strict/v1` and therefore cannot satisfy the Conformance or Recovery promotion gates.
 
-Promotion-grade conformance is derived from a sealed `rchain-rust-native-replay` Reality Record whose replay is complete and reproduced. Promotion-grade recovery is derived from two integrity-valid native-replay records where the after-record links to the before-record digest, the subject identity is unchanged, recovered state matches the pre-recovery state, and the recovery context demonstrates a different process and disk plus a trusted checkpoint.
+Promotion-grade conformance is derived only from a pinned-key signed `rchain-native-replay-attestation/v1` that reconstructs an integrity-valid `rchain-rust-native-replay` Reality Record and binds the exact repository, commit, and binary digest in the release. Promotion-grade recovery requires two such signed records; the after-record must link to the before-record digest, retain the subject identity, reproduce the state, and carry the complete checkpoint-bound recovery artifact manifest.
 
-This still does not authenticate who produced the native-replay record; signer authenticity remains an explicitly recorded limitation.
+Native-replay key possession is verified cryptographically. Organizational authorization is a separate explicit certificate policy: a cryptographically valid native-replay signer outside the declared authorization set causes `FAIL`.
 
 
 ## Optional Ed25519 certificate envelope
@@ -172,8 +172,8 @@ This closes certificate tamper/authorship mechanics when a trusted key is pinned
 
 The signed path is intentionally two-stage:
 
-1. `rchain-sentinel` produces `rchain-sentinel-attestation/v1`, signing the canonical network/finalized-block/cross-node snapshot with Ed25519.
-2. `sentinel-signed-adapter.ts` recomputes the canonical payload SHA-256, verifies the Ed25519 signature, verifies the public-key fingerprint, and requires that fingerprint to equal a caller-pinned expected `keyId`.
+1. `rchain-sentinel` produces `rchain-sentinel-attestation/v1`, signing one canonical snapshot containing network status, RNode-challenged genesis evidence, finalized-block evidence, cross-node observations, and exact failure-domain declarations.
+2. `sentinel-signed-adapter.ts` recomputes the canonical payload SHA-256, verifies the Ed25519 signature and pinned key fingerprint, validates genesis identity, validates exact failure-domain coverage, and reconstructs the corresponding Reality Record.
 
 Only after all checks pass does the adapter create a Reality Record and mark that in-memory record as cryptographically verified. Re-sealing, copying, deserializing, or manually adding `signatureVerified: true` does not recreate this runtime trust marker; the original signed snapshot must be reverified.
 
@@ -228,3 +228,25 @@ previous Reality Record -> signed recovery replay
 The runtime trust markers are intentionally non-serializable process-local capabilities (WeakSet-backed). Reconstructing equivalent JSON does not recreate cryptographic trust; the corresponding signed adapter must verify the pinned key in the current process.
 
 This v1 policy is intentionally conservative. A certificate may remain BLOCKED even when individual logical checks pass if their evidence is not cryptographically bound to the declared release and observed network.
+
+
+## Portable Assurance Package
+
+A process-local WeakSet trust marker is intentionally not serializable. That protects the in-process API from hand-constructed objects, but it is insufficient when an artifact is handed to another reviewer or machine.
+
+`rchain-assurance-package/v1` is the portable external-verification boundary. Its payload contains:
+
+- the complete Assurance Certificate;
+- the original signed SLSA/in-toto build-provenance attestation;
+- the original signed Sentinel snapshot(s), including their Sentinel base URL used when reconstructing the Reality Record;
+- the original signed native-replay/recovery attestation(s).
+
+The whole package is then signed by a reviewer key using Ed25519. `verifyAssurancePackage()` requires a pinned expected reviewer key ID and performs the following from scratch:
+
+1. recompute and verify the package payload digest and reviewer signature;
+2. verify the embedded certificate integrity and non-weakened strict policy;
+3. reverify the build provenance under the authorized builder key and builder ID, then compare its source/artifact/provenance identities to the certificate;
+4. reverify every Sentinel snapshot under an authorized observer key, reconstruct each Reality Record, and require the resulting digest set to exactly equal the certificate's `LIVE_OBSERVATION` references;
+5. reverify every native-replay/recovery snapshot under an authorized replay key, reconstruct the records, and require the digest set to exactly equal the certificate's `NATIVE_REPLAY` references.
+
+Adding, deleting, replacing, or reordering evidence semantically outside the signed canonical package cannot silently change the trusted result. A reviewer signature proves possession of the pinned reviewer key; the governance process that authorizes that key remains external.
