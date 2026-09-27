@@ -232,12 +232,18 @@ function sentinelRecordShapeVerified(record: RealityRecord): boolean {
       observation.type === "NetworkStatus" &&
       observation.source === "rchain-sentinel",
   );
-  if (!block || !network) return false;
+  const crossNode = record.observations.find(
+    (observation) =>
+      observation.type === "CrossNodeReport" &&
+      observation.source === "rchain-sentinel",
+  );
+  if (!block || !network || !crossNode) return false;
 
   const transformationIds = new Set(record.transformations.map((item) => item.id));
   return (
     transformationIds.has("transform_sentinel_finalized_block_to_reality_observation") &&
     transformationIds.has("transform_sentinel_network_status_to_reality_observation") &&
+    transformationIds.has("transform_sentinel_cross_node_to_reality_observation") &&
     transformationIds.has("transform_sentinel_observations_to_verification")
   );
 }
@@ -266,6 +272,7 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     "verify_sentinel_payload_available",
     "verify_sentinel_canonical_consistency",
     "verify_sentinel_finality_hash",
+    "verify_sentinel_cross_node_consistency",
   ];
   const missingOrUnverified = requiredVerificationIds.filter(
     (id) => verificationById.get(id)?.state !== "VERIFIED",
@@ -277,8 +284,12 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   const network = input.record.observations.find(
     (observation) => observation.type === "NetworkStatus",
   );
+  const crossNode = input.record.observations.find(
+    (observation) => observation.type === "CrossNodeReport",
+  );
   const blockData = block?.data ?? {};
   const networkData = network?.data ?? {};
+  const crossNodeData = crossNode?.data ?? {};
 
   const blockEvidenceComplete =
     blockData.available === true &&
@@ -287,16 +298,25 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
     blockData.canonicalConsistency === true &&
     blockData.nodeReportedFinalized === true;
   const networkReachable = networkData.reachable === true;
+  const crossNodeConsistent =
+    typeof crossNodeData.targetCount === "number" &&
+    crossNodeData.targetCount >= 2 &&
+    crossNodeData.agreement === true &&
+    crossNodeData.conflictingNodes === 0 &&
+    crossNodeData.hashAgreement === true &&
+    crossNodeData.heightAgreement === true;
 
   const valid =
     verifyRealityRecordIntegrity(input.record) &&
     missingOrUnverified.length === 0 &&
     blockEvidenceComplete &&
-    networkReachable;
+    networkReachable &&
+    crossNodeConsistent;
 
   const evidence = [
     ...(block ? [block.id] : []),
     ...(network ? [network.id] : []),
+    ...(crossNode ? [crossNode.id] : []),
     ...requiredVerificationIds.map(
       (id) => `${id}:${verificationById.get(id)?.state ?? "MISSING"}`,
     ),
@@ -305,8 +325,8 @@ function liveEvidenceQuality(input: AssuranceRecordInput): {
   return {
     valid,
     description: valid
-      ? "Live Sentinel evidence is integrity-valid, network-reachable, canonically consistent, and node-finalized with a matching full-block identity."
-      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}.`,
+      ? "Live Sentinel evidence is integrity-valid, network-reachable, canonically consistent, node-finalized, and cross-node consistent across at least two targets."
+      : `Live Sentinel evidence is incomplete: missing/unverified=[${missingOrUnverified.join(",")}], blockComplete=${blockEvidenceComplete}, networkReachable=${networkReachable}, crossNodeConsistent=${crossNodeConsistent}.`,
     evidence,
   };
 }
