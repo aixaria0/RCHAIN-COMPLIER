@@ -154,3 +154,14 @@ Free-form digest comparison helpers remain available for diagnostics, but they a
 Promotion-grade conformance is derived from a sealed `rchain-rust-native-replay` Reality Record whose replay is complete and reproduced. Promotion-grade recovery is derived from two integrity-valid native-replay records where the after-record links to the before-record digest, the subject identity is unchanged, recovered state matches the pre-recovery state, and the recovery context demonstrates a different process and disk plus a trusted checkpoint.
 
 This still does not authenticate who produced the native-replay record; signer authenticity remains an explicitly recorded limitation.
+
+
+## Optional Ed25519 certificate envelope
+
+`scripts/assurance-signature.mjs` can wrap the complete canonical Assurance Certificate in a detached-style Ed25519 envelope. The signature covers the entire canonical certificate object, not only its embedded SHA-256 digest.
+
+The envelope publishes the Ed25519 public key and a `sha256:` key fingerprint. Verification can pin an expected `keyId`; **pinning is required for an external trust decision**. Verifying a signature against a public key supplied by the same envelope proves key possession, not that the signer is an authorized RChain reviewer.
+
+Private keys are never generated, stored, or committed by the Assurance Fabric. Key custody and reviewer authorization remain external operational responsibilities.
+
+This closes certificate tamper/authorship mechanics when a trusted key is pinned, but it does not retroactively authenticate unsigned Sentinel or native-replay observations contained in the certificate.
