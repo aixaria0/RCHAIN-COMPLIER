@@ -1,3 +1,7 @@
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -440,6 +444,40 @@ test("portable Assurance Package re-verifies every signed source and exact Reali
       signature_hex: bytesToHex(reviewerSignature),
     },
   };
+
+  // Exercise the actual CLI in a fresh process: runtime trust markers cannot
+  // carry over from this test process or survive JSON serialization.
+  const directory = await mkdtemp(join(tmpdir(), "assurance-review-"));
+  try {
+    const filename = join(directory, "package.json");
+    await writeFile(filename, JSON.stringify(envelope));
+    const run = (key: string, file = filename) => spawnSync(process.execPath, [
+      "--experimental-strip-types",
+      new URL("../../../scripts/assurance-verify.ts", import.meta.url).pathname,
+      "--package", file, "--reviewer-key-id", key,
+    ], { encoding: "utf8" });
+    const accepted = run(reviewerKey.keyId);
+    assert.equal(accepted.status, 0, accepted.stderr || accepted.stdout);
+    assert.equal(JSON.parse(accepted.stdout).valid, true);
+    assert.equal(JSON.parse(accepted.stdout).verificationMode, "OFFLINE_PACKAGE");
+    const wrongReviewer = run(`sha256:${"0".repeat(64)}`);
+    assert.equal(wrongReviewer.status, 1);
+    assert.equal(JSON.parse(wrongReviewer.stdout).valid, false);
+    const edited = structuredClone(envelope);
+    edited.payload.certificate.release.commit = "f".repeat(40);
+    await writeFile(filename, JSON.stringify(edited));
+    const rejected = run(reviewerKey.keyId);
+    assert.equal(rejected.status, 1);
+    assert.equal(JSON.parse(rejected.stdout).valid, false);
+    await writeFile(filename, "null");
+    const malformed = run(reviewerKey.keyId);
+    assert.equal(malformed.status, 2);
+    assert.equal(JSON.parse(malformed.stdout).valid, false);
+    assert.equal(run("invalid-pin").status, 2);
+    assert.equal(run(reviewerKey.keyId, join(directory, "missing.json")).status, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 
   const verified = await verifyAssurancePackage(envelope, reviewerKey.keyId);
   assert.equal(verified.valid, true);
