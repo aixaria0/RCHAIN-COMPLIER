@@ -26,7 +26,9 @@ const certificate = buildAssuranceCertificate({
     freshness: { maxObservationAgeMs: 60_000 },
   release: {
     repository: "aixaria0/RCHAIN-COMPLIER",
-    commit: "demo",
+    commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    binaryDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    buildProvenance: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   },
   network: {
     genesis: "demo-genesis",
