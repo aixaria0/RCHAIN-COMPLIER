@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { compileRealityRecord } from "./reality-record-adapter.ts";
+import { sealRealityRecord } from "./reality-record.ts";
 import {
   sentinelBundleToRecord,
   type SentinelFinalizedBlockEvidence,
@@ -542,4 +543,41 @@ test("policy validator rejects a weakened serialized certificate even independen
   weakened.requirements.requireRecovery = false;
   assert.equal(verifyAssuranceCertificatePolicy(weakened), false);
   assert.equal(validateAssuranceCertificate(weakened).valid, false);
+});
+
+
+test("a source string alone cannot impersonate the Sentinel live adapter shape", () => {
+  const valid = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:11:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+  });
+  const { integrity: _integrity, state: _state, ...payload } = valid;
+  const malformed = sealRealityRecord({
+    ...payload,
+    subject: {
+      ...payload.subject,
+      kind: "forged-sentinel-shape",
+    },
+  });
+
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:11:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: { repository: "rchain-community/rchain-rust", commit: "pinned-rust-commit" },
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "malformed live", sourceClass: "LIVE_OBSERVATION", record: malformed }],
+    checks: commonChecks(),
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id.startsWith("reality_live_quality:"))?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_live_observation")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
 });
