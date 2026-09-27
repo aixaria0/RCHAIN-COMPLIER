@@ -361,6 +361,22 @@ async function signedLiveRecord(collectedAt: string) {
     network: liveNetwork,
     finalized_block: liveEvidence,
     cross_node: liveCrossNode,
+    failure_domains: [
+      {
+        node_url: "http://node-a:40403",
+        operator_id: "operator-a",
+        provider_id: "provider-a",
+        region: "region-a",
+        failure_domain_id: "domain-a",
+      },
+      {
+        node_url: "http://node-b:40403",
+        operator_id: "operator-b",
+        provider_id: "provider-b",
+        region: "region-b",
+        failure_domain_id: "domain-b",
+      },
+    ],
   };
   const payloadDigest = await sentinelAttestationPayloadDigest(payload);
   const signature = new Uint8Array(
