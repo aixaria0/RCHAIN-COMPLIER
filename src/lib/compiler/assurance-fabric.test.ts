@@ -12,8 +12,10 @@ import { searchWeightedPossibility } from "./possibility-plane.ts";
 import {
   buildAssuranceCertificate,
   conformanceCheckFromDigests,
+  conformanceCheckFromRealityRecord,
   possibilityCheckFromSearch,
   recoveryCheckFromDigests,
+  recoveryCheckFromRecordChain,
   validateAssuranceCertificate,
   verifyAssuranceCertificateIntegrity,
   verifyAssuranceCertificatePolicy,
@@ -134,23 +136,111 @@ function possibilityPass() {
   });
 }
 
-function commonChecks() {
-  return [
-    possibilityPass(),
-    conformanceCheckFromDigests({
-      id: "conformance_exact_replay",
-      description: "Pinned implementation replay matched the expected digest.",
+function nativeReplayPair() {
+  const before = sealRealityRecord({
+    schema: "rchain-reality-record/v1",
+    id: "native-replay:before",
+    subject: {
+      id: "native-state:test",
+      kind: "native-replay",
+      label: "Pinned Rust replay before recovery",
+    },
+    source: "rchain-rust-native-replay",
+    observations: [
+      {
+        id: "native-state-before",
+        source: "rchain-rust-native-replay",
+        type: "StateDigest",
+        data: { stateDigest: "state:abc" },
+      },
+    ],
+    claims: [],
+    evidence: [],
+    dependencies: [],
+    transformations: [],
+    verification: [
+      {
+        id: "native_replay_before",
+        predicate: "expectedDigest === observedDigest",
+        state: "VERIFIED",
+        message: "Pinned native replay matched.",
+        evidenceIds: [],
+      },
+    ],
+    replay: {
+      available: true,
+      inputIds: [],
       expectedDigest: "state:abc",
       observedDigest: "state:abc",
+      state: "REPRODUCED",
+    },
+  });
+
+  const after = sealRealityRecord(
+    {
+      schema: "rchain-reality-record/v1",
+      id: "native-replay:after",
+      subject: {
+        id: "native-state:test",
+        kind: "native-replay",
+        label: "Pinned Rust replay after recovery",
+      },
+      source: "rchain-rust-native-replay",
+      observations: [
+        {
+          id: "recovery-context",
+          source: "rchain-rust-native-replay",
+          type: "RecoveryContext",
+          data: {
+            preProcessId: "proc-before",
+            recoveredProcessId: "proc-after",
+            preDiskId: "disk-before",
+            recoveredDiskId: "disk-after",
+            checkpointTrusted: true,
+          },
+        },
+      ],
+      claims: [],
+      evidence: [],
+      dependencies: [],
+      transformations: [],
+      verification: [
+        {
+          id: "native_replay_after",
+          predicate: "recoveredDigest === preRecoveryDigest",
+          state: "VERIFIED",
+          message: "Recovered native replay matched the pre-recovery state.",
+          evidenceIds: [],
+        },
+      ],
+      replay: {
+        available: true,
+        inputIds: [],
+        expectedDigest: "state:abc",
+        observedDigest: "state:abc",
+        state: "REPRODUCED",
+      },
+    },
+    before.integrity.recordDigest,
+  );
+
+  return { before, after };
+}
+
+function commonChecks() {
+  const native = nativeReplayPair();
+  return [
+    possibilityPass(),
+    conformanceCheckFromRealityRecord({
+      id: "conformance_exact_replay",
+      description: "Pinned implementation replay matched the expected digest.",
+      record: native.before,
     }),
-    recoveryCheckFromDigests({
+    recoveryCheckFromRecordChain({
       id: "recovery_restart_state",
-      description: "Recovered state digest matched the pre-restart finalized state.",
-      preRecoveryDigest: "state:abc",
-      recoveredDigest: "state:abc",
-      independentProcess: true,
-      independentDisk: true,
-      checkpointTrusted: true,
+      description: "Recovered state remained linked and identical across an independent process/disk restore.",
+      before: native.before,
+      after: native.after,
     }),
   ];
 }
@@ -689,4 +779,50 @@ test("missing binary or provenance identity blocks strict promotion", () => {
   );
   assert.equal(certificate.status, "BLOCKED");
   assert.ok(certificate.limitations.some((item) => item.includes("not signer authenticity")));
+});
+
+
+test("free-form digest helpers remain diagnostic and cannot satisfy strict promotion", () => {
+  const live = sentinelBundleToRecord({
+    sentinelBaseUrl: "http://sentinel.example",
+    collectedAt: "2026-09-27T00:13:00Z",
+    evidence: liveEvidence,
+    network: liveNetwork,
+    crossNode: liveCrossNode,
+  });
+  const certificate = buildAssuranceCertificate({
+    issuedAt: "2026-09-27T00:13:01Z",
+    freshness: { maxObservationAgeMs: 60_000 },
+    release: releaseIdentity(),
+    network: { genesis: "genesis:test", networkId: "testnet", shardId: "root" },
+    records: [{ label: "live", sourceClass: "LIVE_OBSERVATION", record: live }],
+    checks: [
+      possibilityPass(),
+      conformanceCheckFromDigests({
+        id: "diagnostic-conformance",
+        description: "free-form matching digests",
+        expectedDigest: "x",
+        observedDigest: "x",
+      }),
+      recoveryCheckFromDigests({
+        id: "diagnostic-recovery",
+        description: "free-form recovery digests",
+        preRecoveryDigest: "x",
+        recoveredDigest: "x",
+        independentProcess: true,
+        independentDisk: true,
+        checkpointTrusted: true,
+      }),
+    ],
+  });
+
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_conformance")?.state,
+    "BLOCKED",
+  );
+  assert.equal(
+    certificate.checks.find((check) => check.id === "gate_recovery")?.state,
+    "BLOCKED",
+  );
+  assert.equal(certificate.status, "BLOCKED");
 });
