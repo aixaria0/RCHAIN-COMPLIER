@@ -8,7 +8,9 @@ import {
 import { searchWeightedPossibility } from "./possibility-plane.ts";
 import {
   buildAssuranceCertificate,
+  conformanceCheckFromDigests,
   possibilityCheckFromSearch,
+  recoveryCheckFromDigests,
   verifyAssuranceCertificateIntegrity,
 } from "./assurance-fabric.ts";
 
@@ -50,20 +52,18 @@ function possibilityPass() {
 function commonChecks() {
   return [
     possibilityPass(),
-    {
+    conformanceCheckFromDigests({
       id: "conformance_exact_replay",
-      plane: "CONFORMANCE" as const,
-      state: "PASS" as const,
       description: "Pinned implementation replay matched the expected digest.",
-      evidence: ["replay:abc"],
-    },
-    {
+      expectedDigest: "state:abc",
+      observedDigest: "state:abc",
+    }),
+    recoveryCheckFromDigests({
       id: "recovery_restart_state",
-      plane: "RECOVERY" as const,
-      state: "PASS" as const,
       description: "Recovered state digest matched the pre-restart finalized state.",
-      evidence: ["state:abc"],
-    },
+      preRecoveryDigest: "state:abc",
+      recoveredDigest: "state:abc",
+    }),
   ];
 }
 
@@ -156,4 +156,21 @@ test("certificate integrity detects post-seal tampering", () => {
 
   certificate.checks[0]!.description = "tampered";
   assert.equal(verifyAssuranceCertificateIntegrity(certificate), false);
+});
+
+test("digest helpers block missing evidence and fail mismatches", () => {
+  const incomplete = conformanceCheckFromDigests({
+    id: "missing_conformance",
+    description: "missing observed digest",
+    expectedDigest: "expected",
+  });
+  const mismatch = recoveryCheckFromDigests({
+    id: "recovery_mismatch",
+    description: "state changed across recovery",
+    preRecoveryDigest: "before",
+    recoveredDigest: "after",
+  });
+
+  assert.equal(incomplete.state, "BLOCKED");
+  assert.equal(mismatch.state, "FAIL");
 });
