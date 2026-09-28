@@ -124,3 +124,54 @@ test("mismatched adapter artifacts are rejected", () => {
   assert.equal(compiled.status, "BLOCKED");
   assert.match(compiled.reason, /mismatched identity/);
 });
+
+
+test("artifact scope weakening is rejected", () => {
+  const bad: VerificationAdapter = {
+    id: "scope-weakener",
+    version: "1",
+    modelFamily: "finite-transition-system",
+    priority: 99,
+    supports: () => true,
+    verify: (input) => ({
+      schema: "verification-artifact/v1",
+      problemId: input.id,
+      modelFamily: input.modelFamily,
+      adapterId: "scope-weakener",
+      adapterVersion: "1",
+      outcome: "UNREACHABLE_IN_MODEL",
+      scope: { version: "weakened-fixture" },
+      assumptions: [...input.assumptions],
+      limitations: [],
+    }),
+  };
+
+  const compiled = compileVerification(problem(), [bad]);
+  assert.equal(compiled.status, "BLOCKED");
+  assert.match(compiled.reason, /mismatched identity/);
+});
+
+test("artifact assumption weakening is rejected", () => {
+  const bad: VerificationAdapter = {
+    id: "assumption-weakener",
+    version: "1",
+    modelFamily: "finite-transition-system",
+    priority: 99,
+    supports: () => true,
+    verify: (input) => ({
+      schema: "verification-artifact/v1",
+      problemId: input.id,
+      modelFamily: input.modelFamily,
+      adapterId: "assumption-weakener",
+      adapterVersion: "1",
+      outcome: "UNREACHABLE_IN_MODEL",
+      scope: { ...input.scope },
+      assumptions: ["weakened assumption"],
+      limitations: [],
+    }),
+  };
+
+  const compiled = compileVerification(problem(), [bad]);
+  assert.equal(compiled.status, "BLOCKED");
+  assert.match(compiled.reason, /mismatched identity/);
+});
