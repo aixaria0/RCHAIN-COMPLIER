@@ -12,6 +12,33 @@
 >
 > Important scope: this repository is a research and verification harness. It is not an RChain node, not a replacement for Casper, and does not by itself establish a production-network vulnerability.
 
+## Research map — independent branches, one documentation hub
+
+This default branch remains the Casper CBC/upstream execution baseline. Important research branches are **not merged** into it. Their verified direction and interfaces are summarized here so the repository front page shows the whole program without rewriting Git history.
+
+| Research line | Important branch(es) | Contribution |
+|---|---|---|
+| Casper CBC stress | `feature/casper-cbc-stress-harness`, `feat/cbc-fork-drift-evidence` | deterministic adversarial DAGs, upstream Rust reproduction and fork/conformance evidence |
+| Slashing / ingress | `feat/casper-slashing-conformance`, `research/casper-slashing-persistence-evidence`, `research/m12-cryptographic-ingress-boundary` | conformance, persistence and cryptographic ingress-boundary research |
+| Reality Compiler | `feature/reality-calculus`, `feature/reality-engine-core`, `feature/reality-evidence-plane`, `feature/reality-loop` | causal evidence, replay, Reality Records and inspection model |
+| Causal Assurance v1 | `feat/assurance-fabric-v1` | protocol-neutral verification, bounded repair, native replay binding and cross-repository assurance |
+
+The conceptual progression is:
+
+```text
+Reality evidence / causality
+          ↓
+Casper CBC adversarial execution
+          ↓
+Generic verification + repair
+          ↓
+Cross-repository assurance fabric
+```
+
+See **[Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)** for the non-merged branch map and **[Documentation Hub](docs/WIKI_HOME.md)** for the consolidated v1 reference.
+
+> Documentation copied to `main` describes branch results and contracts. It does not imply that branch-only implementation is present on `main`.
+
 ## What this project does
 
 This repository started as the RChain Reality Compiler: an evidence-oriented workbench for turning distributed execution observations into deterministic, inspectable records.
