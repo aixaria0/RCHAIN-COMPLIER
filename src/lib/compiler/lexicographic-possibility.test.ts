@@ -73,3 +73,41 @@ test("rejects mismatched or negative cost vectors", () => {
     /non-negative/,
   );
 });
+
+
+test("fails closed when stateKey is non-injective", () => {
+  assert.throws(
+    () =>
+      searchLexicographicPossibility<{ id: number; payload: string }>({
+        initial: { id: 0, payload: "start" },
+        objectives: ["steps"],
+        stateKey: (state) => String(state.id),
+        isGoal: () => false,
+        expand: (state) =>
+          state.id === 0
+            ? [
+                { to: { id: 1, payload: "left" }, label: "left", cost: [1] },
+                { to: { id: 1, payload: "right" }, label: "right", cost: [1] },
+              ]
+            : [],
+      }),
+    /non-injective stateKey/,
+  );
+});
+
+test("custom stateFingerprint can define structural identity explicitly", () => {
+  const result = searchLexicographicPossibility<{ id: number; ignored: () => void }>({
+    initial: { id: 0, ignored: () => undefined },
+    objectives: ["steps"],
+    stateKey: (state) => String(state.id),
+    stateFingerprint: (state) => `id:${state.id}`,
+    isGoal: (state) => state.id === 1,
+    expand: (state) =>
+      state.id === 0
+        ? [{ to: { id: 1, ignored: () => undefined }, label: "next", cost: [1] }]
+        : [],
+  });
+
+  assert.equal(result.status, "REACHABLE");
+  assert.deepEqual(result.minimumCost, [1]);
+});
