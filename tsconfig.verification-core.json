@@ -15,6 +15,8 @@
     "src/lib/compiler/verification-compiler.test.ts",
     "src/lib/compiler/verification-core-boundary.test.ts",
     "src/lib/verification-core/index.ts",
-    "examples/verification-compiler-generic.ts"
+    "examples/verification-compiler-generic.ts",
+    "src/lib/compiler/repair-compiler.ts",
+    "src/lib/compiler/repair-compiler.test.ts"
   ]
 }
