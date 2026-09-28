@@ -77,15 +77,25 @@ function numericRepairs(snapshot: AetherForgeSnapshot): NumericRepair[] {
   return repairs;
 }
 
-function supportsBoundedSnapshot(snapshot: AetherForgeSnapshot): boolean {
+function supportsBoundedSnapshot(snapshot: unknown): snapshot is AetherForgeSnapshot {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  const candidate = snapshot as Partial<AetherForgeSnapshot>;
+  if (
+    candidate.schema !== "aetherforge-snapshot/v1" ||
+    !Array.isArray(candidate.faceAreas) ||
+    !Array.isArray(candidate.bounce) ||
+    !candidate.source
+  ) {
+    return false;
+  }
+
   return (
-    snapshot.schema === "aetherforge-snapshot/v1" &&
-    snapshot.faceAreas.length === AETHERFORGE_FROZEN_SNAPSHOT.faceAreas.length &&
-    snapshot.bounce.length === AETHERFORGE_FROZEN_SNAPSHOT.bounce.length &&
-    snapshot.source.repository === AETHERFORGE_FROZEN_SNAPSHOT.source.repository &&
-    snapshot.source.commit === AETHERFORGE_FROZEN_SNAPSHOT.source.commit &&
-    snapshot.source.file === AETHERFORGE_FROZEN_SNAPSHOT.source.file &&
-    snapshot.source.blobSha === AETHERFORGE_FROZEN_SNAPSHOT.source.blobSha
+    candidate.faceAreas.length === AETHERFORGE_FROZEN_SNAPSHOT.faceAreas.length &&
+    candidate.bounce.length === AETHERFORGE_FROZEN_SNAPSHOT.bounce.length &&
+    candidate.source.repository === AETHERFORGE_FROZEN_SNAPSHOT.source.repository &&
+    candidate.source.commit === AETHERFORGE_FROZEN_SNAPSHOT.source.commit &&
+    candidate.source.file === AETHERFORGE_FROZEN_SNAPSHOT.source.file &&
+    candidate.source.blobSha === AETHERFORGE_FROZEN_SNAPSHOT.source.blobSha
   );
 }
 
@@ -96,8 +106,7 @@ export function createAetherForgeRepairAdapter(): RepairAdapter {
     modelFamily: "numeric-scientific-model/v1",
     priority: 50,
     supports(problem) {
-      const snapshot = problem.originalProblem.payload as AetherForgeSnapshot;
-      return supportsBoundedSnapshot(snapshot);
+      return supportsBoundedSnapshot(problem.originalProblem.payload);
     },
     createSearch(problem) {
       const initialSnapshot = cloneSnapshot(
