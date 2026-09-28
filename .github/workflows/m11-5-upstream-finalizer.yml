@@ -6,8 +6,17 @@ on:
     paths:
       - ".github/workflows/m11-5-upstream-finalizer.yml"
       - "scripts/upstream/m11-5-duplicate-minimum-messages.rs"
+      - "scripts/verify-cbc-native-repair-receipt.ts"
+      - "scripts/verify-cbc-native-repair-receipt.test.ts"
       - "src/lib/cbc/**"
+      - "src/lib/compiler/repair-compiler.ts"
+      - "src/lib/compiler/lexicographic-possibility.ts"
+      - "package.json"
+      - "package-lock.json"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   upstream-finalizer:
@@ -15,6 +24,18 @@ jobs:
     steps:
       - name: Checkout harness
         uses: actions/checkout@v4
+
+      - name: Setup Node for repair binding
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install harness dependencies
+        run: npm ci
+
+      - name: Verify native receipt binder negative controls
+        run: node --experimental-strip-types --test scripts/verify-cbc-native-repair-receipt.test.ts
 
       - name: Install pinned upstream Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
@@ -32,8 +53,28 @@ jobs:
       - name: Inject deterministic M11.5 reproduction
         run: |
           mkdir -p upstream-rchain/block-storage/tests
-          cp scripts/upstream/m11-5-duplicate-minimum-messages.rs             upstream-rchain/block-storage/tests/m11_5_duplicate_minimum_messages.rs
+          cp scripts/upstream/m11-5-duplicate-minimum-messages.rs \
+            upstream-rchain/block-storage/tests/m11_5_duplicate_minimum_messages.rs
 
-      - name: Execute upstream Finalizer
+      - name: Execute upstream Finalizer and emit native repair receipt
         working-directory: upstream-rchain
+        env:
+          M11_5_REPAIR_RECEIPT: ../artifacts/cbc-native-repair-replay.json
         run: cargo test -p rchain-block-storage --test m11_5_duplicate_minimum_messages -- --nocapture
+
+      - name: Bind native receipt to compiler-selected repair
+        run: |
+          mkdir -p artifacts
+          node --experimental-strip-types scripts/verify-cbc-native-repair-receipt.ts \
+            artifacts/cbc-native-repair-replay.json \
+            > artifacts/cbc-native-repair-binding.json
+          cat artifacts/cbc-native-repair-binding.json
+
+      - name: Upload native repair replay evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbc-native-repair-replay
+          path: |
+            artifacts/cbc-native-repair-replay.json
+            artifacts/cbc-native-repair-binding.json
+          if-no-files-found: error
