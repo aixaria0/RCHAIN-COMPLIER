@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/lib/compiler/repair-package.ts",
+    "src/lib/compiler/repair-package.test.ts",
+    "src/lib/compiler/signed-repair-root.ts"
+  ]
+}
