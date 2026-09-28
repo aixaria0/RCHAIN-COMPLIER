@@ -59,7 +59,7 @@ jobs:
       - name: Execute upstream Finalizer and emit native repair receipt
         working-directory: upstream-rchain
         env:
-          M11_5_REPAIR_RECEIPT: ../artifacts/cbc-native-repair-replay.json
+          M11_5_REPAIR_RECEIPT: ${{ github.workspace }}/artifacts/cbc-native-repair-replay.json
         run: cargo test -p rchain-block-storage --test m11_5_duplicate_minimum_messages -- --nocapture
 
       - name: Bind native receipt to compiler-selected repair
