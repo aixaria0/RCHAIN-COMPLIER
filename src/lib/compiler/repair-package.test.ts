@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { generateKeyPairSync } from "node:crypto";
 import { buildDuplicateMinimumMessageDAG } from "../cbc/casper-concrete-dag.ts";
+import { sha256Artifact } from "./ecosystem-chain.ts";
 import {
   createCasperCoverageProblem,
   createCasperCoverageVerificationAdapter,
@@ -63,7 +64,6 @@ test("repair package rejects claim weakening even when digests are recomputed", 
   post.scope = { weakened: true };
   pkg.artifacts[2]!.bytes = JSON.stringify(post);
 
-  const { sha256Artifact } = await import("./ecosystem-chain.ts");
   pkg.artifacts[2]!.sha256 = sha256Artifact(pkg.artifacts[2]!.bytes);
 
   const result = verifyRepairPackage(pkg);
