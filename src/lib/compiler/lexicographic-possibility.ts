@@ -42,6 +42,12 @@ export interface LexicographicSearchOptions<State> {
   initial: State;
   objectives: string[];
   stateKey: (state: State) => string;
+  /**
+   * Optional independent structural fingerprint used to prove stateKey
+   * injectivity during the explored search. If omitted, the engine derives a
+   * deterministic fingerprint for JSON-like/Map/Set/Date/Uint8Array states.
+   */
+  stateFingerprint?: (state: State) => string;
   isGoal: (state: State) => boolean;
   expand: (state: State) => LexicographicTransition<State>[];
   maxStates?: number;
@@ -52,6 +58,87 @@ interface QueueItem<State> {
   key: string;
   cost: number[];
   witness: LexicographicWitnessStep[];
+}
+
+function canonicalSearchState(value: unknown, seen = new WeakSet<object>()): string {
+  if (value === null) return "null";
+
+  switch (typeof value) {
+    case "string":
+    case "boolean":
+      return JSON.stringify(value);
+    case "number":
+      if (!Number.isFinite(value)) {
+        throw new Error("search state contains a non-finite number");
+      }
+      return Object.is(value, -0) ? "0" : String(value);
+    case "bigint":
+      return `bigint:${value.toString()}`;
+    case "undefined":
+      return "undefined";
+    case "symbol":
+    case "function":
+      throw new Error(
+        `search state contains unsupported ${typeof value}; provide stateFingerprint`,
+      );
+    case "object": {
+      const object = value as object;
+      if (seen.has(object)) {
+        throw new Error("search state contains a cycle; provide stateFingerprint");
+      }
+      seen.add(object);
+      try {
+        if (Array.isArray(value)) {
+          return `[${value.map((item) => canonicalSearchState(item, seen)).join(",")}]`;
+        }
+        if (value instanceof Date) {
+          if (Number.isNaN(value.getTime())) throw new Error("search state contains invalid Date");
+          return `date:${value.toISOString()}`;
+        }
+        if (value instanceof Uint8Array) {
+          return `bytes:${Buffer.from(value).toString("hex")}`;
+        }
+        if (value instanceof Map) {
+          const entries = [...value.entries()].map(([key, item]) => [
+            canonicalSearchState(key, seen),
+            canonicalSearchState(item, seen),
+          ]);
+          entries.sort(([left], [right]) => left.localeCompare(right));
+          return `map:{${entries.map(([key, item]) => `${key}=>${item}`).join(",")}}`;
+        }
+        if (value instanceof Set) {
+          const items = [...value].map((item) => canonicalSearchState(item, seen)).sort();
+          return `set:[${items.join(",")}]`;
+        }
+
+        const record = value as Record<string, unknown>;
+        return `{${Object.keys(record)
+          .sort()
+          .map((key) => `${JSON.stringify(key)}:${canonicalSearchState(record[key], seen)}`)
+          .join(",")}}`;
+      } finally {
+        seen.delete(object);
+      }
+    }
+  }
+}
+
+function defaultStateFingerprint<State>(state: State): string {
+  return canonicalSearchState(state);
+}
+
+function registerStateKey(
+  fingerprints: Map<string, string>,
+  key: string,
+  fingerprint: string,
+): void {
+  const prior = fingerprints.get(key);
+  if (prior !== undefined && prior !== fingerprint) {
+    throw new Error(
+      `non-injective stateKey: key ${JSON.stringify(key)} maps to multiple states`,
+    );
+  }
+  fingerprints.set(key, fingerprint);
 }
 
 function validateObjectives(objectives: string[]): void {
@@ -118,7 +205,10 @@ export function searchLexicographicPossibility<State>(
 
   const dimensions = options.objectives.length;
   const zero = Array.from({ length: dimensions }, () => 0);
+  const fingerprintState = options.stateFingerprint ?? defaultStateFingerprint<State>;
   const initialKey = options.stateKey(options.initial);
+  const stateFingerprints = new Map<string, string>();
+  registerStateKey(stateFingerprints, initialKey, fingerprintState(options.initial));
   const frontier: QueueItem<State>[] = [{
     state: options.initial,
     key: initialKey,
@@ -163,11 +253,19 @@ export function searchLexicographicPossibility<State>(
       };
     }
 
-    const transitions = [...options.expand(current.state)].map((transition) => ({
-      ...transition,
-      normalizedCost: validateCost(transition.cost, dimensions),
-      targetKey: options.stateKey(transition.to),
-    }));
+    const transitions = [...options.expand(current.state)].map((transition) => {
+      const targetKey = options.stateKey(transition.to);
+      registerStateKey(
+        stateFingerprints,
+        targetKey,
+        fingerprintState(transition.to),
+      );
+      return {
+        ...transition,
+        normalizedCost: validateCost(transition.cost, dimensions),
+        targetKey,
+      };
+    });
 
     transitions.sort((left, right) => {
       const byCost = compareLexicographic(left.normalizedCost, right.normalizedCost);
