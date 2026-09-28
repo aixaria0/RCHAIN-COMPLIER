@@ -202,6 +202,25 @@ export function compileRepair(
     };
   }
 
+  const replayedOriginal = compileVerification(problem.originalProblem, [
+    verificationAdapter,
+  ]);
+  if (
+    replayedOriginal.status !== "COMPILED" ||
+    replayedOriginal.artifact === null ||
+    canonical(replayedOriginal.artifact) !== canonical(problem.originalArtifact)
+  ) {
+    return {
+      status: "BLOCKED",
+      repairProblemId: problem.id,
+      candidateAdapters: [],
+      selectedAdapterId: null,
+      reason:
+        "original verification artifact does not reproduce exactly under the pinned verification adapter",
+      artifact: null,
+    };
+  }
+
   const compatible = repairAdapters
     .filter(
       (adapter) =>
@@ -246,6 +265,16 @@ export function compileRepair(
       candidateAdapters,
       selectedAdapterId: selected.id,
       reason: "repair adapter initial state changes claim identity",
+      artifact: null,
+    };
+  }
+  if (canonical(initialProblem.payload) !== canonical(problem.originalProblem.payload)) {
+    return {
+      status: "BLOCKED",
+      repairProblemId: problem.id,
+      candidateAdapters,
+      selectedAdapterId: selected.id,
+      reason: "repair adapter initial state does not reproduce the original subject payload",
       artifact: null,
     };
   }
