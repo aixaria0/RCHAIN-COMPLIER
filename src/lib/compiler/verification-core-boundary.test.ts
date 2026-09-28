@@ -7,6 +7,7 @@ const protocolNeutralFiles = [
   new URL("./verification-compiler.ts", import.meta.url),
   new URL("./finite-state-verifier.ts", import.meta.url),
   new URL("./quantitative-what-if.ts", import.meta.url),
+  new URL("./repair-compiler.ts", import.meta.url),
 ];
 
 const forbiddenImports = [
