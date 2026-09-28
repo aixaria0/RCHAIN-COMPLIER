@@ -55,5 +55,42 @@ test("native replay binding fails closed if native action differs from selected 
 test("native replay binding rejects a receipt that loses finalization preservation", () => {
   const result = run({ ...base, after: { ...base.after, finalized: false } });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /expected before\/after Finalizer boundary/);
+  assert.match(result.stderr, /exactly match the pinned before\/after Finalizer fixture/);
+});
+
+
+test("native replay binding rejects same-cardinality but different sender identities", () => {
+  const result = run({
+    ...base,
+    before: {
+      ...base.before,
+      minimumMessageSenders: ["v0", "v1", "v1", "v2"],
+    },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /exactly match the pinned before\/after Finalizer fixture/);
+});
+
+test("native replay binding rejects justification drift", () => {
+  const result = run({
+    ...base,
+    after: {
+      ...base.after,
+      justifications: ["a3", "b3", "c3", "x3"],
+    },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /exactly match the pinned before\/after Finalizer fixture/);
+});
+
+test("native replay binding rejects fringe drift", () => {
+  const result = run({
+    ...base,
+    after: {
+      ...base.after,
+      fringe: ["a1", "b1", "c1", "x1"],
+    },
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /exactly match the pinned before\/after Finalizer fixture/);
 });
