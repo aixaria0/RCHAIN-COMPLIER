@@ -60,13 +60,46 @@ const action = compiled.artifact.selectedActions[0]?.label;
 if (!action || action !== receipt.repairAction) {
   throw new Error(`native receipt repair action ${receipt.repairAction} does not match compiler selection ${action ?? "NONE"}`);
 }
+function exactStrings(actual: string[], expected: readonly string[]): boolean {
+  return (
+    actual.length === expected.length &&
+    actual.every((value, index) => value === expected[index])
+  );
+}
+
+const expectedBefore = {
+  justifications: ["a2", "a3", "b3", "c3"] as const,
+  minimumMessageSenders: ["v0", "v0", "v1", "v2"] as const,
+  fringe: ["a1", "b1", "c1"] as const,
+  finalized: true,
+};
+
+const expectedAfter = {
+  justifications: ["a3", "b3", "c3", "d3"] as const,
+  minimumMessageSenders: ["v0", "v1", "v2", "v3"] as const,
+  fringe: ["a1", "b1", "c1", "d1"] as const,
+  finalized: true,
+};
+
 if (
-  receipt.before.finalized !== true ||
-  receipt.after.finalized !== true ||
-  new Set(receipt.before.minimumMessageSenders).size !== 3 ||
-  new Set(receipt.after.minimumMessageSenders).size !== 4
+  receipt.before.finalized !== expectedBefore.finalized ||
+  receipt.after.finalized !== expectedAfter.finalized ||
+  !exactStrings(receipt.before.justifications, expectedBefore.justifications) ||
+  !exactStrings(
+    receipt.before.minimumMessageSenders,
+    expectedBefore.minimumMessageSenders,
+  ) ||
+  !exactStrings(receipt.before.fringe, expectedBefore.fringe) ||
+  !exactStrings(receipt.after.justifications, expectedAfter.justifications) ||
+  !exactStrings(
+    receipt.after.minimumMessageSenders,
+    expectedAfter.minimumMessageSenders,
+  ) ||
+  !exactStrings(receipt.after.fringe, expectedAfter.fringe)
 ) {
-  throw new Error("native receipt does not establish the expected before/after Finalizer boundary");
+  throw new Error(
+    "native receipt does not exactly match the pinned before/after Finalizer fixture",
+  );
 }
 
 const binding = {
