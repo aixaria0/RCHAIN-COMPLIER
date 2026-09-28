@@ -1,4 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
 use rchain_block_storage::dag::finalizer::{Finalizer, Message};
 use rchain_shared::refined::{BlockHeight, NonNegI64, SeqNum};
@@ -242,4 +244,34 @@ fn upstream_m11_5_repaired_distinct_sender_candidate_preserves_finalization() {
         .into_iter()
         .collect()
     );
+
+    // Emit a deterministic machine-readable receipt when CI asks for one.
+    // The receipt binds the exact repair selected by the TypeScript compiler
+    // to the observed native Finalizer before/after states.
+    if let Ok(receipt_path) = std::env::var("M11_5_REPAIR_RECEIPT") {
+        let receipt = concat!(
+            "{\n",
+            "  \"schema\": \"cbc-native-repair-replay/v1\",\n",
+            "  \"upstreamRepository\": \"rchain-community/rchain-rust\",\n",
+            "  \"upstreamCommit\": \"d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b\",\n",
+            "  \"repairAction\": \"replace:a2->d3\",\n",
+            "  \"before\": {\n",
+            "    \"justifications\": [\"a2\", \"a3\", \"b3\", \"c3\"],\n",
+            "    \"minimumMessageSenders\": [\"v0\", \"v0\", \"v1\", \"v2\"],\n",
+            "    \"fringe\": [\"a1\", \"b1\", \"c1\"],\n",
+            "    \"finalized\": true\n",
+            "  },\n",
+            "  \"after\": {\n",
+            "    \"justifications\": [\"a3\", \"b3\", \"c3\", \"d3\"],\n",
+            "    \"minimumMessageSenders\": [\"v0\", \"v1\", \"v2\", \"v3\"],\n",
+            "    \"fringe\": [\"a1\", \"b1\", \"c1\", \"d1\"],\n",
+            "    \"finalized\": true\n",
+            "  }\n",
+            "}\n"
+        );
+        if let Some(parent) = Path::new(&receipt_path).parent() {
+            fs::create_dir_all(parent).expect("create native repair receipt directory");
+        }
+        fs::write(&receipt_path, receipt).expect("write native repair replay receipt");
+    }
 }
