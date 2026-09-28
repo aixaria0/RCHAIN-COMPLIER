@@ -8,6 +8,7 @@ on:
       - "scripts/upstream/m11-5-duplicate-minimum-messages.rs"
       - "scripts/verify-cbc-native-repair-receipt.ts"
       - "scripts/verify-cbc-native-repair-receipt.test.ts"
+      - "scripts/emit-repair-propagation.ts"
       - "src/lib/cbc/**"
       - "src/lib/compiler/repair-compiler.ts"
       - "src/lib/compiler/lexicographic-possibility.ts"
@@ -69,6 +70,14 @@ jobs:
             artifacts/cbc-native-repair-replay.json \
             > artifacts/cbc-native-repair-binding.json
           cat artifacts/cbc-native-repair-binding.json
+
+      - name: Emit portable cross-repo repair envelope
+        run: |
+          node --experimental-strip-types scripts/emit-repair-propagation.ts \
+            artifacts/cbc-native-repair-binding.json
+            artifacts/cbc-repair-propagation.json \
+            artifacts/cbc-native-repair-replay.json \
+            artifacts/cbc-repair-propagation.json
 
       - name: Upload native repair replay evidence
         uses: actions/upload-artifact@v4
