@@ -121,6 +121,8 @@ function canonicalSearchState(value: unknown, seen = new WeakSet<object>()): str
       }
     }
   }
+
+  throw new Error("unreachable search state type");
 }
 
 function defaultStateFingerprint<State>(state: State): string {
