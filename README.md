@@ -13,6 +13,21 @@
 >
 > **Current scope:** the generic assurance layer is implemented independently of any live RChain/RNode runtime. RChain/Casper is the first serious target for integration, not a hard dependency of the core.
 
+
+## Research map — independent branches, one documentation hub
+
+This branch contains the Causal Assurance implementation while the default branch also documents the repository's independent research lines. Their histories remain separate; documentation links do not imply that branch-only implementation has been merged into `main`.
+
+| Research line | Important branch(es) | Contribution |
+|---|---|---|
+| Casper CBC stress | `feature/casper-cbc-stress-harness`, `feat/cbc-fork-drift-evidence` | deterministic adversarial DAGs, upstream Rust reproduction and fork/conformance evidence |
+| Slashing / ingress | `feat/casper-slashing-conformance`, `research/casper-slashing-persistence-evidence`, `research/m12-cryptographic-ingress-boundary` | conformance, persistence and cryptographic ingress-boundary research |
+| Reality Compiler | `feature/reality-calculus`, `feature/reality-engine-core`, `feature/reality-evidence-plane`, `feature/reality-loop` | causal evidence, replay, Reality Records and inspection model |
+| Causal Assurance v1 | `feat/assurance-fabric-v1` | protocol-neutral verification, bounded repair, native replay binding and cross-repository assurance |
+
+See **[Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)** for the non-merged branch map and **[Documentation Hub](docs/WIKI_HOME.md)** for the consolidated v1 reference.
+
+
 ## v1 — four-repository assurance fabric
 
 The primary repository now acts as the documentation and contract hub for the complete v1 chain:

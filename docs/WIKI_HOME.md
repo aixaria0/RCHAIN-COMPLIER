@@ -1,8 +1,10 @@
-# RCHAIN-COMPLIER Wiki Home
+# RCHAIN-COMPLIER Documentation Hub
 
-RCHAIN-COMPLIER is a protocol-agnostic verification and bounded-repair compiler with a Casper CBC research implementation. The v1 assurance path keeps verification, repair, native implementation replay, evidence transport, inspection, and independent root attestation as separate trust boundaries.
+This hub summarizes the default-branch Casper CBC research and important independent research branches without merging their code histories. The v1 assurance path keeps verification, repair, native implementation replay, evidence transport, inspection, and independent root attestation as separate trust boundaries.
 
 ## Start here
+
+- [Research Branch Atlas](RESEARCH_BRANCH_ATLAS.md)
 
 - [Architecture](ARCHITECTURE.md)
 - [Assurance Fabric](ASSURANCE_FABRIC.md)
