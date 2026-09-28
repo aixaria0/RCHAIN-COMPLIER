@@ -6,6 +6,9 @@
   "include": [
     "src/lib/subjects/aetherforge.ts",
     "src/lib/subjects/aetherforge.test.ts",
-    "examples/aetherforge-external-subject.ts"
+    "examples/aetherforge-external-subject.ts",
+    "src/lib/subjects/aetherforge-repair.ts",
+    "src/lib/subjects/aetherforge-repair.test.ts",
+    "examples/aetherforge-minimal-repair.ts"
   ]
 }
