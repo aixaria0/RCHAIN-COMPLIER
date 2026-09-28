@@ -10,6 +10,9 @@ on:
       - "src/lib/compiler/finite-state-verifier.ts"
       - "src/lib/compiler/repair-compiler.ts"
       - "src/lib/compiler/repair-compiler.test.ts"
+      - "src/lib/compiler/repair-package.ts"
+      - "src/lib/compiler/repair-package.test.ts"
+      - "src/lib/compiler/signed-repair-root.ts"
       - "src/lib/compiler/*verification*.test.ts"
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
@@ -20,6 +23,7 @@ on:
       - "examples/aetherforge-minimal-repair.ts"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
+      - "tsconfig.repair-assurance.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verification-core-ci.yml"
@@ -34,6 +38,9 @@ on:
       - "src/lib/compiler/finite-state-verifier.ts"
       - "src/lib/compiler/repair-compiler.ts"
       - "src/lib/compiler/repair-compiler.test.ts"
+      - "src/lib/compiler/repair-package.ts"
+      - "src/lib/compiler/repair-package.test.ts"
+      - "src/lib/compiler/signed-repair-root.ts"
       - "src/lib/compiler/*verification*.test.ts"
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
@@ -44,6 +51,7 @@ on:
       - "examples/aetherforge-minimal-repair.ts"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
+      - "tsconfig.repair-assurance.json"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/verification-core-ci.yml"
@@ -94,3 +102,12 @@ jobs:
 
       - name: Run AETHER FORGE minimal-repair demo
         run: npm run demo:aetherforge-repair
+
+      - name: Typecheck repair assurance package
+        run: npm run typecheck:repair-assurance
+
+      - name: Lint repair assurance package
+        run: npm run lint:repair-assurance
+
+      - name: Verify repair package and signed root
+        run: npm run test:repair-assurance
