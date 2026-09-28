@@ -11,6 +11,9 @@ RCHAIN-COMPLIER is a protocol-agnostic verification and bounded-repair compiler 
 - [Casper CBC Research Status](CASPER_CBC_RESEARCH_STATUS.md)
 - [v1 Release Boundary](V1_RELEASE_BOUNDARY.md)
 - [Cross-Repository Assurance Contract](CROSS_REPO_ASSURANCE_CONTRACT.md)
+- [Four-Repository v1 Integration](FOUR_REPO_V1_INTEGRATION.md)
+- [v1 Schema Index](V1_SCHEMA_INDEX.md)
+- [v1 Baseline Manifest](V1_BASELINE_MANIFEST.md)
 - [Failure Containment](FAILURE_CONTAINMENT.md)
 - [Development](DEVELOPMENT.md)
 
@@ -30,3 +33,12 @@ VerificationProblem
 ```
 
 Every arrow is a boundary, not permission to strengthen the claim. A digest establishes identity/integrity relative to bytes; a signature or attestation establishes binding to a key/root; neither establishes semantic truth by itself.
+
+## Repository map
+
+- **RCHAIN-COMPLIER** — primary compiler and documentation hub.
+- **rchain-sentinel** — observation/transport validation boundary.
+- **rlsenti** — read-only inspection boundary.
+- **Sovereign-Lattice** — independent evidence-root attestation boundary.
+
+The root `index.html` is the visual landing page for this same architecture.
