@@ -46,7 +46,10 @@
     "lint:external-subjects": "eslint src/lib/subjects/aetherforge.ts src/lib/subjects/aetherforge.test.ts src/lib/subjects/aetherforge-repair.ts src/lib/subjects/aetherforge-repair.test.ts examples/aetherforge-external-subject.ts examples/aetherforge-minimal-repair.ts",
     "demo:aetherforge-subject": "node --experimental-strip-types examples/aetherforge-external-subject.ts",
     "demo:aetherforge-repair": "node --experimental-strip-types examples/aetherforge-minimal-repair.ts",
-    "demo:casper-minimal-repair": "node --experimental-strip-types examples/casper-minimal-repair.ts"
+    "demo:casper-minimal-repair": "node --experimental-strip-types examples/casper-minimal-repair.ts",
+    "test:repair-assurance": "node --experimental-strip-types --test src/lib/compiler/repair-package.test.ts",
+    "lint:repair-assurance": "eslint src/lib/compiler/repair-package.ts src/lib/compiler/repair-package.test.ts src/lib/compiler/signed-repair-root.ts",
+    "typecheck:repair-assurance": "tsc -p tsconfig.repair-assurance.json --noEmit"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
