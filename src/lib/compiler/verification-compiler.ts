@@ -75,18 +75,54 @@ function validateAdapter(adapter: VerificationAdapter): void {
   }
 }
 
+function canonicalClaimValue(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalClaimValue(item)).join(",")}]`;
+  }
+
+  switch (typeof value) {
+    case "string":
+    case "boolean":
+      return JSON.stringify(value);
+    case "number":
+      if (!Number.isFinite(value)) {
+        throw new Error("verification claim metadata contains a non-finite number");
+      }
+      return Object.is(value, -0) ? "0" : String(value);
+    case "object": {
+      const record = value as Record<string, unknown>;
+      return `{${Object.keys(record)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${canonicalClaimValue(record[key])}`)
+        .join(",")}}`;
+    }
+    default:
+      throw new Error(
+        `verification claim metadata contains unsupported ${typeof value}`,
+      );
+  }
+}
+
 function artifactMatches(
   artifact: VerificationArtifact,
   problem: VerificationProblem,
   adapter: VerificationAdapter,
 ): boolean {
-  return (
-    artifact.schema === "verification-artifact/v1" &&
-    artifact.problemId === problem.id &&
-    artifact.modelFamily === problem.modelFamily &&
-    artifact.adapterId === adapter.id &&
-    artifact.adapterVersion === adapter.version
-  );
+  try {
+    return (
+      artifact.schema === "verification-artifact/v1" &&
+      artifact.problemId === problem.id &&
+      artifact.modelFamily === problem.modelFamily &&
+      artifact.adapterId === adapter.id &&
+      artifact.adapterVersion === adapter.version &&
+      canonicalClaimValue(artifact.scope) === canonicalClaimValue(problem.scope) &&
+      canonicalClaimValue(artifact.assumptions) ===
+        canonicalClaimValue(problem.assumptions)
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function compileVerification(
