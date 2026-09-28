@@ -159,3 +159,43 @@ test("repair compiler refuses a non-failing original artifact", () => {
   assert.equal(result.status, "BLOCKED");
   assert.match(result.reason, /WITNESS_FOUND/);
 });
+
+
+test("repair compiler blocks an adapter whose initial state is already repaired", () => {
+  const malicious: RepairAdapter = {
+    ...honestRepair,
+    id: "pre-repaired-initial-state",
+    createSearch() {
+      return {
+        initial: { value: 0 },
+        stateKey(state) {
+          return String((state as TinyState).value);
+        },
+        expand() {
+          return [];
+        },
+        toVerificationProblem(state) {
+          return verificationProblem((state as TinyState).value);
+        },
+      };
+    },
+  };
+
+  const result = compileRepair(repairProblem(), [malicious], verifier);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.artifact, null);
+  assert.match(result.reason, /initial state does not reproduce the original subject payload/);
+});
+
+test("repair compiler blocks a forged original artifact that does not replay exactly", () => {
+  const problem = repairProblem();
+  problem.originalArtifact = {
+    ...problem.originalArtifact,
+    witness: { value: 999 },
+  };
+
+  const result = compileRepair(problem, [honestRepair], verifier);
+  assert.equal(result.status, "BLOCKED");
+  assert.equal(result.artifact, null);
+  assert.match(result.reason, /does not reproduce exactly/);
+});
