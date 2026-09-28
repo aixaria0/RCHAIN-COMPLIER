@@ -93,7 +93,7 @@ fn build_duplicate_minimum_message_graph() -> (
         "g0", "g1", "g2", "g3",
     ];
 
-    for (id, sender) in [("a3", "v0"), ("b3", "v1"), ("c3", "v2")] {
+    for (id, sender) in [("a3", "v0"), ("b3", "v1"), ("c3", "v2"), ("d3", "v3")] {
         messages.insert(
             id.to_string(),
             msg(
@@ -174,5 +174,72 @@ fn upstream_m11_5_duplicate_minimum_messages_pass_count_gate_and_finalize() {
         ["a1".to_string(), "b1".to_string(), "c1".to_string()]
             .into_iter()
             .collect()
+    );
+}
+
+
+#[test]
+fn upstream_m11_5_repaired_distinct_sender_candidate_preserves_finalization() {
+    let (msg_map, _original_justifications) = build_duplicate_minimum_message_graph();
+    let finalizer = Finalizer::new(&msg_map);
+    let bond_map = bonds();
+
+    // This is the repair selected by the generic repair compiler:
+    // replace a2 (v0) with d3 (v3) in the justification set.
+    // The corresponding oldest self-parent messages are now one per bonded sender.
+    let repaired_justifications: BTreeSet<_> = ["a3", "b3", "c3", "d3"]
+        .into_iter()
+        .map(|id| msg_map[id].clone())
+        .collect();
+
+    let min_msgs = vec![
+        msg_map["g0"].clone(),
+        msg_map["g1"].clone(),
+        msg_map["g2"].clone(),
+        msg_map["g3"].clone(),
+    ];
+
+    assert_eq!(min_msgs.len(), 4);
+    assert_eq!(
+        min_msgs.iter().map(|m| m.sender.as_str()).collect::<Vec<_>>(),
+        vec!["v0", "v1", "v2", "v3"]
+    );
+    assert!(
+        finalizer.check_min_messages(&min_msgs, &bond_map),
+        "repaired candidate should pass the pinned upstream count gate"
+    );
+
+    let next_layer = finalizer.calculate_next_layer(&min_msgs);
+    assert_eq!(next_layer.len(), 4);
+    assert!(next_layer.contains_key("v0"));
+    assert!(next_layer.contains_key("v1"));
+    assert!(next_layer.contains_key("v2"));
+    assert!(next_layer.contains_key("v3"));
+
+    let prev_fringe = BTreeSet::new();
+    let support = finalizer.calculate_next_fringe_support_map(
+        &repaired_justifications,
+        &next_layer,
+        &prev_fringe,
+    );
+    assert!(
+        finalizer.calculate_fringe(&support, &bond_map),
+        "repair should preserve the Finalizer's ability to advance the fringe"
+    );
+
+    let (_parent_fringe, new_fringe) =
+        finalizer.calculate_finalization(&repaired_justifications, &bond_map);
+    let fringe = new_fringe.expect("repaired distinct-sender candidate should finalize");
+    let fringe_ids: BTreeSet<_> = fringe.into_iter().map(|m| m.id).collect();
+    assert_eq!(
+        fringe_ids,
+        [
+            "a1".to_string(),
+            "b1".to_string(),
+            "c1".to_string(),
+            "d1".to_string(),
+        ]
+        .into_iter()
+        .collect()
     );
 }
