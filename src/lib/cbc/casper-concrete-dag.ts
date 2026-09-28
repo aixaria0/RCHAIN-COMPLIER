@@ -153,9 +153,10 @@ export function buildDuplicateMinimumMessageDAG(): ConcreteDagFixture {
     { id: "a3", sender: "v0", senderSeq: 3, parents: layerTwoIds, seen: [] },
     { id: "b3", sender: "v1", senderSeq: 3, parents: layerTwoIds, seen: [] },
     { id: "c3", sender: "v2", senderSeq: 3, parents: layerTwoIds, seen: [] },
+    { id: "d3", sender: "v3", senderSeq: 3, parents: layerTwoIds, seen: [] },
   ];
   const byId = new Map(messages.map((message) => [message.id, message]));
-  for (const id of [...layerTwoIds, "a3", "b3", "c3"]) {
+  for (const id of [...layerTwoIds, "a3", "b3", "c3", "d3"]) {
     const message = byId.get(id)!;
     const seen = new Set<string>([id]);
     for (const parentId of message.parents) {
