@@ -8,6 +8,8 @@ on:
       - "src/lib/compiler/lexicographic-possibility.ts"
       - "src/lib/compiler/verification-compiler.ts"
       - "src/lib/compiler/finite-state-verifier.ts"
+      - "src/lib/compiler/repair-compiler.ts"
+      - "src/lib/compiler/repair-compiler.test.ts"
       - "src/lib/compiler/*verification*.test.ts"
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
@@ -15,6 +17,7 @@ on:
       - "src/lib/subjects/**"
       - "examples/verification-compiler-generic.ts"
       - "examples/aetherforge-external-subject.ts"
+      - "examples/aetherforge-minimal-repair.ts"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
       - "package.json"
@@ -29,6 +32,8 @@ on:
       - "src/lib/compiler/lexicographic-possibility.ts"
       - "src/lib/compiler/verification-compiler.ts"
       - "src/lib/compiler/finite-state-verifier.ts"
+      - "src/lib/compiler/repair-compiler.ts"
+      - "src/lib/compiler/repair-compiler.test.ts"
       - "src/lib/compiler/*verification*.test.ts"
       - "src/lib/compiler/possibility-plane.test.ts"
       - "src/lib/compiler/quantitative-what-if.test.ts"
@@ -36,6 +41,7 @@ on:
       - "src/lib/subjects/**"
       - "examples/verification-compiler-generic.ts"
       - "examples/aetherforge-external-subject.ts"
+      - "examples/aetherforge-minimal-repair.ts"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
       - "package.json"
@@ -85,3 +91,6 @@ jobs:
 
       - name: Run AETHER FORGE external-subject demo
         run: npm run demo:aetherforge-subject
+
+      - name: Run AETHER FORGE minimal-repair demo
+        run: npm run demo:aetherforge-repair
