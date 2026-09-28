@@ -74,8 +74,7 @@ jobs:
       - name: Emit portable cross-repo repair envelope
         run: |
           node --experimental-strip-types scripts/emit-repair-propagation.ts \
-            artifacts/cbc-native-repair-binding.json
-            artifacts/cbc-repair-propagation.json \
+            artifacts/cbc-native-repair-binding.json \
             artifacts/cbc-native-repair-replay.json \
             artifacts/cbc-repair-propagation.json
 
@@ -86,4 +85,5 @@ jobs:
           path: |
             artifacts/cbc-native-repair-replay.json
             artifacts/cbc-native-repair-binding.json
+            artifacts/cbc-repair-propagation.json
           if-no-files-found: error
