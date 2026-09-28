@@ -7,6 +7,8 @@
 [![Reality Plane CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml)
 [![Assurance Provenance](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml)
 
+> **v1 baseline status:** implementation-complete on the PR #21 line with verification, bounded repair, pinned native replay, portable propagation, inspection, and independent evidence-root attestation.
+>
 > **Current milestone:** [PR #21 — Generic Causal Assurance Fabric](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/21)
 >
 > **Current scope:** the generic assurance layer is implemented independently of any live RChain/RNode runtime. RChain/Casper is the first serious target for integration, not a hard dependency of the core.
@@ -236,7 +238,7 @@ An evidence envelope binds:
 - canonical claims SHA-256;
 - resulting evidence identity.
 
-The important change in v2 is that **claims are no longer loose metadata**.
+In the current evidence contract, **claims are no longer loose metadata**.
 
 Changing a claim changes the claims digest and therefore changes the evidence identity.
 
@@ -423,7 +425,7 @@ The canonical package-root algorithm is independently implemented in:
 
 The frozen four-artifact fixture produces the same package root across all three implementations.
 
-Current v2 frozen root:
+Current frozen conformance root:
 
 ```text
 sha256:d3dda1ea8d69ef493b83b3b373f6d49c53324a19df127788687db92a31310ace
