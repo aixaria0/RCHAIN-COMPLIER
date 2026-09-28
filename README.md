@@ -13,6 +13,31 @@
 >
 > **Current scope:** the generic assurance layer is implemented independently of any live RChain/RNode runtime. RChain/Casper is the first serious target for integration, not a hard dependency of the core.
 
+## v1 — four-repository assurance fabric
+
+The primary repository now acts as the documentation and contract hub for the complete v1 chain:
+
+```text
+RCHAIN-COMPLIER
+  verification → bounded repair → pinned native replay → propagation
+        │
+        ▼
+rchain-sentinel
+  evidence transport observation
+        │
+        ▼
+rlsenti
+  read-only inspection
+        │
+        ▼
+Sovereign-Lattice
+  independent evidence-root attestation
+```
+
+**v1 status:** implementation-complete and CI-verified on the current feature branches. The cross-repository boundary is documented centrally in [Four-Repository v1 Integration](docs/FOUR_REPO_V1_INTEGRATION.md), [v1 Schema Index](docs/V1_SCHEMA_INDEX.md), [v1 Release Boundary](docs/V1_RELEASE_BOUNDARY.md), and [v1 Baseline Manifest](docs/V1_BASELINE_MANIFEST.md).
+
+A visual project landing page is available from the repository's `index.html` and is suitable for GitHub Pages publication.
+
 ---
 
 ## Why this project exists
