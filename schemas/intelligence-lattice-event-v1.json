@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:intelligence-lattice:event:v1",
+  "$comment": "Structural envelope only. Canonical bytes, identity/policy binding, signatures, typed dependencies and verification must also be checked by the event core.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "latticeId",
+    "policyDigest",
+    "actorId",
+    "publicKeyHex",
+    "sequence",
+    "issuedAt",
+    "parents",
+    "body",
+    "id",
+    "signatureHex"
+  ],
+  "properties": {
+    "schema": {
+      "const": "intelligence-lattice-event/v1"
+    },
+    "latticeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "policyDigest": {
+      "$ref": "#/$defs/hash"
+    },
+    "actorId": {
+      "$ref": "#/$defs/hash"
+    },
+    "publicKeyHex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "parents": {
+      "type": "array",
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/hash"
+      }
+    },
+    "body": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "capability",
+            "claim",
+            "evidence",
+            "challenge",
+            "evidence_request",
+            "verification_request",
+            "verification",
+            "decision"
+          ]
+        }
+      }
+    },
+    "id": {
+      "$ref": "#/$defs/hash"
+    },
+    "signatureHex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
