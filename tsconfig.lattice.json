@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "include": ["src/lib/lattice/**/*.ts", "examples/lattice-*.ts"] }
