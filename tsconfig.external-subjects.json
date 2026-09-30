@@ -9,6 +9,9 @@
     "examples/aetherforge-external-subject.ts",
     "src/lib/subjects/aetherforge-repair.ts",
     "src/lib/subjects/aetherforge-repair.test.ts",
-    "examples/aetherforge-minimal-repair.ts"
+    "examples/aetherforge-minimal-repair.ts",
+    "src/lib/subjects/quantumos.ts",
+    "src/lib/subjects/quantumos.test.ts",
+    "examples/quantumos-assurance-adapter.ts"
   ]
 }
