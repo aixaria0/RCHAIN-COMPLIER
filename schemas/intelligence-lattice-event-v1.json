@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:intelligence-lattice:event:v1",
-  "$comment": "Structural envelope only. Canonical bytes, identity/policy binding, signatures, typed dependencies and verification must also be checked by the event core.",
+  "$comment": "Structural v1 schema. Runtime admission additionally enforces canonical UTF-8, depth/byte limits, sorted parents, identity/policy/signature/content binding and typed replay. JSON Schema validation alone is insufficient.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,7 +24,8 @@
     "latticeId": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 128
+      "maxLength": 128,
+      "pattern": "\\S"
     },
     "policyDigest": {
       "$ref": "#/$defs/hash"
@@ -43,7 +44,8 @@
     },
     "issuedAt": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$"
     },
     "parents": {
       "type": "array",
@@ -54,24 +56,330 @@
       }
     },
     "body": {
-      "type": "object",
-      "required": [
-        "kind"
-      ],
-      "properties": {
-        "kind": {
-          "enum": [
-            "capability",
-            "claim",
-            "evidence",
-            "challenge",
-            "evidence_request",
-            "verification_request",
-            "verification",
-            "decision"
-          ]
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "operations", "implementation"],
+          "properties": {
+            "kind": {
+              "const": "capability"
+            },
+            "operations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "implementation": {
+              "$ref": "#/$defs/hash"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "subject",
+            "predicate",
+            "value",
+            "domain",
+            "method",
+            "assumptions",
+            "confidence",
+            "falsifier"
+          ],
+          "properties": {
+            "kind": {
+              "const": "claim"
+            },
+            "subject": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "predicate": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "value": {
+              "$ref": "#/$defs/json"
+            },
+            "domain": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "assumptions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "\\S"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "confidence": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["ppm", "basis"],
+              "properties": {
+                "ppm": {
+                  "type": ["integer", "null"],
+                  "minimum": 0,
+                  "maximum": 1000000
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "falsifier": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "claimId", "relation", "artifact", "method"],
+          "properties": {
+            "kind": {
+              "const": "evidence"
+            },
+            "claimId": {
+              "$ref": "#/$defs/hash"
+            },
+            "relation": {
+              "enum": ["supports", "contradicts"]
+            },
+            "artifact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["digest", "mediaType", "content"],
+              "properties": {
+                "digest": {
+                  "$ref": "#/$defs/hash"
+                },
+                "mediaType": {
+                  "const": "application/json"
+                },
+                "content": {
+                  "$ref": "#/$defs/json"
+                }
+              }
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "claimId", "reason"],
+          "properties": {
+            "kind": {
+              "const": "challenge"
+            },
+            "claimId": {
+              "$ref": "#/$defs/hash"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "claimId", "question"],
+          "properties": {
+            "kind": {
+              "const": "evidence_request"
+            },
+            "claimId": {
+              "$ref": "#/$defs/hash"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "claimId", "evidenceIds", "verifier"],
+          "properties": {
+            "kind": {
+              "const": "verification_request"
+            },
+            "claimId": {
+              "$ref": "#/$defs/hash"
+            },
+            "evidenceIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/hash"
+              },
+              "minItems": 1,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "verifier": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "requestId",
+            "claimId",
+            "evidenceIds",
+            "verifier",
+            "verdict",
+            "artifact"
+          ],
+          "properties": {
+            "kind": {
+              "const": "verification"
+            },
+            "requestId": {
+              "$ref": "#/$defs/hash"
+            },
+            "claimId": {
+              "$ref": "#/$defs/hash"
+            },
+            "evidenceIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/hash"
+              },
+              "minItems": 1,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "verifier": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "verdict": {
+              "enum": ["SUPPORTED", "REFUTED", "INCONCLUSIVE"]
+            },
+            "artifact": {
+              "$ref": "#/$defs/json"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "procedure", "claimIds", "verificationIds", "result"],
+          "properties": {
+            "kind": {
+              "const": "decision"
+            },
+            "procedure": {
+              "const": "evidence-cut/v1"
+            },
+            "claimIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/hash"
+              },
+              "minItems": 1,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "verificationIds": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/hash"
+              },
+              "minItems": 0,
+              "maxItems": 16,
+              "uniqueItems": true
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["accepted", "rejected", "unresolved"],
+              "properties": {
+                "accepted": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/hash"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                },
+                "rejected": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/hash"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                },
+                "unresolved": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/hash"
+                  },
+                  "minItems": 0,
+                  "maxItems": 16,
+                  "uniqueItems": true
+                }
+              }
+            }
+          }
         }
-      }
+      ]
     },
     "id": {
       "$ref": "#/$defs/hash"
@@ -85,6 +393,41 @@
     "hash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
     }
   }
 }

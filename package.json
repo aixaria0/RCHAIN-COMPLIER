@@ -49,7 +49,13 @@
     "demo:casper-minimal-repair": "node --experimental-strip-types examples/casper-minimal-repair.ts",
     "test:repair-assurance": "node --experimental-strip-types --test src/lib/compiler/repair-package.test.ts",
     "lint:repair-assurance": "eslint src/lib/compiler/repair-package.ts src/lib/compiler/repair-package.test.ts src/lib/compiler/signed-repair-root.ts",
-    "typecheck:repair-assurance": "tsc -p tsconfig.repair-assurance.json --noEmit"
+    "typecheck:repair-assurance": "tsc -p tsconfig.repair-assurance.json --noEmit",
+    "test:lattice": "node --experimental-strip-types --test src/lib/lattice/*.test.ts",
+    "typecheck:lattice": "tsc -p tsconfig.lattice.json --noEmit",
+    "lint:lattice": "eslint src/lib/lattice examples/lattice-*.ts --max-warnings 0",
+    "demo:lattice": "node --experimental-strip-types examples/lattice-two-node.ts",
+    "replay:lattice": "node --experimental-strip-types examples/lattice-replay.ts",
+    "check:lattice-vectors": "python3 tools/check_lattice_vectors.py"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

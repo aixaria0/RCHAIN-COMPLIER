@@ -1,0 +1,54 @@
+name: Intelligence Lattice Evidence Core
+on:
+  pull_request:
+    paths:
+      [
+        "src/lib/lattice/**",
+        "src/lib/compiler/**",
+        "examples/lattice-*.ts",
+        "schemas/intelligence-lattice-*.json",
+        "tools/check_lattice_vectors.py",
+        "package*.json",
+        "tsconfig*.json",
+        ".github/workflows/lattice-ci.yml",
+      ]
+  push:
+    branches: [main, feat/intelligence-lattice-event-core-v1, feat/assurance-fabric-v1]
+    paths:
+      [
+        "src/lib/lattice/**",
+        "src/lib/compiler/**",
+        "examples/lattice-*.ts",
+        "schemas/intelligence-lattice-*.json",
+        "tools/check_lattice_vectors.py",
+        "package*.json",
+        "tsconfig*.json",
+        ".github/workflows/lattice-ci.yml",
+      ]
+permissions:
+  contents: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck:lattice
+      - run: npm run lint:lattice
+      - run: npm run test:lattice
+      - run: npm run check:lattice-vectors
+      - name: Two-process crash/rejoin and independent replay
+        run: |
+          npm run demo:lattice -- "$RUNNER_TEMP/lattice-audit.json"
+          npm run replay:lattice -- "$RUNNER_TEMP/lattice-audit.json"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lattice-public-audit
+          path: ${{ runner.temp }}/lattice-audit.json
+          if-no-files-found: error
+          retention-days: 7
