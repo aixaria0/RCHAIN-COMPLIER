@@ -21,6 +21,8 @@ on:
       - "examples/verification-compiler-generic.ts"
       - "examples/aetherforge-external-subject.ts"
       - "examples/aetherforge-minimal-repair.ts"
+      - "examples/quantumos-assurance-adapter.ts"
+      - "docs/QUANTUMOS_ASSURANCE_ADAPTER.md"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
       - "tsconfig.repair-assurance.json"
@@ -30,6 +32,7 @@ on:
   push:
     branches:
       - "feat/assurance-fabric-v1"
+      - "feat/quantumos-assurance-adapter"
     paths:
       - "src/lib/compiler/possibility-plane.ts"
       - "src/lib/compiler/quantitative-what-if.ts"
@@ -49,6 +52,8 @@ on:
       - "examples/verification-compiler-generic.ts"
       - "examples/aetherforge-external-subject.ts"
       - "examples/aetherforge-minimal-repair.ts"
+      - "examples/quantumos-assurance-adapter.ts"
+      - "docs/QUANTUMOS_ASSURANCE_ADAPTER.md"
       - "tsconfig.verification-core.json"
       - "tsconfig.external-subjects.json"
       - "tsconfig.repair-assurance.json"
@@ -92,16 +97,23 @@ jobs:
         run: npm run typecheck:external-subjects
 
       - name: Lint external subjects
-        run: npm run lint:external-subjects
+        run: |
+          npm run lint:external-subjects
+          npx eslint src/lib/subjects/quantumos.ts src/lib/subjects/quantumos.test.ts examples/quantumos-assurance-adapter.ts
 
-      - name: Test AETHER FORGE as external subject
-        run: npm run test:external-subjects
+      - name: Test external subjects
+        run: |
+          npm run test:external-subjects
+          node --experimental-strip-types --test src/lib/subjects/quantumos.test.ts
 
       - name: Run AETHER FORGE external-subject demo
         run: npm run demo:aetherforge-subject
 
       - name: Run AETHER FORGE minimal-repair demo
         run: npm run demo:aetherforge-repair
+
+      - name: Run QuantumOS proof-carrying closure demo
+        run: node --experimental-strip-types examples/quantumos-assurance-adapter.ts
 
       - name: Typecheck repair assurance package
         run: npm run typecheck:repair-assurance
