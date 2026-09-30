@@ -137,3 +137,27 @@ test("assumption ordering and clock skew do not hide contradiction", () => {
   assert.equal(replay([left, right], f.policy).disagreements.length, 1);
   assert.deepEqual(replay([right, left], f.policy), replay([left, right], f.policy));
 });
+
+
+test("decision is invalid when it selects an unreproduced verification receipt", () => {
+  const f = scenario(),
+    forged = f.emit(f.b, {
+      ...verificationBody(f.request, new Map(f.events.map((e) => [e.id, e]))),
+      verdict: "SUPPORTED",
+    }),
+    events = [...f.events.filter((e) => e.id !== f.verification.id), forged],
+    base = replay(events, f.policy),
+    claimIds = [f.bad.id],
+    verificationIds = [forged.id],
+    result = decide(claimIds, verificationIds, base.verifications),
+    decision = f.emit(f.a, {
+      kind: "decision",
+      procedure: "evidence-cut/v1",
+      claimIds,
+      verificationIds,
+      result,
+    }),
+    view = replay([...events, decision], f.policy);
+  assert.equal(base.verifications.find((v) => v.id === forged.id)!.locallyReproduced, false);
+  assert.equal(view.decisions[0]!.valid, false);
+});
