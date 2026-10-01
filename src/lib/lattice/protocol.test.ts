@@ -118,3 +118,36 @@ test("admission returns a detached snapshot", () => {
   assert.equal(copy.body.kind === "claim" && copy.body.value, 12);
   assert.doesNotThrow(() => validateEvent(copy, f.policy));
 });
+
+test("TaskEnvelope binds input, dependencies and observe-only authority", () => {
+  const f = fixture(),
+    content = { schema: "task-input/v1", values: [2, 3, 7] },
+    envelope = {
+      schema: "intelligence-lattice-task/v1" as const,
+      taskId: artifactDigest({ purpose: "sum fixture" }),
+      domain: "arithmetic",
+      operation: "integer-sum",
+      input: { digest: artifactDigest(content), mediaType: "application/json" as const, content },
+      dependencies: [f.goodEvidence.id],
+      authority: { mode: "observe-only" as const, issuer: f.a.actorId },
+      output: { mediaType: "application/json" as const, claimPredicate: "integer-sum" },
+    },
+    task = f.emit(f.a, { kind: "task", envelope });
+  assert.ok(task.parents.includes(f.goodEvidence.id));
+  assert.doesNotThrow(() => validateEvent(task, f.policy));
+  assert.throws(() =>
+    f.emit(f.a, {
+      kind: "task",
+      envelope: { ...envelope, input: { ...envelope.input, digest: artifactDigest({ wrong: true }) } },
+    }),
+  );
+  assert.throws(() =>
+    f.emit(f.a, {
+      kind: "task",
+      envelope: {
+        ...envelope,
+        authority: { mode: "execute" as never, issuer: f.a.actorId },
+      },
+    }),
+  );
+});

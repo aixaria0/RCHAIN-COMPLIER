@@ -15,6 +15,7 @@ export const EVENT_SCHEMA = "intelligence-lattice-event/v1";
 export const MAX_BATCH_EVENTS = 32;
 export const EVENT_KINDS = [
   "capability",
+  "task",
   "claim",
   "evidence",
   "challenge",
@@ -30,8 +31,19 @@ export interface DecisionResult {
   rejected: string[];
   unresolved: string[];
 }
+export interface TaskEnvelope {
+  schema: "intelligence-lattice-task/v1";
+  taskId: string;
+  domain: string;
+  operation: string;
+  input: { digest: string; mediaType: "application/json"; content: Json };
+  dependencies: string[];
+  authority: { mode: "observe-only"; issuer: string };
+  output: { mediaType: "application/json"; claimPredicate: string };
+}
 export type EventBody =
   | { kind: "capability"; operations: string[]; implementation: string }
+  | { kind: "task"; envelope: TaskEnvelope }
   | {
       kind: "claim";
       subject: string;
@@ -151,7 +163,7 @@ export function policyDigest(policy: MembershipPolicy): string {
     exact(m, ["actorId", "publicKeyHex", "kinds", "domains"]);
     if (actorId(m.publicKeyHex) !== m.actorId || seen.has(m.actorId))
       throw new Error("invalid or duplicate member");
-    strings(m.kinds, 8);
+    strings(m.kinds, EVENT_KINDS.length);
     if (!m.kinds.every((k) => EVENT_KINDS.includes(k))) throw new Error("unknown permitted kind");
     strings(m.domains);
     if (!m.domains.length) throw new Error("domain required");
@@ -162,6 +174,9 @@ export function policyDigest(policy: MembershipPolicy): string {
 export function references(b: EventBody): string[] {
   switch (b.kind) {
     case "capability":
+      return [];
+    case "task":
+      return b.envelope.dependencies;
     case "claim":
       return [];
     case "evidence":
@@ -185,6 +200,34 @@ function body(value: unknown): asserts value is EventBody {
       strings(b.operations);
       hash(b.implementation);
       break;
+    case "task": {
+      exact(b, ["kind", "envelope"]);
+      const e = exact(b.envelope, [
+        "schema",
+        "taskId",
+        "domain",
+        "operation",
+        "input",
+        "dependencies",
+        "authority",
+        "output",
+      ]);
+      if (e.schema !== "intelligence-lattice-task/v1") throw new Error("unsupported task schema");
+      hash(e.taskId);
+      text(e.domain);
+      text(e.operation);
+      strings(e.dependencies, 16, true);
+      const input = exact(e.input, ["digest", "mediaType", "content"]);
+      if (input.mediaType !== "application/json" || input.digest !== artifactDigest(input.content))
+        throw new Error("task input mismatch");
+      const authority = exact(e.authority, ["mode", "issuer"]);
+      if (authority.mode !== "observe-only") throw new Error("task execution authority forbidden");
+      text(authority.issuer);
+      const output = exact(e.output, ["mediaType", "claimPredicate"]);
+      if (output.mediaType !== "application/json") throw new Error("unsupported task output");
+      text(output.claimPredicate);
+      break;
+    }
     case "claim": {
       exact(b, [
         "kind",

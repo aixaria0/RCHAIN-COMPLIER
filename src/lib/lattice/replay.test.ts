@@ -138,3 +138,82 @@ test("assumption ordering and clock skew do not hide contradiction", () => {
   assert.deepEqual(replay([right, left], f.policy), replay([left, right], f.policy));
 });
 
+
+test("task provenance binds claim to declared input, operation and output contract", () => {
+  const f = fixture(),
+    task = f.emit(f.a, {
+      kind: "task",
+      envelope: {
+        schema: "intelligence-lattice-task/v1",
+        taskId: f.good.id,
+        domain: "arithmetic",
+        operation: "independent-calculation",
+        input: { digest: f.good.body.kind === "claim" ? f.good.body.subject : "", mediaType: "application/json", content: f.input },
+        dependencies: [],
+        authority: { mode: "observe-only", issuer: f.a.actorId },
+        output: { mediaType: "application/json", claimPredicate: "integer-sum" },
+      },
+    }),
+    claim = f.emit(f.b, f.claimBody(12), [task.id]),
+    valid = replay([task, claim], f.policy);
+  assert.equal(valid.taskProvenance[0]!.valid, true);
+  assert.equal(valid.claims.find((v) => v.id === claim.id)!.taskId, task.id);
+
+  const mismatched = f.emit(f.b, { ...f.claimBody(12), method: "different-operation" }, [task.id]),
+    invalid = replay([task, mismatched], f.policy);
+  assert.equal(invalid.taskProvenance[0]!.valid, false);
+  assert.ok(invalid.blocked.some((b) => b.id === mismatched.id && /task provenance/.test(b.reason)));
+});
+
+test("task provenance survives evidence and locally reproduced verification into decision binding", () => {
+  const f = fixture(),
+    task = f.emit(f.a, {
+      kind: "task",
+      envelope: {
+        schema: "intelligence-lattice-task/v1",
+        taskId: f.good.id,
+        domain: "arithmetic",
+        operation: "independent-calculation",
+        input: {
+          digest: f.good.body.kind === "claim" ? f.good.body.subject : "",
+          mediaType: "application/json",
+          content: f.input,
+        },
+        dependencies: [],
+        authority: { mode: "observe-only", issuer: f.a.actorId },
+        output: { mediaType: "application/json", claimPredicate: "integer-sum" },
+      },
+    }),
+    claim = f.emit(f.b, f.claimBody(12), [task.id]),
+    evidence = f.emit(f.a, {
+      kind: "evidence",
+      claimId: claim.id,
+      relation: "supports",
+      artifact: { digest: f.goodEvidence.body.kind === "evidence" ? f.goodEvidence.body.artifact.digest : "", mediaType: "application/json", content: f.input },
+      method: "fixture",
+    }),
+    request = f.emit(f.a, {
+      kind: "verification_request",
+      claimId: claim.id,
+      evidenceIds: [evidence.id],
+      verifier: "integer-sum/v1",
+    });
+  const events = [task, claim, evidence, request],
+    receipt = f.emit(f.b, verificationBody(request, new Map(events.map((e) => [e.id, e])))),
+    base = replay([...events, receipt], f.policy),
+    verification = base.verifications.find((v) => v.id === receipt.id)!;
+  assert.equal(verification.locallyReproduced, true);
+  assert.equal(verification.provenanceValid, true);
+  assert.equal(verification.taskId, task.id);
+  const result = decide([claim.id], [receipt.id], base.verifications),
+    decision = f.emit(f.a, {
+      kind: "decision",
+      procedure: "evidence-cut/v1",
+      claimIds: [claim.id],
+      verificationIds: [receipt.id],
+      result,
+    }),
+    view = replay([...events, receipt, decision], f.policy);
+  assert.equal(view.decisions[0]!.valid, true);
+  assert.equal(view.claims.find((c) => c.id === claim.id)!.provenance.taskId, task.id);
+});

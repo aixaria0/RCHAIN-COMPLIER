@@ -12,6 +12,8 @@ import { DEFAULT_VERIFIERS, reproduceRequest, type VerifierRegistry } from "./ve
 export interface VerificationView {
   id: string;
   claimId: string;
+  taskId: string | null;
+  provenanceValid: boolean;
   verdict: Verdict;
   locallyReproduced: boolean;
   reason: string;
@@ -89,13 +91,46 @@ export function replay(
   const blocked: { id: string; reason: string }[] = events
     .filter((e) => quarantine.has(e.id))
     .map((e) => ({ id: e.id, reason: "equivocation or dependency on equivocation" }));
+  const invalidTaskClaims = new Set<string>();
+  const taskProvenance = eligible
+    .filter((e) => e.body.kind === "claim")
+    .flatMap((claim) => {
+      if (claim.body.kind !== "claim") return [];
+      const claimBody = claim.body;
+      const tasks = claim.parents
+        .map((id) => unique.get(id))
+        .filter((e): e is LatticeEvent => e?.body.kind === "task");
+      if (!tasks.length) return [];
+      const validTasks = tasks.filter((task) => {
+        if (task.body.kind !== "task") return false;
+        const envelope = task.body.envelope;
+        return (
+          ready.has(task.id) &&
+          envelope.domain === claimBody.domain &&
+          envelope.operation === claimBody.method &&
+          envelope.input.digest === claimBody.subject &&
+          envelope.output.claimPredicate === claimBody.predicate
+        );
+      });
+      const valid = tasks.length === 1 && validTasks.length === 1;
+      if (!valid) {
+        invalidTaskClaims.add(claim.id);
+        blocked.push({ id: claim.id, reason: "task provenance mismatch" });
+      }
+      return [{ claimId: claim.id, taskId: tasks[0]!.id, valid }];
+    });
   function scope(e: LatticeEvent, id: string) {
     const claim = unique.get(id),
       member = policy.members.find((m) => m.actorId === e.actorId)!;
     return (
       claim?.body.kind === "claim" &&
+      !invalidTaskClaims.has(id) &&
       (member.domains.includes("*") || member.domains.includes(claim.body.domain))
     );
+  }
+  function provenanceForClaim(claimId: string) {
+    const match = taskProvenance.find((p) => p.claimId === claimId);
+    return { taskId: match?.taskId ?? null, valid: match?.valid ?? true };
   }
   function inputs(request: LatticeEvent) {
     if (request.body.kind !== "verification_request" || !scope(request, request.body.claimId))
@@ -152,9 +187,12 @@ export function replay(
     } catch (error) {
       reason = error instanceof Error ? error.message : "verification failed";
     }
+    const provenance = provenanceForClaim(b.claimId);
     verifications.push({
       id: e.id,
       claimId: b.claimId,
+      taskId: provenance.taskId,
+      provenanceValid: provenance.valid,
       verdict: b.verdict,
       locallyReproduced,
       reason,
@@ -176,6 +214,8 @@ export function replay(
         actorId: e.actorId,
         issuedAt: e.issuedAt,
         claim: e.body,
+        taskId: taskProvenance.find((p) => p.claimId === e.id)?.taskId ?? null,
+        taskProvenanceValid: taskProvenance.find((p) => p.claimId === e.id)?.valid ?? null,
         status: quarantine.has(e.id)
           ? "QUARANTINED"
           : !ready.has(e.id)
@@ -192,6 +232,13 @@ export function replay(
         evidenceRequestIds: ids("evidence_request"),
         verificationRequestIds: ids("verification_request"),
         verificationIds: verifications.filter((v) => v.claimId === e.id).map((v) => v.id),
+        provenance: {
+          taskId: provenanceForClaim(e.id).taskId,
+          evidenceIds: ids("evidence"),
+          verificationRequestIds: ids("verification_request"),
+          verificationIds: verifications.filter((v) => v.claimId === e.id).map((v) => v.id),
+          valid: provenanceForClaim(e.id).valid,
+        },
       };
     });
   const groups = new Map<string, LatticeEvent[]>();
@@ -226,11 +273,17 @@ export function replay(
         ) &&
         b.verificationIds.every((id) => {
           const v = unique.get(id);
+          if (v?.body.kind !== "verification" || !ready.has(id)) return false;
+          const claimId = v.body.claimId;
           return (
-            v?.body.kind === "verification" &&
-            ready.has(id) &&
-            b.claimIds.includes(v.body.claimId) &&
-            verifications.some((receipt) => receipt.id === id && receipt.locallyReproduced)
+            b.claimIds.includes(claimId) &&
+            verifications.some(
+              (receipt) =>
+                receipt.id === id &&
+                receipt.locallyReproduced &&
+                receipt.provenanceValid &&
+                receipt.taskId === provenanceForClaim(claimId).taskId,
+            )
           );
         });
       return {
@@ -258,6 +311,7 @@ export function replay(
     blocked: blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     equivocations,
     claims,
+    taskProvenance,
     disagreements,
     verifications,
     decisions,

@@ -24,7 +24,8 @@ export function conformanceVector() {
       {
         actorId: identity.actorId,
         publicKeyHex: identity.publicKeyHex,
-        kinds: [...EVENT_KINDS],
+        // Keep the v1 golden vector byte-stable as new event kinds are added.
+        kinds: EVENT_KINDS.filter((kind) => kind !== "task"),
         domains: ["arithmetic"],
       },
     ],
