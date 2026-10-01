@@ -55,7 +55,8 @@
     "lint:lattice": "eslint src/lib/lattice examples/lattice-*.ts --max-warnings 0",
     "demo:lattice": "node --experimental-strip-types examples/lattice-two-node.ts",
     "replay:lattice": "node --experimental-strip-types examples/lattice-replay.ts",
-    "check:lattice-vectors": "python3 tools/check_lattice_vectors.py"
+    "check:lattice-vectors": "python3 tools/check_lattice_vectors.py",
+    "demo:lattice-three": "node --experimental-strip-types examples/lattice-three-node.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
