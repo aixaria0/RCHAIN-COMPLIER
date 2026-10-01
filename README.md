@@ -142,7 +142,7 @@ That repair should be tested first against the paired unit falsifiers, then agai
 - [RChain C192 Live Witness](docs/RCHAIN_C192_LIVE_WITNESS.md)
 - [RChain C192 / C171 Paired Evaluator](docs/RCHAIN_C192_C171_PAIRED_EVALUATOR.md)
 - [RChain C192 / C171 Disposable Rust Gate](docs/RCHAIN_C192_C171_RUST_GATE.md)
-- [RChain C192 / C171 Production Wiring Gate](docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md)
+- [RChain C192 / C171 Production Wiring Gate](docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md)\n- [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md)
 - [Four-Repository Assurance](docs/FOUR_REPO_ASSURANCE.md)
 - [Casper CBC Research Status](docs/CASPER_CBC_RESEARCH_STATUS.md)
 - [Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)
