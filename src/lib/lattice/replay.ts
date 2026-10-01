@@ -1,210 +1,182 @@
 import { sha256Artifact } from "../compiler/ecosystem-chain.ts";
 import {
   canonical,
-  EVENT_KINDS,
   policyDigest,
+  validateEvent,
   type DecisionResult,
   type LatticeEvent,
   type MembershipPolicy,
+  type Verdict,
 } from "./protocol.ts";
 import { DEFAULT_VERIFIERS, reproduceRequest, type VerifierRegistry } from "./verification.ts";
-
+export interface VerificationView {
+  id: string;
+  claimId: string;
+  verdict: Verdict;
+  locallyReproduced: boolean;
+  reason: string;
+}
 export function decide(
   claimIds: string[],
   verificationIds: string[],
-  verifications: Array<{
-    id: string;
-    claimId: string;
-    verdict: "SUPPORTED" | "REFUTED" | "INCONCLUSIVE";
-    locallyReproduced: boolean;
-  }>,
+  views: VerificationView[],
 ): DecisionResult {
-  const selected = new Set(verificationIds);
-  const byClaim = new Map<string, Set<string>>();
-  for (const v of verifications) {
-    if (!selected.has(v.id) || !v.locallyReproduced) continue;
-    const s = byClaim.get(v.claimId) ?? new Set<string>();
-    s.add(v.verdict);
-    byClaim.set(v.claimId, s);
+  const selected = new Set(verificationIds),
+    result: DecisionResult = { accepted: [], rejected: [], unresolved: [] };
+  for (const id of claimIds.slice().sort()) {
+    const results = views.filter(
+        (v) => selected.has(v.id) && v.claimId === id && v.locallyReproduced,
+      ),
+      support = results.some((v) => v.verdict === "SUPPORTED"),
+      refute = results.some((v) => v.verdict === "REFUTED");
+    (support && !refute
+      ? result.accepted
+      : refute && !support
+        ? result.rejected
+        : result.unresolved
+    ).push(id);
   }
-  const accepted: string[] = [],
-    rejected: string[] = [],
-    unresolved: string[] = [];
-  for (const id of claimIds) {
-    const verdicts = byClaim.get(id) ?? new Set<string>();
-    const support = verdicts.has("SUPPORTED"),
-      refute = verdicts.has("REFUTED");
-    if (support && !refute) accepted.push(id);
-    else if (refute && !support) rejected.push(id);
-    else unresolved.push(id);
-  }
-  return { accepted, rejected, unresolved };
+  return result;
 }
-
 export function replay(
-  input: LatticeEvent[],
+  input: readonly LatticeEvent[],
   policy: MembershipPolicy,
   registry: VerifierRegistry = DEFAULT_VERIFIERS,
 ) {
+  if (input.length > 4096) throw new Error("replay event limit");
   const unique = new Map<string, LatticeEvent>();
-  for (const e of input) unique.set(e.id, e);
-  const events = [...unique.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-
-  const byActorSequence = new Map<string, LatticeEvent[]>();
-  for (const e of events) {
-    const key = `${e.actorId}:${e.sequence}`;
-    byActorSequence.set(key, [...(byActorSequence.get(key) ?? []), e]);
+  for (const value of input) {
+    const event = validateEvent(value, policy),
+      old = unique.get(event.id);
+    if (old && canonical(old) !== canonical(event)) throw new Error("event ID collision");
+    unique.set(event.id, event);
   }
-  const equivocations = [...byActorSequence.entries()]
-    .filter(([, v]) => v.length > 1)
-    .map(([key, v]) => ({ key, eventIds: v.map((e) => e.id).sort() }));
-  const quarantined = new Set(equivocations.flatMap((x) => x.eventIds));
-
+  const events = [...unique.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
+    slots = new Map<string, LatticeEvent[]>();
+  for (const e of events) {
+    const slot = `${e.actorId}:${e.sequence}`;
+    slots.set(slot, [...(slots.get(slot) ?? []), e]);
+  }
+  const equivocations = [...slots.values()]
+      .filter((v) => v.length > 1)
+      .map((v) => ({
+        actorId: v[0]!.actorId,
+        sequence: v[0]!.sequence,
+        eventIds: v.map((e) => e.id),
+      })),
+    quarantine = new Set(equivocations.flatMap((v) => v.eventIds));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of events)
+      if (!quarantine.has(e.id) && e.parents.some((p) => quarantine.has(p))) {
+        quarantine.add(e.id);
+        changed = true;
+      }
+  }
   const ready = new Set<string>();
-  const blocked: Array<{ id: string; reason: string }> = [];
-  const pending: string[] = [];
-
-  let progress = true;
-  while (progress) {
-    progress = false;
-    for (const e of events) {
-      if (ready.has(e.id) || quarantined.has(e.id) || blocked.some((b) => b.id === e.id)) continue;
-      const refs: string[] = [];
-      switch (e.body.kind) {
-        case "evidence":
-          refs.push(e.body.claimId);
-          break;
-        case "challenge":
-        case "evidence_request":
-          refs.push(e.body.claimId);
-          break;
-        case "verification_request":
-          refs.push(e.body.claimId, ...e.body.evidenceIds);
-          break;
-        case "verification":
-          refs.push(e.body.requestId, e.body.claimId, ...e.body.evidenceIds);
-          break;
-        case "decision":
-          refs.push(...e.body.claimIds, ...e.body.verificationIds);
-          break;
+  changed = true;
+  while (changed) {
+    changed = false;
+    for (const e of events)
+      if (!ready.has(e.id) && !quarantine.has(e.id) && e.parents.every((p) => ready.has(p))) {
+        ready.add(e.id);
+        changed = true;
       }
-      const missing = refs.filter((id) => !unique.has(id));
-      if (missing.length) continue;
-      const quarantinedRef = refs.find((id) => quarantined.has(id));
-      if (quarantinedRef) {
-        blocked.push({ id: e.id, reason: `dependency quarantined: ${quarantinedRef}` });
-        progress = true;
-        continue;
-      }
-      if (!refs.every((id) => ready.has(id))) continue;
-
-      if (e.body.kind === "verification_request" && !registry.has(e.body.verifier)) {
-        blocked.push({ id: e.id, reason: "unregistered verifier" });
-        progress = true;
-        continue;
-      }
-      if (e.body.kind === "verification") {
-        const request = unique.get(e.body.requestId);
-        if (!request || request.body.kind !== "verification_request") {
-          blocked.push({ id: e.id, reason: "invalid verification request binding" });
-          progress = true;
-          continue;
-        }
-        try {
-          const reproduced = reproduceRequest(request, unique, registry);
-          const matches =
-            reproduced.verdict === e.body.verdict &&
-            canonical(reproduced.artifact) === canonical(e.body.artifact);
-          if (!matches) {
-            blocked.push({ id: e.id, reason: "verification reproduction mismatch" });
-            progress = true;
-            continue;
-          }
-        } catch {
-          blocked.push({ id: e.id, reason: "verification reproduction failed" });
-          progress = true;
-          continue;
-        }
-      }
-      ready.add(e.id);
-      progress = true;
+  }
+  const pending = events.filter((e) => !ready.has(e.id) && !quarantine.has(e.id)).map((e) => e.id),
+    eligible = events.filter((e) => ready.has(e.id));
+  const blocked: { id: string; reason: string }[] = events
+    .filter((e) => quarantine.has(e.id))
+    .map((e) => ({ id: e.id, reason: "equivocation or dependency on equivocation" }));
+  function scope(e: LatticeEvent, id: string) {
+    const claim = unique.get(id),
+      member = policy.members.find((m) => m.actorId === e.actorId)!;
+    return (
+      claim?.body.kind === "claim" &&
+      (member.domains.includes("*") || member.domains.includes(claim.body.domain))
+    );
+  }
+  function inputs(request: LatticeEvent) {
+    if (request.body.kind !== "verification_request" || !scope(request, request.body.claimId))
+      throw new Error("request claim/domain mismatch");
+    const b = request.body;
+    for (const id of b.evidenceIds) {
+      const e = unique.get(id)!;
+      if (e.body.kind !== "evidence" || e.body.claimId !== b.claimId || !scope(e, b.claimId))
+        throw new Error("evidence claim/domain mismatch");
     }
   }
-
-  for (const e of events) {
-    if (ready.has(e.id) || quarantined.has(e.id) || blocked.some((b) => b.id === e.id)) continue;
-    const refs: string[] = [];
-    switch (e.body.kind) {
-      case "evidence":
-      case "challenge":
-      case "evidence_request":
-        refs.push(e.body.claimId);
-        break;
-      case "verification_request":
-        refs.push(e.body.claimId, ...e.body.evidenceIds);
-        break;
-      case "verification":
-        refs.push(e.body.requestId, e.body.claimId, ...e.body.evidenceIds);
-        break;
-      case "decision":
-        refs.push(...e.body.claimIds, ...e.body.verificationIds);
-        break;
-    }
-    pending.push(e.id);
-  }
-
-  const verifications = events
-    .filter((e) => e.body.kind === "verification")
-    .map((e) => {
-      if (e.body.kind !== "verification") throw new Error("unreachable");
-      let locallyReproduced = false;
-      try {
-        const request = unique.get(e.body.requestId);
-        if (request?.body.kind === "verification_request") {
-          const reproduced = reproduceRequest(request, unique, registry);
-          locallyReproduced =
-            reproduced.verdict === e.body.verdict &&
-            canonical(reproduced.artifact) === canonical(e.body.artifact);
-        }
-      } catch {
-        locallyReproduced = false;
+  for (const e of eligible) {
+    const b = e.body;
+    if (
+      !["evidence", "challenge", "evidence_request", "verification_request"].includes(b.kind) ||
+      !("claimId" in b)
+    )
+      continue;
+    try {
+      if (!scope(e, b.claimId)) throw new Error("claim reference/domain mismatch");
+      if (b.kind === "verification_request") {
+        inputs(e);
+        if (!registry.has(b.verifier)) throw new Error("unregistered verifier");
       }
-      return {
+    } catch (error) {
+      blocked.push({
         id: e.id,
-        claimId: e.body.claimId,
-        requestId: e.body.requestId,
-        verifier: e.body.verifier,
-        verdict: e.body.verdict,
-        artifact: e.body.artifact,
-        locallyReproduced,
-      };
+        reason: error instanceof Error ? error.message : "invalid reference",
+      });
+    }
+  }
+  const verifications: VerificationView[] = [];
+  for (const e of eligible) {
+    if (e.body.kind !== "verification") continue;
+    const b = e.body;
+    let locallyReproduced = false,
+      reason = "";
+    try {
+      if (!scope(e, b.claimId)) throw new Error("verification domain mismatch");
+      const request = unique.get(b.requestId)!;
+      inputs(request);
+      if (
+        request.body.kind !== "verification_request" ||
+        request.body.claimId !== b.claimId ||
+        request.body.verifier !== b.verifier ||
+        canonical(request.body.evidenceIds) !== canonical(b.evidenceIds)
+      )
+        throw new Error("request binding mismatch");
+      const result = reproduceRequest(request, unique, registry);
+      if (result.verdict !== b.verdict || canonical(result.artifact) !== canonical(b.artifact))
+        throw new Error("local reproduction differs");
+      locallyReproduced = true;
+      reason = "locally reproduced using registered deterministic verifier";
+    } catch (error) {
+      reason = error instanceof Error ? error.message : "verification failed";
+    }
+    verifications.push({
+      id: e.id,
+      claimId: b.claimId,
+      verdict: b.verdict,
+      locallyReproduced,
+      reason,
     });
-
-  const scope = (event: LatticeEvent, referencedId: string) =>
-    event.parents.length === 0 || event.parents.includes(referencedId) || unique.has(referencedId);
-
-  const eligible = events.filter((e) => ready.has(e.id) && !quarantined.has(e.id));
+    if (!locallyReproduced) blocked.push({ id: e.id, reason });
+  }
   const claims = events
     .filter((e) => e.body.kind === "claim")
     .map((e) => {
-      if (e.body.kind !== "claim") throw new Error("unreachable");
-      const ids = (kind: (typeof EVENT_KINDS)[number]) =>
-        eligible
-          .filter((x) => x.body.kind === kind && "claimId" in x.body && x.body.claimId === e.id)
-          .map((x) => x.id);
-      const relevant = verifications.filter((v) => v.claimId === e.id && v.locallyReproduced);
-      const support = relevant.some((v) => v.verdict === "SUPPORTED"),
-        refute = relevant.some((v) => v.verdict === "REFUTED");
+      const results = verifications.filter((v) => v.claimId === e.id && v.locallyReproduced),
+        support = results.some((v) => v.verdict === "SUPPORTED"),
+        refute = results.some((v) => v.verdict === "REFUTED");
+      const linked = eligible.filter(
+          (v) => "claimId" in v.body && v.body.claimId === e.id && scope(v, e.id),
+        ),
+        ids = (kind: string) => linked.filter((v) => v.body.kind === kind).map((v) => v.id);
       return {
         id: e.id,
         actorId: e.actorId,
-        subject: e.body.subject,
-        predicate: e.body.predicate,
-        value: e.body.value,
-        domain: e.body.domain,
-        assumptions: e.body.assumptions,
-        assertedConfidence: e.body.confidence,
-        status: quarantined.has(e.id)
+        issuedAt: e.issuedAt,
+        claim: e.body,
+        status: quarantine.has(e.id)
           ? "QUARANTINED"
           : !ready.has(e.id)
             ? "PENDING"
@@ -222,7 +194,6 @@ export function replay(
         verificationIds: verifications.filter((v) => v.claimId === e.id).map((v) => v.id),
       };
     });
-
   const groups = new Map<string, LatticeEvent[]>();
   for (const e of events)
     if (e.body.kind === "claim") {
@@ -243,7 +214,6 @@ export function replay(
       proposition: JSON.parse(proposition) as unknown,
       claimIds: v.map((e) => e.id),
     }));
-
   const decisions = eligible
     .filter((e) => e.body.kind === "decision")
     .map((e) => {
@@ -256,12 +226,11 @@ export function replay(
         ) &&
         b.verificationIds.every((id) => {
           const v = unique.get(id);
-          const reproduced = verifications.find((r) => r.id === id);
           return (
             v?.body.kind === "verification" &&
             ready.has(id) &&
             b.claimIds.includes(v.body.claimId) &&
-            reproduced?.locallyReproduced === true
+            verifications.some((receipt) => receipt.id === id && receipt.locallyReproduced)
           );
         });
       return {
@@ -276,7 +245,6 @@ export function replay(
         authority: "actor-scoped evidence cut; no execution permit or universal truth",
       };
     });
-
   return {
     schema: "intelligence-lattice-view/v1",
     latticeId: policy.latticeId,
@@ -290,8 +258,8 @@ export function replay(
     blocked: blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     equivocations,
     claims,
-    verifications,
     disagreements,
+    verifications,
     decisions,
   };
 }
