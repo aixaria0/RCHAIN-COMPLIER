@@ -164,11 +164,16 @@ export async function runThreeNodeExperiment() {
     assert.notEqual(a.actorId, b.actorId);
     assert.notEqual(b.actorId, c.actorId);
     assert.notEqual(left.child.pid, third.child.pid);
-    async function submit(url: string, i: Identity, body: EventBody) {
+    async function submit(
+      url: string,
+      i: Identity,
+      body: EventBody,
+      parents: readonly string[] = [],
+    ) {
       const prior = await events(url),
         sequence =
           Math.max(0, ...prior.filter((e) => e.actorId === i.actorId).map((e) => e.sequence)) + 1,
-        e = createEvent(i, policy, { sequence, body });
+        e = createEvent(i, policy, { sequence, body, parents: [...parents] });
       const r = await fetch(url + "/events", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -209,11 +214,18 @@ export async function runThreeNodeExperiment() {
       }),
       good = createEvent(a, policy, { sequence: 3, body: claim(12), parents: [task.id] }),
       bad = createEvent(b, policy, { sequence: 2, body: claim(13), parents: [task.id] });
-    for (const [url, event] of [[urlA, good], [urlB, bad]] as const) {
-      const r = await fetch(url + "/events", { method: "POST", body: canonical(event), signal: AbortSignal.timeout(5000) });
+    for (const [url, event] of [
+      [urlA, good],
+      [urlB, bad],
+    ] as const) {
+      const r = await fetch(url + "/events", {
+        method: "POST",
+        body: canonical(event),
+        signal: AbortSignal.timeout(5000),
+      });
       assert.equal(r.status, 200, await r.text());
     }
-    const invalid = await submit(urlC, c, { ...claim(13), method: "wrong-operation" });
+    const invalid = await submit(urlC, c, { ...claim(13), method: "wrong-operation" }, [task.id]);
     const evidence = (id: string): Extract<EventBody, { kind: "evidence" }> => ({
       kind: "evidence",
       claimId: id,
@@ -222,7 +234,8 @@ export async function runThreeNodeExperiment() {
       artifact: { digest: artifactDigest(input), mediaType: "application/json", content: input },
     });
     const goodEvidence = await submit(urlA, a, evidence(good.id)),
-      badEvidence = await submit(urlB, b, evidence(bad.id));
+      badEvidence = await submit(urlB, b, evidence(bad.id)),
+      invalidEvidence = await submit(urlA, a, evidence(invalid.id));
     const challenge = await submit(urlA, a, {
         kind: "challenge",
         claimId: bad.id,
@@ -243,6 +256,12 @@ export async function runThreeNodeExperiment() {
         evidenceIds: [e!.id],
         verifier: "integer-sum/v1",
       });
+    const invalidVerificationRequest = await submit(urlA, a, {
+      kind: "verification_request",
+      claimId: invalid.id,
+      evidenceIds: [invalidEvidence.id],
+      verifier: "integer-sum/v1",
+    });
     const unknown = await submit(urlB, b, {
       ...claim(99),
       subject: "incomplete-external-input",
@@ -256,7 +275,25 @@ export async function runThreeNodeExperiment() {
     let v = await view(urlA);
     assert.deepEqual(await view(urlB), v);
     assert.deepEqual(await view(urlC), v);
-    assert.ok(v.blocked.some((x) => x.id === invalid.id) || v.claims.some((x) => x.id === invalid.id));
+    const assertInvalidContributionContained = (current: typeof v) => {
+      const invalidClaim = current.claims.find((c) => c.id === invalid.id);
+      assert.equal(invalidClaim?.status, "UNVERIFIED");
+      assert.equal(invalidClaim.taskId, task.id);
+      assert.equal(invalidClaim.taskProvenanceValid, false);
+      assert.ok(
+        current.blocked.some((x) => x.id === invalid.id && x.reason === "task provenance mismatch"),
+      );
+      assert.ok(current.blocked.some((x) => x.id === invalidVerificationRequest.id));
+      assert.equal(
+        current.verifications.some((x) => x.claimId === invalid.id),
+        false,
+      );
+      assert.equal(
+        current.reproductionCertificates.some((x) => x.claimId === invalid.id && x.valid),
+        false,
+      );
+    };
+    assertInvalidContributionContained(v);
     assert.equal(v.claims.find((c) => c.id === good.id)!.status, "SUPPORTED");
     assert.equal(v.claims.find((c) => c.id === bad.id)!.status, "REFUTED");
     assert.equal(v.claims.find((c) => c.id === unknown.id)!.status, "UNVERIFIED");
@@ -274,15 +311,26 @@ export async function runThreeNodeExperiment() {
       verificationIds,
       result: decide(claimIds, verificationIds, v.verifications),
     });
+    const invalidDecision = await submit(urlA, a, {
+      kind: "decision",
+      procedure: "evidence-cut/v1",
+      claimIds: [invalid.id],
+      verificationIds: [],
+      result: { accepted: [invalid.id], rejected: [], unresolved: [] },
+    });
     const duplicate = await fetch(urlA + "/events", { method: "POST", body: canonical(good) });
     assert.deepEqual(await duplicate.json(), { inserted: 0, duplicates: 1 });
     await sync();
     await sync(urlC);
     await sync();
     v = await view(urlA);
-    const cert = v.reproductionCertificates.find((x) => x.claimId === good.id && x.verdict === "SUPPORTED");
+    const cert = v.reproductionCertificates.find(
+      (x) => x.claimId === good.id && x.verdict === "SUPPORTED",
+    );
     assert.ok(cert?.valid);
     assert.ok(cert.independentlyReproduced >= 2);
+    assertInvalidContributionContained(v);
+    assert.equal(v.decisions.find((d) => d.id === invalidDecision.id)?.valid, false);
     const preCrash = v.eventRoot;
     await stop(left.child, "SIGKILL");
     left = undefined;
@@ -311,10 +359,12 @@ export async function runThreeNodeExperiment() {
     const exported = await events(urlB);
     assert.deepEqual(replay([...exported].reverse().concat(exported.slice(0, 3)), policy), v);
     assert.equal(v.decisions.find((d) => d.id === decision.id)!.valid, true);
+    assertInvalidContributionContained(v);
+    assert.equal(v.decisions.find((d) => d.id === invalidDecision.id)?.valid, false);
     assert.throws(() => validateEvent({ ...bad, body: claim(999) }, policy));
     return {
       schema: "intelligence-lattice-experiment/v1",
-      scope: "two-process evidence/lifecycle slice; not the complete MVL",
+      scope: "three-process evidence/lifecycle slice; not the complete MVL",
       runtime: {
         processes: 3,
         separateIdentities: true,
@@ -335,6 +385,7 @@ export async function runThreeNodeExperiment() {
         independentReplay: true,
         tamperRejected: true,
         taskProvenancePreserved: true,
+        invalidTaskContractContained: true,
         independentReproductionCertificate: true,
         threeProcessConvergence: true,
       },
@@ -359,7 +410,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         eventRoot: result.view.eventRoot,
         eventCount: result.view.eventCount,
         checks: result.checks,
-        decision: result.view.decisions[0]?.recomputed,
+        decision: result.view.decisions.find((decision) => decision.valid)?.recomputed,
       },
       null,
       2,
