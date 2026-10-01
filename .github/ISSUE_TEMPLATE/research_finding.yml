@@ -1,0 +1,49 @@
+name: Research finding / evidence packet
+description: Submit a bounded technical finding with provenance, reproduction, and limitations.
+title: "[research] "
+labels: ["research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for evidence-first findings. Do not publish actionable security-sensitive details here; use SECURITY.md.
+  - type: input
+    id: subject
+    attributes:
+      label: Subject
+      description: Exact implementation, protocol path, or artifact being examined.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Exact revision
+      description: Upstream or local commit SHA.
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: Smallest supported claim
+      description: State only what the evidence directly supports.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and reproduction
+      description: Commands, fixtures, artifact digests, roots, or links needed to reproduce the result.
+    validations:
+      required: true
+  - type: textarea
+    id: controls
+    attributes:
+      label: Negative controls
+      description: What invalid or counterfactual case was tested, and what happened?
+  - type: textarea
+    id: limitations
+    attributes:
+      label: Limitations / unresolved questions
+      description: Explicitly separate observation from interpretation.
+    validations:
+      required: true
