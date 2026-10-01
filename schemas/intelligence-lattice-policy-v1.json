@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:intelligence-lattice:policy:v1",
+  "$comment": "Runtime also requires unique actor identities and public-key binding. Policy order is digest-significant. Static membership only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "latticeId", "members"],
+  "properties": {
+    "schema": {
+      "const": "intelligence-lattice-policy/v1"
+    },
+    "latticeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actorId", "publicKeyHex", "kinds", "domains"],
+        "properties": {
+          "actorId": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "publicKeyHex": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "capability",
+                "claim",
+                "evidence",
+                "challenge",
+                "evidence_request",
+                "verification_request",
+                "verification",
+                "decision"
+              ]
+            },
+            "minItems": 0,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "\\S"
+            },
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true
+    }
+  }
+}
