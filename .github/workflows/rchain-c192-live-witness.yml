@@ -1,0 +1,128 @@
+name: RChain C192 Live Witness
+on:
+  pull_request:
+    paths:
+      - "src/lib/lattice/**"
+      - "examples/lattice-rchain-c192.ts"
+      - "package*.json"
+      - "docs/RCHAIN_C192_LIVE_WITNESS.md"
+      - ".github/workflows/rchain-c192-live-witness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RCHAIN_SHA: 51935310789a1a75a183ad0af7152e4eef450c88
+  TEST_NAME: a_round_that_comes_to_rest_at_one_height_is_sealed_by_its_own_bound
+
+jobs:
+  c192-live-witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout assurance repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install assurance dependencies
+        run: npm ci
+
+      - name: Lattice type, lint and unit gates
+        run: |
+          npm run typecheck:lattice
+          npm run lint:lattice
+          npm run test:lattice
+
+      - name: Checkout pinned rchain-rust
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rchain-community/rchain-rust
+          ref: ${{ env.RCHAIN_SHA }}
+          path: upstream
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@46817827a5bfabe028bf34e1cce71fd40e2ff697 # 1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Record Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+
+      - name: Execute pinned upstream C192 falsifier
+        shell: bash
+        run: |
+          set -uo pipefail
+          cd upstream
+          set +e
+          cargo test -p rchain-node "$TEST_NAME" -- --nocapture 2>&1 | tee "$RUNNER_TEMP/c192-cargo-test.log"
+          status=${PIPESTATUS[0]}
+          set -e
+
+          source_sha=$(sha256sum node/src/runtime/node_runtime.rs | awk '{print $1}')
+          evidence_sha=$(sha256sum spec/audit/evidence/n149-results.md | awk '{print $1}')
+          output_sha=$(sha256sum "$RUNNER_TEMP/c192-cargo-test.log" | awk '{print $1}')
+          cd ..
+
+          export STATUS="$status"
+          export SOURCE_SHA="sha256:$source_sha"
+          export EVIDENCE_SHA="sha256:$evidence_sha"
+          export OUTPUT_SHA="sha256:$output_sha"
+          export RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "schema": "rchain-c192-upstream-witness/v1",
+              "repository": "rchain-community/rchain-rust",
+              "revision": os.environ["RCHAIN_SHA"],
+              "issue": 172,
+              "finding": "C192",
+              "sourcePath": "node/src/runtime/node_runtime.rs",
+              "evidencePath": "spec/audit/evidence/n149-results.md",
+              "testName": os.environ["TEST_NAME"],
+              "command": f"cargo test -p rchain-node {os.environ['TEST_NAME']} -- --nocapture",
+              "exitCode": int(os.environ["STATUS"]),
+              "testPassed": int(os.environ["STATUS"]) == 0,
+              "sourceSha256": os.environ["SOURCE_SHA"],
+              "evidenceSha256": os.environ["EVIDENCE_SHA"],
+              "outputSha256": os.environ["OUTPUT_SHA"],
+              "runUrl": os.environ["RUN_URL"],
+          }
+          Path(os.environ["RUNNER_TEMP"], "c192-witness.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          test "$status" -eq 0
+
+      - name: Carry upstream witness through three-process lifecycle
+        run: |
+          npm run demo:rchain-c192 -- \
+            "$RUNNER_TEMP/c192-witness.json" \
+            "$RUNNER_TEMP/c192-lattice-audit.json"
+
+      - name: Independently replay exported lifecycle
+        run: npm run replay:lattice -- "$RUNNER_TEMP/c192-lattice-audit.json"
+
+      - name: Upload C192 witness and replayable audit
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rchain-c192-live-witness
+          path: |
+            ${{ runner.temp }}/c192-witness.json
+            ${{ runner.temp }}/c192-cargo-test.log
+            ${{ runner.temp }}/c192-lattice-audit.json
+          if-no-files-found: error
+          retention-days: 14
