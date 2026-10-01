@@ -11,12 +11,22 @@ import {
 import { DEFAULT_VERIFIERS, reproduceRequest, type VerifierRegistry } from "./verification.ts";
 export interface VerificationView {
   id: string;
+  actorId: string;
   claimId: string;
   taskId: string | null;
   provenanceValid: boolean;
   verdict: Verdict;
   locallyReproduced: boolean;
   reason: string;
+}
+export interface ReproductionCertificate {
+  claimId: string;
+  taskId: string | null;
+  verdict: Verdict;
+  verificationIds: string[];
+  actorIds: string[];
+  independentlyReproduced: number;
+  valid: boolean;
 }
 export function decide(
   claimIds: string[],
@@ -190,6 +200,7 @@ export function replay(
     const provenance = provenanceForClaim(b.claimId);
     verifications.push({
       id: e.id,
+      actorId: e.actorId,
       claimId: b.claimId,
       taskId: provenance.taskId,
       provenanceValid: provenance.valid,
@@ -199,6 +210,29 @@ export function replay(
     });
     if (!locallyReproduced) blocked.push({ id: e.id, reason });
   }
+  const reproductionCertificates: ReproductionCertificate[] = [];
+  const reproductionGroups = new Map<string, VerificationView[]>();
+  for (const receipt of verifications.filter((v) => v.locallyReproduced && v.provenanceValid)) {
+    const key = canonical({ claimId: receipt.claimId, taskId: receipt.taskId, verdict: receipt.verdict });
+    reproductionGroups.set(key, [...(reproductionGroups.get(key) ?? []), receipt]);
+  }
+  for (const receipts of reproductionGroups.values()) {
+    const first = receipts[0]!,
+      actorIds = [...new Set(receipts.map((v) => v.actorId))].sort(),
+      verificationIds = receipts.map((v) => v.id).sort();
+    reproductionCertificates.push({
+      claimId: first.claimId,
+      taskId: first.taskId,
+      verdict: first.verdict,
+      verificationIds,
+      actorIds,
+      independentlyReproduced: actorIds.length,
+      valid: actorIds.length >= 2,
+    });
+  }
+  reproductionCertificates.sort((a, b) =>
+    a.claimId < b.claimId ? -1 : a.claimId > b.claimId ? 1 : a.verdict < b.verdict ? -1 : a.verdict > b.verdict ? 1 : 0,
+  );
   const claims = events
     .filter((e) => e.body.kind === "claim")
     .map((e) => {
@@ -314,6 +348,7 @@ export function replay(
     taskProvenance,
     disagreements,
     verifications,
+    reproductionCertificates,
     decisions,
   };
 }
