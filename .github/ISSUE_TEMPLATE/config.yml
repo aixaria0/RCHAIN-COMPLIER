@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security-sensitive report
+    url: https://github.com/aixaria0/RCHAIN-COMPLIER/security
+    about: Use the repository security guidance for sensitive findings; do not publish actionable exploit details in public issues.
