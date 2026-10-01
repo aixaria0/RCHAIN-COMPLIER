@@ -1,10 +1,10 @@
 # Research Branch Atlas
 
-This page is a documentation-only map of the repository's major research lines. It intentionally does **not** merge their code or histories.
+This page is a documentation-only map of the repository's major research lines. It intentionally does **not** merge their code or histories. Historical pull requests may be closed once they stop being active integration candidates; their branches remain preserved as research lineage.
 
-## Main — upstream Casper CBC execution baseline
+## Main — assurance framework + Intelligence Lattice lifecycle
 
-The default branch contains the deterministic Casper CBC stress harness and controlled upstream Rust reproduction path. It keeps synthetic modeling, upstream-facing observation, native execution, and evidence separate.
+The default branch now carries the protocol-independent assurance framework together with the merged Intelligence Lattice lifecycle gate. It also retains the deterministic Casper CBC stress harness and controlled upstream Rust reproduction path. Synthetic modeling, upstream-facing observation, native execution, and evidence remain explicitly separated.
 
 Pinned implementation used by the documented CBC reproduction:
 
