@@ -89,11 +89,39 @@ export function replay(
   const blocked: { id: string; reason: string }[] = events
     .filter((e) => quarantine.has(e.id))
     .map((e) => ({ id: e.id, reason: "equivocation or dependency on equivocation" }));
+  const invalidTaskClaims = new Set<string>();
+  const taskProvenance = eligible
+    .filter((e) => e.body.kind === "claim")
+    .flatMap((claim) => {
+      if (claim.body.kind !== "claim") return [];
+      const tasks = claim.parents
+        .map((id) => unique.get(id))
+        .filter((e): e is LatticeEvent => e?.body.kind === "task");
+      if (!tasks.length) return [];
+      const validTasks = tasks.filter((task) => {
+        if (task.body.kind !== "task") return false;
+        const envelope = task.body.envelope;
+        return (
+          ready.has(task.id) &&
+          envelope.domain === claim.body.domain &&
+          envelope.operation === claim.body.method &&
+          envelope.input.digest === claim.body.subject &&
+          envelope.output.claimPredicate === claim.body.predicate
+        );
+      });
+      const valid = tasks.length === 1 && validTasks.length === 1;
+      if (!valid) {
+        invalidTaskClaims.add(claim.id);
+        blocked.push({ id: claim.id, reason: "task provenance mismatch" });
+      }
+      return [{ claimId: claim.id, taskId: tasks[0]!.id, valid }];
+    });
   function scope(e: LatticeEvent, id: string) {
     const claim = unique.get(id),
       member = policy.members.find((m) => m.actorId === e.actorId)!;
     return (
       claim?.body.kind === "claim" &&
+      !invalidTaskClaims.has(id) &&
       (member.domains.includes("*") || member.domains.includes(claim.body.domain))
     );
   }
@@ -176,6 +204,8 @@ export function replay(
         actorId: e.actorId,
         issuedAt: e.issuedAt,
         claim: e.body,
+        taskId: taskProvenance.find((p) => p.claimId === e.id)?.taskId ?? null,
+        taskProvenanceValid: taskProvenance.find((p) => p.claimId === e.id)?.valid ?? null,
         status: quarantine.has(e.id)
           ? "QUARANTINED"
           : !ready.has(e.id)
@@ -258,6 +288,7 @@ export function replay(
     blocked: blocked.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     equivocations,
     claims,
+    taskProvenance,
     disagreements,
     verifications,
     decisions,
