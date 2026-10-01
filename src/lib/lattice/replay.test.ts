@@ -219,19 +219,22 @@ test("task provenance survives evidence and locally reproduced verification into
 });
 
 test("independent reproduction certificate requires two distinct actors", () => {
-  const f = fixture(),
-    request = f.request,
+  const f = scenario(),
+    request = f.request;
+  assert.equal(request.body.kind, "verification_request");
+  if (request.body.kind !== "verification_request") throw new Error("unreachable");
+  const claimId = request.body.claimId,
     events = f.events.filter((e) => e.id !== f.verification.id),
     first = f.emit(f.a, verificationBody(request, new Map(events.map((e) => [e.id, e])))),
     second = f.emit(f.b, verificationBody(request, new Map(events.map((e) => [e.id, e])))),
     view = replay([...events, first, second], f.policy),
-    cert = view.reproductionCertificates.find((c) => c.claimId === request.body.claimId)!;
+    cert = view.reproductionCertificates.find((c) => c.claimId === claimId)!;
   assert.equal(cert.independentlyReproduced, 2);
   assert.deepEqual(cert.actorIds, [f.a.actorId, f.b.actorId].sort());
   assert.equal(cert.valid, true);
 
   const single = replay([...events, first], f.policy),
-    singleCert = single.reproductionCertificates.find((c) => c.claimId === request.body.claimId)!;
+    singleCert = single.reproductionCertificates.find((c) => c.claimId === claimId)!;
   assert.equal(singleCert.independentlyReproduced, 1);
   assert.equal(singleCert.valid, false);
 });
