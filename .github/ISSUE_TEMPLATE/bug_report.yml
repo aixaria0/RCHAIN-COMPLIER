@@ -1,0 +1,49 @@
+name: Bug / reproducibility report
+description: Report a deterministic defect, replay mismatch, or verification failure.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please keep the claim no stronger than the evidence. Security-sensitive findings should follow SECURITY.md instead of a public issue.
+  - type: input
+    id: revision
+    attributes:
+      label: Repository revision
+      description: Exact commit SHA or branch/commit pair used for the reproduction.
+      placeholder: "e.g. 4b4e40d..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Minimal deterministic reproduction
+      description: Smallest command sequence or fixture that reproduces the behavior.
+      placeholder: |
+        npm ci
+        npm run ...
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed result
+      description: What actually happened. Include exact output, state roots, artifact digests, or logs when relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What you expected and why.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and limitations
+      description: State what this reproduction does not prove.
+      placeholder: "Example: controlled fixture only; no production-network claim."
+    validations:
+      required: true
