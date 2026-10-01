@@ -123,7 +123,7 @@ export function replay(
     return (
       claim?.body.kind === "claim" &&
       !invalidTaskClaims.has(id) &&
-      (member.domains.includes("*") || member.domains.includes(claimBody.domain))
+      (member.domains.includes("*") || member.domains.includes(claim.body.domain))
     );
   }
   function inputs(request: LatticeEvent) {
