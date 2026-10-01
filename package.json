@@ -1,7 +1,7 @@
 {
   "name": "rchain-reality-compiler",
   "version": "0.2.0",
-  "description": "Deterministic research harness for stress-testing Casper CBC finalization against the pinned RChain Rust implementation.",
+  "description": "Protocol-independent verification, evidence binding, replay, provenance, and multi-process assurance lifecycle.",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -9,6 +9,7 @@
     "nf3": "0.3.17"
   },
   "scripts": {
+    "demo": "npm run demo:lattice-three",
     "dev": "vite dev --host 0.0.0.0 --port 8080",
     "build": "vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
