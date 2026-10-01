@@ -1,25 +1,12 @@
-import { canonical } from "./canonical.ts";
+import { sha256Artifact } from "../compiler/ecosystem-chain.ts";
 import {
-  artifactDigest,
-  EVENT_KINDS,
+  canonical,
   policyDigest,
-  sha256Artifact,
-  type Json,
+  type DecisionResult,
   type LatticeEvent,
   type MembershipPolicy,
 } from "./protocol.ts";
-import {
-  DEFAULT_VERIFIERS,
-  reproduceRequest,
-  type ReproducedResult,
-  type VerifierRegistry,
-} from "./verification.ts";
-
-export type DecisionResult = {
-  accepted: string[];
-  rejected: string[];
-  unresolved: string[];
-};
+import { DEFAULT_VERIFIERS, reproduceRequest, type VerifierRegistry } from "./verification.ts";
 
 export function decide(
   claimIds: string[],
@@ -74,7 +61,7 @@ export function replay(
 
   const ready = new Set<string>();
   const blocked: Array<{ id: string; reason: string }> = [];
-  const pending: Array<{ id: string; missing: string[] }> = [];
+  const pending: string[] = [];
 
   let progress = true;
   while (progress) {
@@ -162,7 +149,7 @@ export function replay(
         refs.push(...e.body.claimIds, ...e.body.verificationIds);
         break;
     }
-    pending.push({ id: e.id, missing: refs.filter((id) => !ready.has(id)) });
+    pending.push(e.id);
   }
 
   const verifications = events
