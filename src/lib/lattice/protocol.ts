@@ -163,7 +163,7 @@ export function policyDigest(policy: MembershipPolicy): string {
     exact(m, ["actorId", "publicKeyHex", "kinds", "domains"]);
     if (actorId(m.publicKeyHex) !== m.actorId || seen.has(m.actorId))
       throw new Error("invalid or duplicate member");
-    strings(m.kinds, 8);
+    strings(m.kinds, EVENT_KINDS.length);
     if (!m.kinds.every((k) => EVENT_KINDS.includes(k))) throw new Error("unknown permitted kind");
     strings(m.domains);
     if (!m.domains.length) throw new Error("domain required");
