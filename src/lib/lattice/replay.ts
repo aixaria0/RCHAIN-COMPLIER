@@ -273,16 +273,16 @@ export function replay(
         ) &&
         b.verificationIds.every((id) => {
           const v = unique.get(id);
+          if (v?.body.kind !== "verification" || !ready.has(id)) return false;
+          const claimId = v.body.claimId;
           return (
-            v?.body.kind === "verification" &&
-            ready.has(id) &&
-            b.claimIds.includes(v.body.claimId) &&
+            b.claimIds.includes(claimId) &&
             verifications.some(
               (receipt) =>
                 receipt.id === id &&
                 receipt.locallyReproduced &&
                 receipt.provenanceValid &&
-                receipt.taskId === provenanceForClaim(v.body.claimId).taskId,
+                receipt.taskId === provenanceForClaim(claimId).taskId,
             )
           );
         });
