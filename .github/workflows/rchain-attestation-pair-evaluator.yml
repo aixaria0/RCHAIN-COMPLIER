@@ -1,0 +1,90 @@
+name: RChain C192 C171 Paired Evaluator
+on:
+  pull_request:
+    paths:
+      - "src/lib/lattice/rchain-attestation-pair.ts"
+      - "src/lib/lattice/rchain-attestation-pair.test.ts"
+      - "examples/lattice-rchain-attestation-pair.ts"
+      - "tools/check_rchain_attestation_pair_seam.py"
+      - "docs/RCHAIN_C192_C171_PAIRED_EVALUATOR.md"
+      - "package*.json"
+      - ".github/workflows/rchain-attestation-pair-evaluator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RCHAIN_SHA: 51935310789a1a75a183ad0af7152e4eef450c88
+
+jobs:
+  paired-evaluator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout assurance repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lattice type, lint and unit gates
+        run: |
+          npm run typecheck:lattice
+          npm run lint:lattice
+          npm run test:lattice
+
+      - name: Checkout pinned rchain-rust
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rchain-community/rchain-rust
+          ref: ${{ env.RCHAIN_SHA }}
+          path: upstream
+
+      - name: Verify pinned upstream attestation seam
+        run: |
+          python3 tools/check_rchain_attestation_pair_seam.py \
+            upstream \
+            "$RUNNER_TEMP/rchain-attestation-seam.json"
+
+      - name: Evaluate paired C192 C171 candidates
+        run: |
+          npm run eval:rchain-attestation-pair -- \
+            "$RUNNER_TEMP/rchain-attestation-pair.json"
+
+      - name: Enforce paired acceptance boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              Path(os.environ["RUNNER_TEMP"], "rchain-attestation-pair.json").read_text()
+          )
+          assert report["upstreamRevision"] == os.environ["RCHAIN_SHA"]
+          assert report["survivors"] == ["round-close-plus-cadence"]
+
+          rows = {row["candidate"]: row for row in report["candidates"]}
+          assert rows["current-strict-height"]["pass"] is False
+          assert rows["naive-nonstrict-height"]["pass"] is False
+          assert rows["own-quiet-cadence-only"]["pass"] is False
+          assert rows["round-close-only"]["pass"] is False
+          assert rows["round-close-plus-cadence"]["pass"] is True
+          PY
+
+      - name: Upload paired evaluator evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rchain-c192-c171-paired-evaluator
+          path: |
+            ${{ runner.temp }}/rchain-attestation-seam.json
+            ${{ runner.temp }}/rchain-attestation-pair.json
+          if-no-files-found: error
+          retention-days: 14
