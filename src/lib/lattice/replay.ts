@@ -12,6 +12,8 @@ import { DEFAULT_VERIFIERS, reproduceRequest, type VerifierRegistry } from "./ve
 export interface VerificationView {
   id: string;
   claimId: string;
+  taskId: string | null;
+  provenanceValid: boolean;
   verdict: Verdict;
   locallyReproduced: boolean;
   reason: string;
@@ -126,6 +128,10 @@ export function replay(
       (member.domains.includes("*") || member.domains.includes(claim.body.domain))
     );
   }
+  function provenanceForClaim(claimId: string) {
+    const match = taskProvenance.find((p) => p.claimId === claimId);
+    return { taskId: match?.taskId ?? null, valid: match?.valid ?? true };
+  }
   function inputs(request: LatticeEvent) {
     if (request.body.kind !== "verification_request" || !scope(request, request.body.claimId))
       throw new Error("request claim/domain mismatch");
@@ -181,9 +187,12 @@ export function replay(
     } catch (error) {
       reason = error instanceof Error ? error.message : "verification failed";
     }
+    const provenance = provenanceForClaim(b.claimId);
     verifications.push({
       id: e.id,
       claimId: b.claimId,
+      taskId: provenance.taskId,
+      provenanceValid: provenance.valid,
       verdict: b.verdict,
       locallyReproduced,
       reason,
@@ -223,6 +232,13 @@ export function replay(
         evidenceRequestIds: ids("evidence_request"),
         verificationRequestIds: ids("verification_request"),
         verificationIds: verifications.filter((v) => v.claimId === e.id).map((v) => v.id),
+        provenance: {
+          taskId: provenanceForClaim(e.id).taskId,
+          evidenceIds: ids("evidence"),
+          verificationRequestIds: ids("verification_request"),
+          verificationIds: verifications.filter((v) => v.claimId === e.id).map((v) => v.id),
+          valid: provenanceForClaim(e.id).valid,
+        },
       };
     });
   const groups = new Map<string, LatticeEvent[]>();
@@ -261,7 +277,13 @@ export function replay(
             v?.body.kind === "verification" &&
             ready.has(id) &&
             b.claimIds.includes(v.body.claimId) &&
-            verifications.some((receipt) => receipt.id === id && receipt.locallyReproduced)
+            verifications.some(
+              (receipt) =>
+                receipt.id === id &&
+                receipt.locallyReproduced &&
+                receipt.provenanceValid &&
+                receipt.taskId === provenanceForClaim(v.body.claimId).taskId,
+            )
           );
         });
       return {
