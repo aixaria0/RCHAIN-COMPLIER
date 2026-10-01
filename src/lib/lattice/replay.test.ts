@@ -138,3 +138,29 @@ test("assumption ordering and clock skew do not hide contradiction", () => {
   assert.deepEqual(replay([right, left], f.policy), replay([left, right], f.policy));
 });
 
+
+test("task provenance binds claim to declared input, operation and output contract", () => {
+  const f = fixture(),
+    task = f.emit(f.a, {
+      kind: "task",
+      envelope: {
+        schema: "intelligence-lattice-task/v1",
+        taskId: f.good.id,
+        domain: "arithmetic",
+        operation: "independent-calculation",
+        input: { digest: f.good.body.kind === "claim" ? f.good.body.subject : "", mediaType: "application/json", content: f.input },
+        dependencies: [],
+        authority: { mode: "observe-only", issuer: f.a.actorId },
+        output: { mediaType: "application/json", claimPredicate: "integer-sum" },
+      },
+    }),
+    claim = f.emit(f.b, f.claimBody(12), [task.id]),
+    valid = replay([task, claim], f.policy);
+  assert.equal(valid.taskProvenance[0]!.valid, true);
+  assert.equal(valid.claims.find((v) => v.id === claim.id)!.taskId, task.id);
+
+  const mismatched = f.emit(f.b, { ...f.claimBody(12), method: "different-operation" }, [task.id]),
+    invalid = replay([task, mismatched], f.policy);
+  assert.equal(invalid.taskProvenance[0]!.valid, false);
+  assert.ok(invalid.blocked.some((b) => b.id === mismatched.id && /task provenance/.test(b.reason)));
+});
