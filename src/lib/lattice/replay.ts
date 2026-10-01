@@ -94,6 +94,7 @@ export function replay(
     .filter((e) => e.body.kind === "claim")
     .flatMap((claim) => {
       if (claim.body.kind !== "claim") return [];
+      const claimBody = claim.body;
       const tasks = claim.parents
         .map((id) => unique.get(id))
         .filter((e): e is LatticeEvent => e?.body.kind === "task");
@@ -103,10 +104,10 @@ export function replay(
         const envelope = task.body.envelope;
         return (
           ready.has(task.id) &&
-          envelope.domain === claim.body.domain &&
-          envelope.operation === claim.body.method &&
-          envelope.input.digest === claim.body.subject &&
-          envelope.output.claimPredicate === claim.body.predicate
+          envelope.domain === claimBody.domain &&
+          envelope.operation === claimBody.method &&
+          envelope.input.digest === claimBody.subject &&
+          envelope.output.claimPredicate === claimBody.predicate
         );
       });
       const valid = tasks.length === 1 && validTasks.length === 1;
@@ -122,7 +123,7 @@ export function replay(
     return (
       claim?.body.kind === "claim" &&
       !invalidTaskClaims.has(id) &&
-      (member.domains.includes("*") || member.domains.includes(claim.body.domain))
+      (member.domains.includes("*") || member.domains.includes(claimBody.domain))
     );
   }
   function inputs(request: LatticeEvent) {
