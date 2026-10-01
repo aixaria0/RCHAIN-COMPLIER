@@ -61,18 +61,22 @@ replay success     != production safety
 | Real `SIGKILL` + restart/rejoin | ✅ Tested |
 | Deterministic exported-event replay | ✅ Tested |
 | Signed build provenance | ✅ Gated |
-| Live unresolved `rchain-rust` witness through this lifecycle | ⏭️ Next milestone |
+| Active unresolved `rchain-rust` witness through this lifecycle | ✅ C192 / Issue #172 — PR #28 |
 | Byzantine consensus / production safety claim | ❌ Not claimed |
 
-## Current milestone: PR #27
+## Current milestone: PR #28
 
-[PR #27 — Intelligence Lattice: three-process lifecycle gate](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/27) moves the evidence lifecycle across real OS process boundaries.
+[PR #28 — unresolved RChain C192 witness](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/28) is the first active upstream RChain finding carried through the evidence lifecycle end to end.
 
-It exercises three distinct Ed25519 identities and SQLite WAL-backed journals, two independent deterministic verification workers, TaskEnvelope-bound contributions, invalid-task containment, a real coordinator `SIGKILL`, restart/rejoin, convergence, and deterministic replay.
+The CI gate checks out `rchain-community/rchain-rust@51935310789a1a75a183ad0af7152e4eef450c88`, executes the upstream C192 falsifier `a_round_that_comes_to_rest_at_one_height_is_sealed_by_its_own_bound`, binds the source/evidence/output digests into a TaskEnvelope, obtains two independent verification receipts, kills and restarts the coordinator, rejoins the three-process lifecycle, and independently replays the exported event history.
 
-A correctly signed contribution for the wrong task is still rejected. Killing a process does not turn invalid evidence into valid evidence.
+The demonstrated claim is deliberately narrow:
 
-That is the current demonstrated boundary.
+> **The pinned upstream C192 unit falsifier executed successfully at the declared revision, and that execution artifact remained task-bound and replayable through the three-process evidence lifecycle.**
+
+This is a real upstream execution boundary. It is **not** a claim that Issue #172 is fixed, that the multi-validator devnet measurement was rerun, or that a safe C192/C171 repair has been designed.
+
+See [RChain C192 Live Witness](docs/RCHAIN_C192_LIVE_WITNESS.md).
 
 ## Quickstart
 
@@ -95,37 +99,47 @@ npm run test:verification-core
 npm test
 ```
 
+The C192 integration is reproduced in CI from the pinned upstream revision and then passed into the local three-process lifecycle.
+
 ## RChain integration boundary
 
-The earlier PoS/slashing work helped establish the evidence-first method, but already-resolved trust/slash paths are **not** presented as current open problems.
+The earlier PoS/slashing work established the evidence-first method; already-resolved trust/slash paths are **not** presented as current open problems.
 
-PR #27 still does **not** execute `rchain-rust` directly.
-
-The next external milestone is:
+PR #28 now crosses the first external RChain boundary:
 
 ```text
-rchain-rust source + exact input provenance
+pinned rchain-rust source
+        ↓
+real upstream C192 cargo test
+        ↓
+source / evidence / output digests
         ↓
 TaskEnvelope
         ↓
-execution evidence
+two independent verification workers
         ↓
-persisted pre/post-state observations
+reproduction certificate
         ↓
-process failure / recovery
+SIGKILL + SQLite journal recovery
         ↓
-deterministic replay
+three-process convergence
         ↓
-independently verifiable audit artifact
+independent deterministic replay
 ```
 
-The target should be one **active, unresolved** RChain witness whose result is not known in advance.
+The next boundary is not another fixture. It is to evaluate a candidate repair against **both sides of the same attestation-tap tension**:
+
+- C192 / Issue #172: a round that comes to rest at one height must be able to advance;
+- C171 / Issue #149: the advance mechanism must remain bounded and must not reintroduce the all-live block storm.
+
+That repair should be tested first against the paired unit falsifiers, then against the relevant controlled multi-validator devnet arms before any production-liveness claim is made.
 
 ## Repository map
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Assurance Fabric](docs/ASSURANCE_FABRIC.md)
 - [Intelligence Lattice Event Core](docs/INTELLIGENCE_LATTICE_EVENT_CORE.md)
+- [RChain C192 Live Witness](docs/RCHAIN_C192_LIVE_WITNESS.md)
 - [Four-Repository Assurance](docs/FOUR_REPO_ASSURANCE.md)
 - [Casper CBC Research Status](docs/CASPER_CBC_RESEARCH_STATUS.md)
 - [Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)
