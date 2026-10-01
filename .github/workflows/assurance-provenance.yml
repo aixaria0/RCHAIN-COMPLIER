@@ -1,0 +1,190 @@
+name: Assurance Build Provenance
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-artifact:
+    name: Build deterministic assurance artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+
+    steps:
+      - name: Enforce trusted signing ref
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != "refs/heads/main" && "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::Signed provenance is restricted to main or a v* tag; got $GITHUB_REF"
+            exit 1
+          fi
+
+      - name: Checkout exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Capture build start time
+        shell: bash
+        run: echo "ASSURANCE_BUILD_STARTED_ON=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify source before producing an artifact
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+
+      - name: Record provenance trust mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assurance-out
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            MODE="UNSIGNED_PR_BUILD"
+          else
+            MODE="ATTESTED_TRUSTED_BUILD"
+          fi
+          printf '%s\n' "$MODE" > assurance-out/PROVENANCE_TRUST_MODE
+          {
+            printf 'schema=causal-assurance-build-trust/v1\n'
+            printf 'mode=%s\n' "$MODE"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'source_commit=%s\n' "${{ github.event.pull_request.head.sha || github.sha }}"
+            printf 'event=%s\n' "$GITHUB_EVENT_NAME"
+          } > assurance-out/PROVENANCE_TRUST.txt
+
+      - name: Create deterministic release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assurance-out
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            --format=posix \
+            -cf assurance-out/rchain-reality-compiler-build.tar \
+            .vercel/output package.json package-lock.json
+          sha256sum assurance-out/rchain-reality-compiler-build.tar \
+            > assurance-out/SHA256SUMS
+          sha256sum assurance-out/PROVENANCE_TRUST_MODE assurance-out/PROVENANCE_TRUST.txt \
+            >> assurance-out/SHA256SUMS
+
+      - name: Enforce PR trust boundary
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat assurance-out/PROVENANCE_TRUST_MODE)" = "UNSIGNED_PR_BUILD"
+          test ! -e assurance-out/rchain-build-provenance.json
+          echo "PR artifact is validated but intentionally unsigned; release attestation privileges remain unavailable."
+
+      - name: Materialize builder signing seed
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        env:
+          ASSURANCE_BUILDER_KEY: ${{ secrets.ASSURANCE_BUILDER_ED25519_PRIVATE_KEY_HEX }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ASSURANCE_BUILDER_KEY" ]]; then
+            echo "::error::ASSURANCE_BUILDER_ED25519_PRIVATE_KEY_HEX is not configured"
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$ASSURANCE_BUILDER_KEY" > "$RUNNER_TEMP/assurance-builder-ed25519.hex"
+
+      - name: Produce signed in-toto/SLSA provenance
+        if: ${{ github.event_name != 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --experimental-strip-types scripts/assurance-attestation-producer.ts build \
+            --repository "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA" \
+            --artifact assurance-out/rchain-reality-compiler-build.tar \
+            --subject-name rchain-reality-compiler-build.tar \
+            --builder-id "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/assurance-provenance.yml" \
+            --invocation-id "$GITHUB_RUN_ID:$GITHUB_RUN_ATTEMPT" \
+            --started-on "$ASSURANCE_BUILD_STARTED_ON" \
+            --finished-on "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --key-file "$RUNNER_TEMP/assurance-builder-ed25519.hex" \
+            --output assurance-out/rchain-build-provenance.json
+
+      - name: Remove signing material
+        if: ${{ always() && github.event_name != 'pull_request' }}
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/assurance-builder-ed25519.hex"
+
+      - name: Upload validated artifact bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rchain-assurance-build-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: assurance-out/
+
+  attest-release:
+    name: GitHub/Sigstore attest and verify
+    needs: validate-artifact
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Download exact validated bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: rchain-assurance-build-${{ github.run_id }}
+          path: assurance-out
+
+      - name: Generate GitHub/Sigstore build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: assurance-out/rchain-reality-compiler-build.tar
+
+      - name: Verify GitHub artifact attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh attestation verify \
+            assurance-out/rchain-reality-compiler-build.tar \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Upload attested release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rchain-assurance-attested-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: 30
+          path: assurance-out/

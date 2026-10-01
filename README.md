@@ -1,20 +1,22 @@
-# RChain Casper CBC Stress Harness
+# Causal Assurance Compiler
 
-**Deterministic, replayable research infrastructure for stress-testing Casper CBC finalization behavior against the real RChain Rust implementation.**
+**A protocol-independent verification and evidence system for turning bounded technical claims into reproducible, inspectable, cryptographically bound assurance artifacts.**
 
 [![CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/ci.yml)
-[![Reality Plane CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-plane.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-plane.yml)
-[![Upstream Finalizer](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-5-upstream-finalizer.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-5-upstream-finalizer.yml)
-[![Upstream Validation](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-6-upstream-admission.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-6-upstream-admission.yml)
-[![Upstream Pre-State Bridge](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-7-upstream-pre-state.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/m11-7-upstream-pre-state.yml)
+[![Verification Core CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/verification-core-ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/verification-core-ci.yml)
+[![Reality Plane CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml)
+[![Assurance Provenance](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml)
 
-> Research status: executable upstream reproduction complete for the current duplicate-minimum-message candidate under a controlled DAG/state fixture.
+> **v1 baseline status:** implementation-complete on the PR #21 line with verification, bounded repair, pinned native replay, portable propagation, inspection, and independent evidence-root attestation.
 >
-> Important scope: this repository is a research and verification harness. It is not an RChain node, not a replacement for Casper, and does not by itself establish a production-network vulnerability.
+> **Current milestone:** [PR #21 — Generic Causal Assurance Fabric](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/21)
+>
+> **Current scope:** the generic assurance layer is implemented independently of any live RChain/RNode runtime. RChain/Casper is the first serious target for integration, not a hard dependency of the core.
+
 
 ## Research map — independent branches, one documentation hub
 
-This default branch remains the Casper CBC/upstream execution baseline. Important research branches are **not merged** into it. Their verified direction and interfaces are summarized here so the repository front page shows the whole program without rewriting Git history.
+This branch contains the Causal Assurance implementation while the default branch also documents the repository's independent research lines. Their histories remain separate; documentation links do not imply that branch-only implementation has been merged into `main`.
 
 | Research line | Important branch(es) | Contribution |
 |---|---|---|
@@ -23,259 +25,1117 @@ This default branch remains the Casper CBC/upstream execution baseline. Importan
 | Reality Compiler | `feature/reality-calculus`, `feature/reality-engine-core`, `feature/reality-evidence-plane`, `feature/reality-loop` | causal evidence, replay, Reality Records and inspection model |
 | Causal Assurance v1 | `feat/assurance-fabric-v1` | protocol-neutral verification, bounded repair, native replay binding and cross-repository assurance |
 
-The conceptual progression is:
-
-```text
-Reality evidence / causality
-          ↓
-Casper CBC adversarial execution
-          ↓
-Generic verification + repair
-          ↓
-Cross-repository assurance fabric
-```
-
 See **[Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)** for the non-merged branch map and **[Documentation Hub](docs/WIKI_HOME.md)** for the consolidated v1 reference.
 
-> Documentation copied to `main` describes branch results and contracts. It does not imply that branch-only implementation is present on `main`.
 
-## What this project does
+## v1 — four-repository assurance fabric
 
-This repository started as the RChain Reality Compiler: an evidence-oriented workbench for turning distributed execution observations into deterministic, inspectable records.
+The primary repository now acts as the documentation and contract hub for the complete v1 chain:
 
-The current research track uses that architecture to answer a focused question:
+```text
+RCHAIN-COMPLIER
+  verification → bounded repair → pinned native replay → propagation
+        │
+        ▼
+rchain-sentinel
+  evidence transport observation
+        │
+        ▼
+rlsenti
+  read-only inspection
+        │
+        ▼
+Sovereign-Lattice
+  independent evidence-root attestation
+```
 
-**What happens when adversarial-but-causally-valid Casper CBC message histories are pushed through the actual upstream Rust finalization and validation pipeline?**
+**v1 status:** implementation-complete and CI-verified on the current feature branches. The cross-repository boundary is documented centrally in [Four-Repository v1 Integration](docs/FOUR_REPO_V1_INTEGRATION.md), [v1 Schema Index](docs/V1_SCHEMA_INDEX.md), [v1 Release Boundary](docs/V1_RELEASE_BOUNDARY.md), and [v1 Baseline Manifest](docs/V1_BASELINE_MANIFEST.md).
 
-The harness keeps three layers separate:
+A visual project landing page is available from the repository's `index.html` and is suitable for GitHub Pages publication.
 
-~~~text
-synthetic model
-     |
-upstream-facing observation
-     |
-real upstream Rust execution
-     |
-deterministic evidence
-~~~
+---
 
-The goal is not to manufacture a vulnerability claim. The goal is to make the smallest implementation claim that survives contact with the actual code.
+## Why this project exists
 
-## Current verified result
+Distributed systems research usually produces many useful artifacts, but they often remain disconnected:
 
-Upstream pin:
+- a model checker finds a witness;
+- a stress harness produces a failure case;
+- a node reports an observation;
+- a replay reproduces behavior;
+- a CI job passes;
+- a UI shows a verdict;
+- a reviewer signs a result.
 
-~~~text
+Each artifact may be individually useful, but that still leaves a harder question:
+
+> **Do all of these artifacts still refer to the same run, the same subject, the same evidence, the same assumptions, and the same scope?**
+
+And an even harder one:
+
+> **Can another implementation independently verify that nobody strengthened the claim while moving from model → evidence → verdict → review?**
+
+The Causal Assurance Compiler is built around that problem.
+
+It does not try to replace the system being verified. It creates a **verification boundary around claims about that system**.
+
+The goal is to make a result answerable in a disciplined way:
+
+- What exactly was tested?
+- Under what assumptions?
+- Was the result bounded or complete?
+- Was the witness actually reachable under the declared model?
+- What evidence was observed?
+- Was that evidence replayed?
+- What code/version produced it?
+- Did any layer silently promote uncertainty into confidence?
+- Is the evidence chain still intact?
+- Who signed or reviewed it?
+- Can another implementation reproduce the same canonical result?
+
+That is the core value of the project.
+
+---
+
+## The assurance chain
+
+At a high level:
+
+```text
+verification problem
+        │
+        ▼
+bounded search / witness
+        │
+        ▼
+observation evidence
+        │
+        ▼
+inspection / verdict
+        │
+        ▼
+optional independent attestation
+        │
+        ▼
+portable assurance package
+        │
+        ▼
+canonical package root
+        │
+        ▼
+pinned-key Ed25519 signature
+```
+
+The important property is not that these stages exist.
+
+The important property is that **each stage is explicitly bound to the previous stage and is not allowed to silently strengthen its meaning**.
+
+That rule drives the entire architecture.
+
+---
+
+# What PR #21 adds
+
+PR #21 moves the repository beyond a Casper-specific research harness and introduces a protocol-independent assurance layer.
+
+The generic system now includes:
+
+- protocol-neutral verification adapters;
+- deterministic adapter selection;
+- bounded possibility / counterexample search;
+- explicit `INCONCLUSIVE` and `LIMIT_REACHED` outcomes;
+- witness polarity semantics;
+- raw-byte artifact verification;
+- transitive predecessor binding;
+- canonical package ordering;
+- portable assurance packages;
+- length-prefixed canonical root encoding;
+- SHA-256 package roots;
+- Ed25519 signing;
+- independently pinned signer identity;
+- cross-language conformance;
+- protocol-neutral evidence envelopes;
+- claims bound into evidence identity;
+- read-only verdict inspection;
+- explicit supply-chain / provenance checks;
+- optional independent reviewer attestation;
+- fail-closed negative controls;
+- versioned schemas for semantic changes.
+
+This is deliberately more than a reporting layer.
+
+It is intended to act as a **compiler from bounded technical evidence into an assurance artifact whose scope and integrity survive transport between tools**.
+
+---
+
+# The core design rule
+
+The project follows one rule:
+
+> **A claim must never become stronger while moving through the pipeline unless new evidence explicitly justifies the stronger claim.**
+
+That means:
+
+```text
+missing evidence      != PASS
+INCONCLUSIVE          != PASS
+LIMIT_REACHED         != PASS
+hash integrity        != truth
+signature validity    != trust
+quorum count          != protocol finality
+synthetic witness     != live exploit
+replay success        != production safety
+```
+
+These distinctions are intentionally encoded into the implementation rather than left only as documentation.
+
+---
+
+# 1. Protocol-independent verification compiler
+
+The verification compiler accepts a declared verification problem:
+
+```text
+problem id
+model family
+scope
+assumptions
+payload
+```
+
+and selects one compatible adapter.
+
+Adapter selection is deterministic.
+
+If no adapter exists:
+
+```text
+BLOCKED
+```
+
+If multiple top-priority adapters tie:
+
+```text
+BLOCKED
+```
+
+A compiler result cannot silently continue under ambiguity.
+
+The current verification outcomes are:
+
+```text
+WITNESS_FOUND
+UNREACHABLE_IN_MODEL
+LIMIT_REACHED
+INCONCLUSIVE
+```
+
+These are intentionally not equivalent to PASS/FAIL.
+
+A witness must first have an explicitly declared interpretation:
+
+```text
+VIOLATION
+SUPPORT
+```
+
+For example:
+
+```text
+WITNESS_FOUND + VIOLATION → FAIL
+UNREACHABLE_IN_MODEL + VIOLATION → PASS
+
+WITNESS_FOUND + SUPPORT → PASS
+UNREACHABLE_IN_MODEL + SUPPORT → FAIL
+
+INCONCLUSIVE → BLOCKED
+LIMIT_REACHED → BLOCKED
+```
+
+Without the declared witness semantics, the result remains BLOCKED.
+
+This prevents a generic reachability result from being given a meaning it did not actually prove.
+
+---
+
+# 2. Evidence is part of the identity
+
+The protocol-neutral observation layer is implemented in **rchain-sentinel**.
+
+The current evidence contract is:
+
+```text
+causal-assurance-evidence/v2
+```
+
+An evidence envelope binds:
+
+- source;
+- evidence kind;
+- timestamp;
+- subject;
+- raw payload SHA-256;
+- canonical claims SHA-256;
+- resulting evidence identity.
+
+In the current evidence contract, **claims are no longer loose metadata**.
+
+Changing a claim changes the claims digest and therefore changes the evidence identity.
+
+That means this transformation is not allowed to remain invisible:
+
+```text
+observed claim
+      ↓
+claim rewritten later
+      ↓
+same evidence id
+```
+
+Instead:
+
+```text
+claim mutation
+      ↓
+claims digest changes
+      ↓
+evidence identity changes
+```
+
+Payload tampering is also independently detected by recomputing SHA-256 from raw bytes.
+
+---
+
+# 3. Portable assurance package
+
+The portable package contract is:
+
+```text
+causal-assurance-portable-package/v2
+```
+
+The base chain contains exactly three artifacts:
+
+```text
+WITNESS
+   ↓
+EVIDENCE
+   ↓
+WORKBENCH
+```
+
+A fourth independent reviewer artifact may be appended:
+
+```text
+WITNESS
+   ↓
+EVIDENCE
+   ↓
+WORKBENCH
+   ↓
+ATTESTATION
+```
+
+For every artifact the verifier independently checks:
+
+1. artifact role;
+2. raw artifact bytes;
+3. recomputed SHA-256;
+4. declared SHA-256;
+5. canonical order;
+6. exact predecessor bindings.
+
+The chain is transitive.
+
+For example:
+
+```text
+WITNESS binds []
+EVIDENCE binds [WITNESS]
+WORKBENCH binds [WITNESS, EVIDENCE]
+ATTESTATION binds [WITNESS, EVIDENCE, WORKBENCH]
+```
+
+Changing a predecessor without rebuilding downstream artifacts breaks the chain.
+
+Reordering artifacts breaks the chain.
+
+Substituting a valid artifact from a different package breaks the chain.
+
+Mutating raw bytes while leaving the declared digest unchanged breaks the chain.
+
+---
+
+# 4. Canonical signed package root
+
+Once a package passes independent verification, the system derives a deterministic root.
+
+The root contains the identity and binding structure of the package:
+
+```text
+signed-root schema
+package schema
+run id
+subject
+artifact index
+artifact role
+artifact digest
+binding count
+predecessor bindings
+```
+
+These fields are encoded using an explicit:
+
+```text
+u32 big-endian length
++
+UTF-8 field bytes
+```
+
+framing scheme.
+
+This replaces delimiter-based framing and removes ambiguity between cases such as:
+
+```text
+["a\0b", "c"]
+```
+
+and:
+
+```text
+["a", "b\0c"]
+```
+
+The canonical material is hashed with SHA-256.
+
+The resulting root can then be signed with Ed25519.
+
+---
+
+# 5. Signature validity is not treated as trust
+
+A recurring security mistake is to accept this logic:
+
+```text
+package includes public key
+signature verifies under included key
+therefore signer is trusted
+```
+
+This project explicitly rejects that model.
+
+The signed-root verifier requires both:
+
+1. mathematical signature validity;
+2. an independently supplied expected signer fingerprint.
+
+Signer identity is:
+
+```text
+SHA-256(raw 32-byte Ed25519 public key)
+```
+
+The embedded public key must hash to the declared key id.
+
+That key id must also equal the externally pinned expected key id.
+
+So the trust model is:
+
+```text
+valid signature
+      +
+valid key fingerprint
+      +
+fingerprint matches configured trust anchor
+      =
+accepted signer
+```
+
+A self-supplied key is not a trust anchor.
+
+---
+
+# 6. Cross-language conformance
+
+The canonical package-root algorithm is independently implemented in:
+
+- TypeScript — **RCHAIN-COMPLIER**
+- Rust — **rchain-sentinel**
+- Rust — **Sovereign-Lattice**
+
+The frozen four-artifact fixture produces the same package root across all three implementations.
+
+Current frozen conformance root:
+
+```text
+sha256:d3dda1ea8d69ef493b83b3b373f6d49c53324a19df127788687db92a31310ace
+```
+
+This matters because the producer is not the only implementation defining what the package means.
+
+A second language and a second repository can independently reconstruct the canonical result.
+
+That reduces the chance that one implementation-specific serialization assumption silently becomes the protocol.
+
+---
+
+# 7. Read-only workbench semantics
+
+**rlsenti** is the inspection layer.
+
+Its job is to make evidence understandable without becoming an authority that can upgrade it.
+
+The workbench preserves states such as:
+
+```text
+PASS
+FAIL
+BLOCKED
+NOT_TESTED
+INCONCLUSIVE
+```
+
+It also represents separate assurance planes:
+
+```text
+POSSIBILITY
+REALITY
+CONFORMANCE
+RECOVERY
+SUPPLY_CHAIN
+```
+
+A certificate claiming PASS while containing a critical non-PASS check is rejected.
+
+This is deliberate.
+
+The visualization layer is not allowed to turn uncertainty into confidence merely because a UI needs a simple status.
+
+---
+
+# 8. Optional independent reviewer
+
+**Sovereign-Lattice** acts as an optional independent reviewer.
+
+Its role is not to replace the subject system's consensus.
+
+It adds a second assurance boundary.
+
+The reviewer can bind a decision to:
+
+- certificate digest;
+- scope digest;
+- reviewer identity;
+- review decision.
+
+Current reviewer decisions are:
+
+```text
+CONFIRMED
+REJECTED
+ABSTAINED
+```
+
+The attestation is deterministically encoded and can be signed with Ed25519.
+
+Verification requires a pinned signer key id.
+
+The base assurance contract does not require this reviewer.
+
+A stricter policy can.
+
+So both of these are valid configurations:
+
+```text
+BASE PROFILE
+WITNESS → EVIDENCE → WORKBENCH
+```
+
+and:
+
+```text
+REVIEWED PROFILE
+WITNESS → EVIDENCE → WORKBENCH → ATTESTATION
+```
+
+If policy requires attestation and it is missing:
+
+```text
+BLOCKED
+```
+
+---
+
+# Four repositories, four independent responsibilities
+
+| Repository | Responsibility | What it is not allowed to do |
+|---|---|---|
+| **[RCHAIN-COMPLIER](https://github.com/aixaria0/RCHAIN-COMPLIER)** | verification, possibility search, conformance, portable package, canonical root | invent live observation evidence |
+| **[rchain-sentinel](https://github.com/aixaria0/rchain-sentinel)** | observation/evidence production | decide final protocol meaning on its own |
+| **[rlsenti](https://github.com/aixaria0/rlsenti)** | inspection / visualization / evidence navigation | promote an upstream verdict |
+| **[Sovereign-Lattice](https://github.com/aixaria0/Sovereign-Lattice)** | optional independent review | replace subject consensus/finality |
+
+The repositories are connected through artifacts rather than hidden shared state.
+
+This separation makes it possible to inspect where a conclusion came from.
+
+See:
+
+[docs/FOUR_REPO_ASSURANCE.md](docs/FOUR_REPO_ASSURANCE.md)
+
+---
+
+# What value this adds to RChain
+
+RChain is where this work started, and it remains the first serious target.
+
+The existing Casper CBC research track already contains:
+
+- deterministic stake distributions;
+- adversarial message histories;
+- DAG construction;
+- equivocation / ordering perturbations;
+- minimum-message analysis;
+- causal reachability checks;
+- exact upstream revision pinning;
+- real Rust Finalizer execution;
+- upstream validation probes;
+- pre-state reconstruction;
+- replay-oriented evidence;
+- negative controls.
+
+Those pieces are useful individually.
+
+The generic assurance system gives them a common structure.
+
+Future RChain integration can look like:
+
+```text
+Casper/CBC search
+      │
+      ▼
+minimum / adversarial witness
+      │
+      ▼
+real RNode/RChain observation
+      │
+      ▼
+native implementation replay
+      │
+      ▼
+build provenance
+      │
+      ▼
+recovery evidence
+      │
+      ▼
+bounded assurance certificate
+      │
+      ▼
+optional independent review
+```
+
+This creates a much more useful question than:
+
+> "Did the test pass?"
+
+The intended question becomes:
+
+> **For this exact implementation revision, this exact run, this exact observed state, and this exact replay: what was demonstrated, what evidence supports it, what remains unproven, and can another verifier reproduce the same chain?**
+
+That is the practical reason the generic layer exists.
+
+---
+
+# Why RChain is not connected yet
+
+The current generic milestone deliberately stops at the adapter boundary.
+
+That is intentional.
+
+The upstream RChain/RNode implementation is currently being updated, so coupling the generic assurance core directly to a moving runtime would weaken the separation the project is trying to create.
+
+The generic side is therefore being stabilized first.
+
+When the RChain implementation boundary is ready, the next step is not to redesign the assurance system.
+
+The next step is to implement the RChain adapter and replace generic fixture inputs with:
+
+- real observation evidence;
+- real runtime identity;
+- real replay output;
+- real build provenance;
+- real recovery evidence.
+
+In other words:
+
+```text
+generic assurance architecture
+        +
+stable RChain adapter
+        =
+RChain-specific assurance pipeline
+```
+
+Until that adapter exists, this repository does **not** claim that RChain itself is verified by the generic system.
+
+---
+
+# Existing Casper CBC research track
+
+The repository still contains the original Casper CBC stress and implementation research.
+
+Its focused question is:
+
+> **What happens when adversarial-but-causally-valid Casper CBC message histories are exercised against the actual pinned upstream Rust implementation?**
+
+Current upstream pin used by the existing reproducer:
+
+```text
 rchain-community/rchain-rust
 d92f0787a6096cd6d79864ec2d7c1dd9b6912d0b
-~~~
+```
 
-The current candidate reproduces this chain:
+The research progression reached:
 
-~~~text
-duplicate-sender justification shape
-          |
-active block_summary validation
-          |
-get_pre_state_for_parents
-          |
-real Finalizer::calculate_finalization
-          |
-validate_block_checkpoint
-          |
-MultiParentCasper::validate
-          |
-1 passed / 0 failed
-~~~
+```text
+law-level stake tension
+        ↓
+minimum-message gate
+        ↓
+concrete DAG/message fixture
+        ↓
+causal reachability screen
+        ↓
+Finalizer semantic lock
+        ↓
+real upstream Finalizer
+        ↓
+active validation admission
+        ↓
+pre-state reconstruction
+        ↓
+checkpoint validation
+        ↓
+MultiParentCasper validation
+```
 
-The concrete candidate contains a minimum-message multiset with duplicate sender coverage:
+The duplicate-sender candidate that drove part of this research is intentionally narrow:
 
-~~~text
+```text
 minimum-message senders = [v0, v0, v1, v2]
 bonded validators       = [v0, v1, v2, v3]
 supporting stake        = 90 / 100
-~~~
+```
 
-The key implementation boundary is that the minimum-message entry count equals the bond count while the distinct sender count does not. Later sender-keyed stages can therefore collapse duplicate entries.
+The measurable implementation boundary is:
 
-The full integration probe also creates a real native PoS genesis state through RuntimeManager::compute_genesis and exercises the candidate through the production Rust validation functions used by MultiParentCasper::validate.
-
-This is a confirmed implementation behavior under a deterministic integration fixture. It is deliberately not labelled a network-level vulnerability until the remaining ingress, signature, storage, and deployment assumptions are independently demonstrated.
-
-See the full evidence log in docs/CASPER_CBC_RESEARCH_STATUS.md.
-
-## Research progression
-
-~~~text
-law-level stake tension
-        |
-upstream minimum-message gate
-        |
-concrete DAG/message fixture
-        |
-causal reachability screen
-        |
-finalizer semantic lock
-        |
-real upstream Finalizer
-        |
-active validation admission
-        |
-real pre-state reconstruction
-        |
-full MultiParentCasper validation
-~~~
-
-| Milestone | Boundary | Result |
-|---|---|---|
-| M7 | deterministic tension minimization | 70/10 minimal law-level tension |
-| M8 | upstream minimum-message gate | incomplete coverage blocked before fringe |
-| M10 | concrete DAG/message construction | explicit sender/seq/parent/seen history |
-| M11.4 | duplicate minimum-message candidate | candidate discrepancy isolated |
-| M11.5 | real upstream Finalizer | confirmed |
-| M11.6 | active block_summary validation | confirmed |
-| M11.7–M11.9 | pre-state + checkpoint + full validation bridge | confirmed |
-
-## Why the duplicate-message case matters
-
-The candidate is intentionally narrow.
-
-A protocol interpretation may expect one minimum message per bonded validator. The pinned implementation gate checks message count against bond count, while later processing is keyed by sender.
-
-That creates the measurable boundary:
-
-~~~text
+```text
 count(minimumMessages) = count(bonds)
 but
 count(distinct senders) < count(bonds)
-~~~
+```
 
-The harness does not assume that this is exploitable. It measures what the actual implementation does with that shape.
+The harness observes how the pinned implementation handles that shape.
 
-## What is real vs. synthetic
+It does not automatically label the behavior a production exploit.
 
-The synthetic layer provides deterministic stake-aware scenarios, delivery perturbations, equivocation, DAG/message construction, invariant checks, shrinking, and replay digests.
+See:
 
-The upstream layer is separate. It injects focused integration tests into a clean checkout of the pinned upstream commit and compiles the relevant RChain crate against that exact revision.
+[docs/CASPER_CBC_RESEARCH_STATUS.md](docs/CASPER_CBC_RESEARCH_STATUS.md)
 
-No upstream source code is vendored into this repository.
+---
 
-## Reproduce the local research layer
+# Evidence levels
+
+The project separates evidence strength into distinct levels.
+
+| Level | Meaning |
+|---|---|
+| **Synthetic scenario** | deterministic generated case |
+| **Model result** | result inside a declared formal/algorithmic model |
+| **Reachable witness** | witness satisfying declared reachability constraints |
+| **Implementation behavior** | same shape executed against the implementation under study |
+| **Observed runtime behavior** | evidence from an identified real execution |
+| **Recovery/replay evidence** | state or behavior reproduced under declared recovery conditions |
+| **Protocol claim** | conclusion supported at protocol semantics level |
+| **Production claim** | conclusion supported under real deployment assumptions |
+
+The existence of one level does not imply the next.
+
+This distinction is part of the project's claim discipline.
+
+---
+
+# Threat model
+
+The generic assurance layer is designed to detect or block several classes of evidence failure.
+
+### Artifact mutation
+
+An artifact's raw bytes are changed after generation.
+
+**Defense:** recompute SHA-256 from raw bytes.
+
+### Artifact substitution
+
+A valid artifact from another run is inserted.
+
+**Defense:** ordered predecessor bindings + package identity + canonical root.
+
+### Artifact reordering
+
+Artifacts are rearranged without changing individual hashes.
+
+**Defense:** canonical role ordering.
+
+### Claim rewriting
+
+Observation claims are changed while payload identity is preserved.
+
+**Defense:** canonical claims digest is bound into evidence identity.
+
+### Signer substitution
+
+An attacker signs a modified package with their own key and includes that key.
+
+**Defense:** externally pinned expected signer fingerprint.
+
+### Verdict promotion
+
+A downstream tool turns uncertain upstream state into PASS.
+
+**Defense:** explicit outcome mapping + workbench contradiction rejection.
+
+### Ambiguous serialization
+
+Different field boundaries produce the same serialized byte stream.
+
+**Defense:** length-prefixed canonical framing.
+
+### Missing review under strict policy
+
+Optional attestation is omitted when policy requires one.
+
+**Defense:** fail closed to BLOCKED.
+
+---
+
+# What the generic layer can guarantee
+
+Within its declared scope, the current system can provide evidence that:
+
+- artifact bytes match their declared digests;
+- artifact ordering is canonical;
+- predecessor bindings are intact;
+- package identity is included in the root;
+- signer key fingerprint matches the configured trust anchor;
+- a signature is mathematically valid;
+- multiple independent implementations reproduce the same canonical root;
+- inconclusive results were not promoted to PASS;
+- evidence claims were not silently rewritten without changing identity;
+- a PASS certificate does not contradict critical non-PASS checks.
+
+These are integrity and semantic guarantees about the assurance chain.
+
+They are intentionally narrower than claims about the truth of the external system.
+
+---
+
+# What the generic layer cannot guarantee by itself
+
+It does **not** prove:
+
+- that a sensor or observer told the truth;
+- that an external node was uncompromised;
+- that a network observation represents the full network;
+- that a bounded search covered an unbounded state space;
+- that a hash proves the meaning of the bytes it protects;
+- that a cryptographic signer is organizationally authorized unless policy says so;
+- that consensus finality follows from quorum count alone;
+- that one successful replay proves production safety;
+- that RChain/RNode is correct;
+- that a synthetic or controlled fixture is a live exploit;
+- that external security review is unnecessary.
+
+These limits are deliberate and documented.
+
+---
+
+# CI and negative controls
+
+The generic core is covered by dedicated CI and repository-wide validation.
+
+Current checks include:
+
+- repository CI;
+- Verification Core CI;
+- Reality Plane CI;
+- build provenance checks;
+- upstream RChain reproducer workflows;
+- Sentinel CI;
+- Sovereign-Lattice CI;
+- Sovereign cluster smoke tests;
+- Lean 4 verification;
+- rlsenti CI.
+
+Negative controls include:
+
+- raw-byte mutation;
+- digest mismatch;
+- artifact substitution;
+- artifact reordering;
+- wrong predecessor binding;
+- wrong signer;
+- mismatched key id;
+- malformed signature;
+- changed run id;
+- changed subject;
+- critical INCONCLUSIVE hidden beneath PASS;
+- missing required attestation.
+
+The system is expected to fail closed under these cases.
+
+---
+
+# Reproduce the generic core
 
 Install dependencies:
 
-~~~bash
+```bash
 npm install
-~~~
+```
 
-Run the TypeScript research suite:
+Run the verification-core suite:
 
-~~~bash
+```bash
+npm run test:verification-core
+```
+
+Run the full repository suite:
+
+```bash
 npm test
-~~~
+```
 
-Run the repository quality gates:
+Run quality gates:
 
-~~~bash
+```bash
 npm run typecheck
 npm run lint
 npm run build
-~~~
+```
 
-Run focused Casper demonstrations:
+Run the generic verification compiler example:
 
-~~~bash
-npm run demo:casper-upstream-gate
-npm run demo:casper-concrete-dag
-npm run demo:casper-finalizer-semantics
-npm run demo:casper-adversarial-search
-npm run demo:casper-upstream-reachability
-npm run demo:casper-reachable-flip
-npm run demo:casper-duplicate-minimum
-~~~
+```bash
+npm run demo:verification-core
+```
 
-The upstream Rust reproductions run in GitHub Actions so the exact upstream source revision is controlled and visible.
+The RChain upstream reproducers run in GitHub Actions against pinned source revisions so the exact source boundary remains visible.
 
-## Repository map
+---
 
-~~~text
+# Repository structure
+
+```text
+src/lib/compiler/
+    verification compiler
+    adaptive verification adapters
+    possibility search
+    multi-objective refinement
+    quantitative what-if analysis
+    ecosystem evidence chain
+    portable assurance package
+    signed package root
+    provenance adapters
+    replay adapters
+    recovery adapters
+    assurance certificate logic
+
 src/lib/cbc/
-    deterministic Casper stress model
-    observation adapters
-    DAG fixtures
-    finalizer semantics
-    reachability / perturbation searches
+    Casper CBC simulator
+    stake analysis
+    DAG/message construction
+    upstream semantics
+    adversarial search
+    reachability search
+    finalizer probes
+    fragility analysis
 
 scripts/upstream/
-    exact upstream integration reproducers
+    pinned upstream Rust reproducers
+
+schemas/
+    causal assurance contract versions
+
+docs/
+    architecture
+    assurance contract
+    evidence discipline
+    Casper/CBC research status
 
 .github/workflows/
     repository CI
-    Reality Plane CI
-    pinned upstream Finalizer / validation bridges
+    verification core
+    Reality Plane
+    provenance
+    pinned upstream reproductions
+```
 
-docs/
-    research status
-    evidence / Reality Compiler architecture
-~~~
+---
 
-Key upstream probes:
+# Contract versions
 
-- scripts/upstream/m11-5-duplicate-minimum-messages.rs
-- scripts/upstream/m11-6-duplicate-sender-admission.rs
-- scripts/upstream/m11-7-pre-state-finalizer-bridge.rs
+Current generic contract versions:
 
-## Evidence discipline
+| Contract | Version |
+|---|---|
+| Evidence envelope | `causal-assurance-evidence/v2` |
+| Ecosystem manifest | `causal-assurance-ecosystem/v2` |
+| Portable package | `causal-assurance-portable-package/v2` |
+| Signed package root | `causal-assurance-signed-root/v2` |
+| Reviewer attestation | `causal-assurance-attestation/v2` |
 
-**Observation** — a concrete result produced by the harness or upstream implementation.
+Semantic changes are versioned rather than silently changing the meaning of an existing schema.
 
-**Reachability** — an observation that satisfies the currently checked upstream structural invariants.
+The older v1 ecosystem schema remains preserved for compatibility with the earlier four-stage mandatory-attestation contract.
 
-**Implementation behavior** — the same shape exercised against real upstream Rust code.
+---
 
-**Protocol finding** — a stronger claim requiring protocol-level impact to be demonstrated.
+# Intended use
 
-The current milestone is in the third category.
+The generic assurance layer is suitable for systems where a useful result has to survive movement between:
 
-## Non-goals
+- model/search engines;
+- runtime observers;
+- replay tools;
+- provenance systems;
+- verification workbenches;
+- independent reviewers.
 
-This repository does not claim to:
+It is intentionally not limited to blockchain.
 
-- replace the RChain node;
-- implement a second Casper consensus engine;
-- provide live mainnet evidence;
-- prove all Casper safety or liveness properties;
-- declare a vulnerability solely from a synthetic scenario;
-- silently turn missing evidence into certainty.
+A future adapter could represent:
 
-## Research-facing architecture
+- distributed consensus;
+- replicated databases;
+- recovery testing;
+- safety-critical state machines;
+- deterministic simulation;
+- build/runtime provenance chains;
+- formal-model-to-runtime conformance.
 
-The original Reality Compiler architecture remains useful because it provides an evidence boundary around the stress harness:
+The core only requires that evidence and semantics can be expressed through the declared adapter boundary.
 
-~~~text
-execution / fixture
-      |
-canonical observation
-      |
-evidence + provenance
-      |
-deterministic analysis
-      |
-replay / contradiction checks
-      |
-upstream confirmation
-      |
-inspectable research result
-~~~
+---
 
-## License
+# Current status
 
-No license is currently declared for this repository. Public visibility should not be interpreted as a grant of reuse rights.
+## Generic assurance system
 
-## Security
+The current v2 milestone is implemented and CI-gated.
 
-Consensus-sensitive findings should be handled carefully. See SECURITY.md.
+The main generic boundaries are now in place:
 
-## Contributing
+```text
+bounded verification
+        ✓
+explicit uncertainty
+        ✓
+evidence identity
+        ✓
+raw-byte verification
+        ✓
+transitive binding
+        ✓
+portable package
+        ✓
+canonical root
+        ✓
+Ed25519 signature
+        ✓
+pinned signer trust
+        ✓
+cross-language conformance
+        ✓
+read-only verdict inspection
+        ✓
+optional independent review
+        ✓
+negative controls
+        ✓
+```
 
-Research contributions should include the exact upstream commit, a deterministic reproducer, the relevant implementation path, the observed result, and the smallest claim actually supported by the evidence. See CONTRIBUTING.md.
+## RChain integration
+
+Not yet connected to the currently changing live RChain/RNode runtime.
+
+That is the next external boundary.
+
+The generic system is being kept stable so that when the RChain implementation is ready, integration can happen through an adapter rather than by mixing RChain-specific assumptions into the core.
+
+---
+
+# Why this matters
+
+The project is not trying to make every result look stronger.
+
+It is trying to make every result **harder to misstate**.
+
+A useful assurance system should preserve uncertainty as carefully as it preserves success.
+
+It should make it obvious when:
+
+- evidence is missing;
+- a search stopped early;
+- a result only applies to a model;
+- a runtime observation was not independently reproduced;
+- a signer is valid but not trusted;
+- a reviewer was not present;
+- a production claim has not yet been earned.
+
+That is the standard this repository is moving toward.
+
+---
+
+# License
+
+No license is currently declared for this repository.
+
+Public visibility should not be interpreted as a grant of reuse rights.
+
+---
+
+# Security
+
+Consensus-sensitive or security-sensitive findings should be handled carefully.
+
+See [SECURITY.md](SECURITY.md).
+
+---
+
+# Contributing
+
+A research contribution should include, where applicable:
+
+- exact implementation revision;
+- deterministic reproducer;
+- declared assumptions;
+- declared limitations;
+- subject identity;
+- artifact digests;
+- evidence bindings;
+- observed result;
+- negative control;
+- smallest claim actually supported by the evidence.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Short version
+
+If you only read one paragraph:
+
+**RCHAIN-COMPLIER is evolving into a protocol-independent Causal Assurance Compiler: a system that takes bounded verification results, observation evidence, replay/provenance information, and optional independent review, then binds them into a portable, reproducible, cryptographically verifiable chain without allowing uncertainty to be silently promoted into PASS. RChain/Casper is the first serious target; the generic system is intentionally being stabilized first so the real RChain adapter can be attached cleanly when the upstream runtime boundary is ready.**

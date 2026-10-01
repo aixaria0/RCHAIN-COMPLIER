@@ -16,3 +16,4 @@ export * from "./casper-finalizer-semantics.ts";
 export * from "./casper-adversarial-search.ts";
 export * from "./casper-upstream-reachability.ts";
 export * from "./casper-reachable-perturbation-search.ts";
+export * from "./casper-possibility-search.ts";

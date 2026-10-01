@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/lib/compiler/possibility-plane.ts",
+    "src/lib/compiler/quantitative-what-if.ts",
+    "src/lib/compiler/lexicographic-possibility.ts",
+    "src/lib/compiler/verification-compiler.ts",
+    "src/lib/compiler/finite-state-verifier.ts",
+    "src/lib/compiler/possibility-plane.test.ts",
+    "src/lib/compiler/quantitative-what-if.test.ts",
+    "src/lib/compiler/lexicographic-possibility.test.ts",
+    "src/lib/compiler/verification-compiler.test.ts",
+    "src/lib/compiler/verification-core-boundary.test.ts",
+    "src/lib/verification-core/index.ts",
+    "examples/verification-compiler-generic.ts",
+    "src/lib/compiler/repair-compiler.ts",
+    "src/lib/compiler/repair-compiler.test.ts"
+  ]
+}

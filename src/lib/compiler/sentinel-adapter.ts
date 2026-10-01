@@ -18,6 +18,7 @@ export const SENTINEL_ENDPOINTS = {
   blockVerification: "/api/verify/block",
   casperVerification: "/api/verify/casper",
   crossNodeVerification: "/api/verify/cross-node",
+  attestationSnapshot: "/api/attestation/snapshot",
   realityEvent: (eventId: string) => `/api/reality/event/${encodeURIComponent(eventId)}`,
   realityReplay: (eventId: string) => `/api/reality/replay/${encodeURIComponent(eventId)}`,
 } as const;
@@ -65,11 +66,47 @@ export interface SentinelNetworkStatus {
   } | null;
 }
 
+export interface SentinelCrossNodeAgreement {
+  node_url: string;
+  reachable: boolean;
+  finalized_height: number | null;
+  block_hash: string | null;
+  payload_sha256: string | null;
+  proposer: string | null;
+  signature_present: boolean;
+  justification_present: boolean;
+  full_block_available: boolean;
+  full_block_hash_match: boolean | null;
+  node_reported_finalized: boolean | null;
+}
+
+export interface SentinelCrossNodeReport {
+  target_count: number;
+  reachable_count: number;
+  evidence_count: number;
+  agreeing_nodes: number;
+  quorum_required: number;
+  quorum_observed: boolean;
+  agreement_ratio: number;
+  common_finalized_height: number | null;
+  common_block_hash: string | null;
+  height_agreement: boolean;
+  hash_agreement: boolean;
+  missing_height_nodes: number;
+  missing_hash_nodes: number;
+  conflicting_nodes: number;
+  agreement: boolean;
+  status: string;
+  verification_basis: string;
+  observations: SentinelCrossNodeAgreement[];
+}
+
 export interface SentinelObservationBundle {
   sentinelBaseUrl: string;
   collectedAt: string;
   evidence: SentinelFinalizedBlockEvidence;
   network?: SentinelNetworkStatus;
+  crossNode?: SentinelCrossNodeReport;
 }
 
 function stableEvidenceId(bundle: SentinelObservationBundle): string {
@@ -131,6 +168,38 @@ function networkObservation(bundle: SentinelObservationBundle): RealityObservati
   };
 }
 
+function crossNodeObservation(bundle: SentinelObservationBundle): RealityObservation | null {
+  if (!bundle.crossNode) return null;
+  const report = bundle.crossNode;
+  return {
+    id: `sentinel-cross-node:${payloadDigest(report)}`,
+    source: "rchain-sentinel",
+    type: "CrossNodeReport",
+    timestamp: bundle.collectedAt,
+    data: {
+      endpoint: `${bundle.sentinelBaseUrl}${SENTINEL_ENDPOINTS.crossNodeVerification}`,
+      targetCount: report.target_count,
+      reachableCount: report.reachable_count,
+      evidenceCount: report.evidence_count,
+      agreeingNodes: report.agreeing_nodes,
+      quorumRequired: report.quorum_required,
+      quorumObserved: report.quorum_observed,
+      agreementRatio: report.agreement_ratio,
+      commonFinalizedHeight: report.common_finalized_height,
+      commonBlockHash: report.common_block_hash,
+      heightAgreement: report.height_agreement,
+      hashAgreement: report.hash_agreement,
+      missingHeightNodes: report.missing_height_nodes,
+      missingHashNodes: report.missing_hash_nodes,
+      conflictingNodes: report.conflicting_nodes,
+      agreement: report.agreement,
+      status: report.status,
+      verificationBasis: report.verification_basis,
+      observationsDigest: payloadDigest(report.observations),
+    },
+  };
+}
+
 function evidenceForObservation(observation: RealityObservation): RealityEvidence {
   return {
     id: `evidence:${observation.id}`,
@@ -166,7 +235,11 @@ function claimForBundle(bundle: SentinelObservationBundle, observation: RealityO
   return claims;
 }
 
-function verificationForBundle(bundle: SentinelObservationBundle, evidenceId: string): RealityVerification[] {
+function verificationForBundle(
+  bundle: SentinelObservationBundle,
+  evidenceId: string,
+  crossNodeEvidenceId?: string,
+): RealityVerification[] {
   const evidence = bundle.evidence;
   const checks: RealityVerification[] = [];
   if (evidence.available) {
@@ -211,18 +284,45 @@ function verificationForBundle(bundle: SentinelObservationBundle, evidenceId: st
     });
   }
 
+  if (bundle.crossNode && crossNodeEvidenceId) {
+    const report = bundle.crossNode;
+    const enoughTargets = report.target_count >= 2;
+    const consistent =
+      enoughTargets &&
+      report.agreement &&
+      report.conflicting_nodes === 0 &&
+      report.hash_agreement &&
+      report.height_agreement;
+    const divergent = report.conflicting_nodes > 0;
+    checks.push({
+      id: "verify_sentinel_cross_node_consistency",
+      predicate: "sentinel.cross_node has >=2 targets and consistent height/hash observations",
+      state: consistent ? "VERIFIED" : divergent ? "DIVERGENT" : "INCOMPLETE",
+      message: consistent
+        ? `Cross-node consistency observed across ${report.target_count} targets; this is not a stake-weighted Casper finality proof or proof of operator independence.`
+        : report.verification_basis,
+      evidenceIds: [crossNodeEvidenceId],
+    });
+  }
+
   return checks;
 }
 
 export function sentinelBundleToRecord(bundle: SentinelObservationBundle, previousDigest?: string): RealityRecord {
   const block = blockObservation(bundle);
   const network = networkObservation(bundle);
-  const observations = network ? [block, network] : [block];
+  const crossNode = crossNodeObservation(bundle);
+  const observations = [block, ...(network ? [network] : []), ...(crossNode ? [crossNode] : [])];
   const blockEvidence = evidenceForObservation(block);
   const networkEvidence = network ? evidenceForObservation(network) : null;
-  const evidence = networkEvidence ? [blockEvidence, networkEvidence] : [blockEvidence];
+  const crossNodeEvidence = crossNode ? evidenceForObservation(crossNode) : null;
+  const evidence = [
+    blockEvidence,
+    ...(networkEvidence ? [networkEvidence] : []),
+    ...(crossNodeEvidence ? [crossNodeEvidence] : []),
+  ];
   const claims = claimForBundle(bundle, block);
-  const verifications = verificationForBundle(bundle, blockEvidence.id);
+  const verifications = verificationForBundle(bundle, blockEvidence.id, crossNodeEvidence?.id);
 
   const dependencies: RealityDependency[] = network
     ? [{ from: network.id, to: block.id, relation: "contextualizes" }]
@@ -244,6 +344,16 @@ export function sentinelBundleToRecord(bundle: SentinelObservationBundle, previo
       name: "Sentinel network status → canonical observation",
       inputIds: [network.id],
       outputIds: [network.id],
+      deterministic: true,
+    });
+  }
+
+  if (crossNode) {
+    transformations.push({
+      id: "transform_sentinel_cross_node_to_reality_observation",
+      name: "Sentinel cross-node report → consistency observation",
+      inputIds: [crossNode.id],
+      outputIds: [crossNode.id],
       deterministic: true,
     });
   }
@@ -288,6 +398,7 @@ export async function fetchSentinelBundle(
     fetchImpl?: typeof fetch;
     collectedAt?: string;
     includeNetworkStatus?: boolean;
+    includeCrossNodeVerification?: boolean;
   } = {},
 ): Promise<SentinelObservationBundle> {
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -299,6 +410,7 @@ export async function fetchSentinelBundle(
 
   const evidence = (await response.json()) as SentinelFinalizedBlockEvidence;
   let network: SentinelNetworkStatus | undefined;
+  let crossNode: SentinelCrossNodeReport | undefined;
   if (options.includeNetworkStatus) {
     const networkResponse = await fetchImpl(`${base}${SENTINEL_ENDPOINTS.networkStatus}`);
     if (!networkResponse.ok) {
@@ -306,12 +418,20 @@ export async function fetchSentinelBundle(
     }
     network = (await networkResponse.json()) as SentinelNetworkStatus;
   }
+  if (options.includeCrossNodeVerification) {
+    const crossNodeResponse = await fetchImpl(`${base}${SENTINEL_ENDPOINTS.crossNodeVerification}`);
+    if (!crossNodeResponse.ok) {
+      throw new Error(`Sentinel cross-node endpoint returned HTTP ${crossNodeResponse.status}`);
+    }
+    crossNode = (await crossNodeResponse.json()) as SentinelCrossNodeReport;
+  }
 
   return {
     sentinelBaseUrl: base,
     collectedAt: options.collectedAt ?? new Date().toISOString(),
     evidence,
     ...(network ? { network } : {}),
+    ...(crossNode ? { crossNode } : {}),
   };
 }
 

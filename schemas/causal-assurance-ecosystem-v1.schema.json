@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aixaria0.github.io/causal-assurance/ecosystem-contract-v1.schema.json",
+  "title": "Causal Assurance Ecosystem Contract v1",
+  "type": "object",
+  "required": ["schema", "runId", "subject", "artifacts"],
+  "properties": {
+    "schema": { "const": "causal-assurance-ecosystem/v1" },
+    "runId": { "type": "string", "minLength": 1 },
+    "subject": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": true
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["possibility", "observation", "workbench", "attestation"],
+      "properties": {
+        "possibility": { "$ref": "#/$defs/artifact" },
+        "observation": { "$ref": "#/$defs/artifact" },
+        "workbench": { "$ref": "#/$defs/artifact" },
+        "attestation": { "$ref": "#/$defs/artifact" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["producer", "schema", "digest", "status"],
+      "properties": {
+        "producer": { "type": "string", "minLength": 1 },
+        "schema": { "type": "string", "minLength": 1 },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-fA-F]{64}$" },
+        "status": { "enum": ["PASS", "FAIL", "BLOCKED", "NOT_TESTED"] }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}
