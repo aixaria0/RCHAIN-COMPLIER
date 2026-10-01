@@ -1,0 +1,92 @@
+name: RChain C192 C171 Production Wiring Gate
+on:
+  pull_request:
+    paths:
+      - "tools/inject_rchain_attestation_production_wiring.py"
+      - "docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md"
+      - ".github/workflows/rchain-attestation-production-wiring.yml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RCHAIN_SHA: 51935310789a1a75a183ad0af7152e4eef450c88
+
+jobs:
+  production-wiring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout assurance repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@46817827a5bfabe028bf34e1cce71fd40e2ff697
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Checkout pinned rchain-rust
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rchain-community/rchain-rust
+          ref: ${{ env.RCHAIN_SHA }}
+          path: upstream
+
+      - name: Verify exact upstream revision
+        run: test "$(git -C upstream rev-parse HEAD)" = "$RCHAIN_SHA"
+
+      - name: Inject disposable production wiring
+        run: python3 tools/inject_rchain_attestation_production_wiring.py upstream
+
+      - name: Reject malformed temporary patch
+        run: git -C upstream diff --check
+
+      - name: Preserve temporary production patch
+        run: git -C upstream diff -- node/src/runtime/node_runtime.rs > "$RUNNER_TEMP/c192-c171-production-wiring.patch"
+
+      - name: Compile production node path
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo check --manifest-path upstream/Cargo.toml -p rchain-node 2>&1 |
+            tee "$RUNNER_TEMP/production-check.log"
+
+      - name: Run original strict-height C192 test
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path upstream/Cargo.toml -p rchain-node             a_round_that_comes_to_rest_at_one_height_is_sealed_by_its_own_bound             -- --nocapture 2>&1 | tee "$RUNNER_TEMP/c192-original.log"
+
+      - name: Run production wiring candidate tests
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path upstream/Cargo.toml -p rchain-node             paired_production_gate_             -- --nocapture 2>&1 | tee "$RUNNER_TEMP/production-paired.log"
+
+      - name: Record evidence digests
+        shell: bash
+        run: |
+          {
+            echo "schema=rchain-c192-c171-production-wiring/v1"
+            echo "revision=$RCHAIN_SHA"
+            echo "patch_sha256=sha256:$(sha256sum "$RUNNER_TEMP/c192-c171-production-wiring.patch" | awk '{print $1}')"
+            echo "production_check_sha256=sha256:$(sha256sum "$RUNNER_TEMP/production-check.log" | awk '{print $1}')"
+            echo "original_c192_log_sha256=sha256:$(sha256sum "$RUNNER_TEMP/c192-original.log" | awk '{print $1}')"
+            echo "paired_log_sha256=sha256:$(sha256sum "$RUNNER_TEMP/production-paired.log" | awk '{print $1}')"
+          } | tee "$RUNNER_TEMP/c192-c171-production-wiring-evidence.txt"
+
+      - name: Upload production wiring evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rchain-c192-c171-production-wiring
+          path: |
+            ${{ runner.temp }}/c192-c171-production-wiring.patch
+            ${{ runner.temp }}/production-check.log
+            ${{ runner.temp }}/c192-original.log
+            ${{ runner.temp }}/production-paired.log
+            ${{ runner.temp }}/c192-c171-production-wiring-evidence.txt
+          if-no-files-found: error
+          retention-days: 14
