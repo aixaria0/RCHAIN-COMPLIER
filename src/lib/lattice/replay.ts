@@ -1,6 +1,7 @@
 import { sha256Artifact } from "../compiler/ecosystem-chain.ts";
 import {
   canonical,
+  EVENT_KINDS,
   policyDigest,
   type DecisionResult,
   type LatticeEvent,
