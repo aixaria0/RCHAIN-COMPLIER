@@ -7,11 +7,11 @@
 [![Reality Plane CI](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/reality-ci.yml)
 [![Assurance Provenance](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml/badge.svg)](https://github.com/aixaria0/RCHAIN-COMPLIER/actions/workflows/assurance-provenance.yml)
 
-> **v1 baseline status:** implementation-complete on the PR #21 line with verification, bounded repair, pinned native replay, portable propagation, inspection, and independent evidence-root attestation.
+> **v1 baseline status:** [PR #21 — Generic Causal Assurance Fabric](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/21) remains the protocol-independent assurance baseline.
 >
-> **Current milestone:** [PR #21 — Generic Causal Assurance Fabric](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/21)
+> **Current merged milestone:** [PR #27 — Intelligence Lattice: three-process lifecycle gate](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/27) adds a real multi-process evidence lifecycle with separate identities and journals, TaskEnvelope-bound provenance, crash/rejoin recovery, deterministic replay, and signed provenance.
 >
-> **Current scope:** the generic assurance layer is implemented independently of any live RChain/RNode runtime. RChain/Casper is the first serious target for integration, not a hard dependency of the core.
+> **Current scope:** the lifecycle is real infrastructure, but it does **not** yet execute a live `rchain-rust` witness. It does not claim network consensus, Byzantine safety, or production correctness.
 
 
 ## Research map — independent branches, one documentation hub
@@ -24,6 +24,7 @@ This branch contains the Causal Assurance implementation while the default branc
 | Slashing / ingress | `feat/casper-slashing-conformance`, `research/casper-slashing-persistence-evidence`, `research/m12-cryptographic-ingress-boundary` | conformance, persistence and cryptographic ingress-boundary research |
 | Reality Compiler | `feature/reality-calculus`, `feature/reality-engine-core`, `feature/reality-evidence-plane`, `feature/reality-loop` | causal evidence, replay, Reality Records and inspection model |
 | Causal Assurance v1 | `feat/assurance-fabric-v1` | protocol-neutral verification, bounded repair, native replay binding and cross-repository assurance |
+| Intelligence Lattice lifecycle | `main` via PR #27 | three real processes, task-bound evidence, SIGKILL recovery/rejoin, deterministic replay and provenance |
 
 See **[Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)** for the non-merged branch map and **[Documentation Hub](docs/WIKI_HOME.md)** for the consolidated v1 reference.
 
@@ -52,6 +53,51 @@ Sovereign-Lattice
 **v1 status:** implementation-complete and CI-verified on the current feature branches. The cross-repository boundary is documented centrally in [Four-Repository v1 Integration](docs/FOUR_REPO_V1_INTEGRATION.md), [v1 Schema Index](docs/V1_SCHEMA_INDEX.md), [v1 Release Boundary](docs/V1_RELEASE_BOUNDARY.md), and [v1 Baseline Manifest](docs/V1_BASELINE_MANIFEST.md).
 
 A visual project landing page is available from the repository's `index.html` and is suitable for GitHub Pages publication.
+
+---
+
+## Current merged milestone — PR #27
+
+[PR #27](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/27) moves the evidence lifecycle across a real process boundary.
+
+The acceptance gate now exercises:
+
+- three separate OS processes;
+- three separate Ed25519 identities;
+- separate SQLite WAL-backed journals;
+- two independently scheduled deterministic verification workers;
+- claims bound to the exact `TaskEnvelope` that requested them;
+- a validly signed but wrong-operation contribution that is rejected with a task-provenance mismatch;
+- no accepting receipt, certificate, or valid decision for that invalid contribution;
+- a real `SIGKILL` of the coordinator after acknowledged writes;
+- restart from persisted journal state;
+- peer rejoin and three-process convergence;
+- deterministic replay of the exported event history;
+- preservation of the invalid-task boundary before and after recovery.
+
+The CI gate exports both the earlier two-process audit and the three-process audit, then independently replays them.
+
+This is intentionally narrower than a consensus claim.
+
+It demonstrates a crash-safe, replayable, task-bound evidence substrate. It does **not** establish Byzantine consensus, network finality, universal truth, or production readiness.
+
+The important progression is:
+
+```text
+one-off investigation
+        ↓
+repeatable evidence method
+        ↓
+task-bound lifecycle
+        ↓
+real process failure / recovery
+        ↓
+deterministic replay
+        ↓
+reproducible audit substrate
+```
+
+The next integration boundary is to bind one **active, unresolved** `rchain-rust` witness into this lifecycle instead of continuing to use only generic fixtures.
 
 ---
 
@@ -647,37 +693,42 @@ That is the practical reason the generic layer exists.
 
 ---
 
-# Why RChain is not connected yet
+# Current RChain integration boundary
 
-The current generic milestone deliberately stops at the adapter boundary.
+The earlier PoS work showed why the evidence-first method matters: concrete state-transition and persistence failures can look similar from the outside while having different causes.
 
-That is intentional.
+Those earlier investigations informed this lifecycle, but PR #27 does **not** claim to have fixed those upstream RChain defects, and already-resolved trust/slash paths are not treated as the current target.
 
-The upstream RChain/RNode implementation is currently being updated, so coupling the generic assurance core directly to a moving runtime would weaken the separation the project is trying to create.
+The boundary is now more precise:
 
-The generic side is therefore being stabilized first.
+- PR #27 does not execute `rchain-rust` directly;
+- no live RChain witness is currently carried inside a `TaskEnvelope`;
+- the three-process lifecycle has been proven against its own deterministic acceptance scenario;
+- the next useful integration is one unresolved upstream witness whose answer is not already known.
 
-When the RChain implementation boundary is ready, the next step is not to redesign the assurance system.
-
-The next step is to implement the RChain adapter and replace generic fixture inputs with:
-
-- real observation evidence;
-- real runtime identity;
-- real replay output;
-- real build provenance;
-- real recovery evidence.
-
-In other words:
+The intended path is:
 
 ```text
-generic assurance architecture
-        +
-stable RChain adapter
-        =
-RChain-specific assurance pipeline
+rchain-rust source + exact input provenance
+        ↓
+TaskEnvelope
+        ↓
+execution evidence
+        ↓
+persisted pre/post-state observations
+        ↓
+process failure / recovery
+        ↓
+deterministic replay
+        ↓
+independently verifiable audit artifact
 ```
 
-Until that adapter exists, this repository does **not** claim that RChain itself is verified by the generic system.
+That is deliberately different from saying that RChain is already verified by this repository.
+
+The current claim is smaller and testable: **the repository now contains a crash-safe, replayable, task-bound evidence lifecycle that can host such an audit.**
+
+The next milestone is to connect that machinery to a live unresolved RChain problem without weakening the evidence boundary.
 
 ---
 
