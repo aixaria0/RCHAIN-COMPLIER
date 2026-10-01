@@ -210,7 +210,7 @@ export async function startNode(config: NodeConfig) {
           body: {
             kind: "capability",
             operations: config.worker
-              ? ["replicate-events/v1", "integer-sum/v1"]
+              ? ["replicate-events/v1", "integer-sum/v1", "rchain-c192-upstream/v1"]
               : ["replicate-events/v1"],
             implementation: sha256Artifact(readFileSync(fileURLToPath(import.meta.url))),
           },
