@@ -34,7 +34,7 @@ checks = {
     ),
     "bounded_proposer_escape": (
         "has_advanced_past_the_round" in texts["proposer"]
-        and "if waited <= LIVENESS_WINDOW" in texts["proposer"]
+        and "if waited <= rchain_block_storage::dag::liveness::LIVENESS_WINDOW" in texts["proposer"]
     ),
     "deterministic_round_boundary": "pub round_parents:" in texts["message_state"],
     "round_advance_signal": "pub fn has_advanced_past_the_round" in texts["message_state"],
