@@ -132,6 +132,7 @@ The target should be one **active, unresolved** RChain witness whose result is n
 - [Schema Index](docs/V1_SCHEMA_INDEX.md)
 - [Release Boundary](docs/V1_RELEASE_BOUNDARY.md)
 - [Documentation Hub](docs/WIKI_HOME.md)
+- [Ecosystem comparison](docs/ECOSYSTEM_COMPARISON.md)
 - [Archived full project reference](docs/PROJECT_REFERENCE_2026-10-02.md)
 
 ## Research branches
