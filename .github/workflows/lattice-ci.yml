@@ -46,8 +46,10 @@ jobs:
         run: |
           npm run demo:lattice -- "$RUNNER_TEMP/lattice-audit.json"
           npm run replay:lattice -- "$RUNNER_TEMP/lattice-audit.json"
-      - name: Three-process worker crash/rejoin gate
-        run: npm run demo:lattice-three -- "$RUNNER_TEMP/lattice-three-audit.json"
+      - name: Three-process coordinator crash/rejoin and invalid-task containment gate
+        run: |
+          npm run demo:lattice-three -- "$RUNNER_TEMP/lattice-three-audit.json"
+          npm run replay:lattice -- "$RUNNER_TEMP/lattice-three-audit.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: lattice-public-audit
