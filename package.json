@@ -57,7 +57,8 @@
     "demo:lattice": "node --experimental-strip-types examples/lattice-two-node.ts",
     "replay:lattice": "node --experimental-strip-types examples/lattice-replay.ts",
     "check:lattice-vectors": "python3 tools/check_lattice_vectors.py",
-    "demo:lattice-three": "node --experimental-strip-types examples/lattice-three-node.ts"
+    "demo:lattice-three": "node --experimental-strip-types examples/lattice-three-node.ts",
+    "demo:rchain-c192": "node --experimental-strip-types examples/lattice-rchain-c192.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
