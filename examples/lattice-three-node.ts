@@ -207,7 +207,7 @@ export async function runThreeNodeExperiment() {
           output: { mediaType: "application/json", claimPredicate: "integer-sum" },
         },
       }),
-      good = createEvent(a, policy, { sequence: 2, body: claim(12), parents: [task.id] }),
+      good = createEvent(a, policy, { sequence: 3, body: claim(12), parents: [task.id] }),
       bad = createEvent(b, policy, { sequence: 2, body: claim(13), parents: [task.id] });
     for (const [url, event] of [[urlA, good], [urlB, bad]] as const) {
       const r = await fetch(url + "/events", { method: "POST", body: canonical(event), signal: AbortSignal.timeout(5000) });
