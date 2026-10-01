@@ -46,6 +46,12 @@ jobs:
           ref: ${{ env.RCHAIN_SHA }}
           path: upstream
 
+      - name: Install pinned upstream Rust toolchain
+        uses: dtolnay/rust-toolchain@46817827a5bfabe028bf34e1cce71fd40e2ff697 # 1.95.0
+
+      - name: Install upstream build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: Record Rust toolchain
         run: |
           rustc --version
