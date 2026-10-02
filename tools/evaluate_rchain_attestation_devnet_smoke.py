@@ -31,7 +31,8 @@ def read_blocks(path):
     return rows
 
 def read_series(path):
-    out = {}
+    finalized_by_node = {}
+    sampled_nodes = set()
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#") or line.startswith("utc\t"):
             continue
@@ -39,9 +40,10 @@ def read_series(path):
         if len(parts) != 6:
             continue
         _utc, epoch, node, _height, finalized, _alive = parts
+        sampled_nodes.add(node)
         if finalized.isdigit():
-            out.setdefault(node, []).append((int(epoch), int(finalized)))
-    return out
+            finalized_by_node.setdefault(node, []).append((int(epoch), int(finalized)))
+    return finalized_by_node, sampled_nodes
 
 def time_to_finality(series, deploy_epoch, target):
     if not series:
@@ -87,7 +89,7 @@ def summarize(root):
 
     marks = read_marks(run / "marks.tsv")
     blocks = read_blocks(run / "blocks.tsv")
-    series = read_series(run / "series.tsv")
+    series, sampled_nodes = read_series(run / "series.tsv")
     deploy_epoch = int(marks["idle_end_and_deploy"])
     settle_end = int(marks["settle_end"])
     read_end = int(marks["read_end"])
@@ -116,7 +118,7 @@ def summarize(root):
         "senders": len({b["sender"] for b in post}),
         "maxParents": max((b["parents"] for b in post), default=0),
         "timeToFinalitySeconds": ttf,
-        "sampledNodes": len(series),
+        "sampledNodes": len(sampled_nodes),
         "blockReadErrors": read_errors,
         "readWindowSeconds": read_end - deploy_epoch,
     }
@@ -132,9 +134,11 @@ def main():
     candidate = summarize(sys.argv[2])
     read_seconds = int(sys.argv[3])
 
-    # CI smoke threshold only, not a protocol law:
-    # upstream records a healthy three-validator envelope of 12-16 blocks/min.
-    # Give that high end a 1.5x guard band, then scale to this reading window.
+    # CI smoke threshold only, not a protocol law.
+    # The numeric ceiling below was frozen before the first smoke run. Its original rationale
+    # incorrectly paraphrased upstream's 12-16 value as blocks/min; the upstream preregistration
+    # explicitly corrects that value to heights/min. Keep the pre-run number unchanged here so the
+    # acceptance boundary is not moved after seeing candidate data.
     smoke_blocks_per_minute = 24
     max_candidate_blocks = math.ceil(smoke_blocks_per_minute * read_seconds / 60)
 
@@ -190,8 +194,9 @@ def main():
             "candidateSmokeBlocksPerMinuteCeiling": smoke_blocks_per_minute,
             "candidatePostDeployBlockCeiling": max_candidate_blocks,
             "thresholdNature": (
-                "CI smoke threshold derived from a 12-16 blocks/min healthy envelope "
-                "with a 1.5x guard band; not a protocol law and not C171 closure"
+                "frozen pre-run CI smoke ceiling; its initial rationale misread upstream's "
+                "12-16 heights/min value as blocks/min, so the number is retained for comparability "
+                "but is not interpreted as a healthy-rate estimate, protocol law, or C171 closure"
             ),
         },
         "blockedReasons": blocked,
