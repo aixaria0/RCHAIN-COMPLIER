@@ -1,5 +1,16 @@
 # Changelog
 
+## Assurance Engine 0.3.0 — release candidate
+
+- Add a separately packaged, typed Node SDK and `assurance` CLI around the existing signed lattice/journal/compiler architecture.
+- Add versioned generic workloads, canonical NDJSON evidence packages, explicit external reviewer pins and PASS/BLOCKED/FAIL reports.
+- Make the three-process lifecycle reusable with persistent identities, SQLite supervisor ownership, idempotent submission and restart/rejoin.
+- Thread integration registries through workers/journals/replay; extract the existing C192 verifier without changing its historical artifacts or defaults.
+- Add package/adversarial/recovery tests, offline consumer and declaration verification, Node 22/24 product CI, checksums and public sample artifacts.
+- Preserve existing dashboard/compiler APIs, RChain workflows, signed schemas and evidence lineage; document limits, security boundaries and migration/release policy.
+
+The distributable is versioned independently of the existing private 0.2.0 repository/UI package. The original license remains unchanged. No upstream RChain repair, network finality, hidden-evidence completeness or maximum performance score is claimed.
+
 ## Unreleased — public Casper CBC research milestone
 
 ### Added

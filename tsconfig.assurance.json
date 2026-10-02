@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "rewriteRelativeImportExtensions": true,
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist/assurance-engine/lib"
+  },
+  "include": [
+    "src/lib/assurance/**/*.ts",
+    "src/lib/lattice/index.ts",
+    "src/lib/integrations/rchain-c192.ts"
+  ],
+  "exclude": ["src/**/*.test.ts"]
+}

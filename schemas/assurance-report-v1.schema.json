@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:assurance:report:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "status",
+    "code",
+    "reason",
+    "packageDigest",
+    "eventRoot",
+    "taskId",
+    "claimId",
+    "eventCount",
+    "verifierActorIds",
+    "operation",
+    "limitations"
+  ],
+  "properties": {
+    "schema": {
+      "const": "assurance-report/v1"
+    },
+    "status": {
+      "enum": ["PASS", "BLOCKED", "FAIL"]
+    },
+    "code": {
+      "enum": [
+        "INVALID_INPUT",
+        "RESOURCE_LIMIT",
+        "INTEGRITY_MISMATCH",
+        "BINDING_MISMATCH",
+        "INCOMPLETE_EVIDENCE",
+        "UNSUPPORTED_VERIFIER",
+        "QUORUM_MISSING",
+        "CONFLICT",
+        "CLAIM_REFUTED",
+        "VERIFIED",
+        "BUSY",
+        "TIMEOUT",
+        "IO_ERROR"
+      ]
+    },
+    "reason": {
+      "type": "string"
+    },
+    "packageDigest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "eventRoot": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "taskId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claimId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "eventCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4096
+    },
+    "verifierActorIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "maxItems": 16,
+      "uniqueItems": true
+    },
+    "operation": {
+      "type": ["string", "null"]
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 16
+    }
+  }
+}

@@ -378,6 +378,106 @@
               }
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "envelope"],
+          "properties": {
+            "kind": {
+              "const": "task"
+            },
+            "envelope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema",
+                "taskId",
+                "domain",
+                "operation",
+                "input",
+                "dependencies",
+                "authority",
+                "output"
+              ],
+              "properties": {
+                "schema": {
+                  "const": "intelligence-lattice-task/v1"
+                },
+                "taskId": {
+                  "$ref": "#/$defs/hash"
+                },
+                "domain": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "\\S"
+                },
+                "operation": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "pattern": "\\S"
+                },
+                "input": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["digest", "mediaType", "content"],
+                  "properties": {
+                    "digest": {
+                      "$ref": "#/$defs/hash"
+                    },
+                    "mediaType": {
+                      "const": "application/json"
+                    },
+                    "content": {
+                      "$ref": "#/$defs/json"
+                    }
+                  }
+                },
+                "dependencies": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/hash"
+                  },
+                  "maxItems": 16,
+                  "uniqueItems": true
+                },
+                "authority": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["mode", "issuer"],
+                  "properties": {
+                    "mode": {
+                      "const": "observe-only"
+                    },
+                    "issuer": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "output": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["mediaType", "claimPredicate"],
+                  "properties": {
+                    "mediaType": {
+                      "const": "application/json"
+                    },
+                    "claimPredicate": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "pattern": "\\S"
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       ]
     },
