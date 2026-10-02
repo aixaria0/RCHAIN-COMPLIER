@@ -61,6 +61,10 @@ It does **not** change:
 - validator set;
 - devnet timing.
 
+The workflow enforces that isolation mechanically: it saves the candidate
+`node_runtime.rs`, injects cadence-off, and requires the resulting file to equal
+the saved candidate **byte-for-byte except for the single preregistered cadence-helper replacement**.
+
 The exact temporary diff is retained as evidence.
 
 ## Fixed network protocol
