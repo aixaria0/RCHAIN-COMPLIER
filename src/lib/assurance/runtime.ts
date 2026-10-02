@@ -89,7 +89,9 @@ export async function loadRegistry(state: EngineState): Promise<VerifierRegistry
         "INTEGRITY_MISMATCH",
         "Operator verifier module changed; explicit migration required",
       );
-    const module = await import(pathToFileURL(state.verifierModule).href);
+    const moduleUrl = pathToFileURL(state.verifierModule);
+    moduleUrl.searchParams.set("sha256", state.verifierModuleDigest!);
+    const module = await import(moduleUrl.href);
     const extensions: unknown = module.VERIFIERS;
     if (!(extensions instanceof Map))
       throw new AssuranceError("INVALID_INPUT", "Verifier module must export a VERIFIERS Map");
@@ -99,7 +101,8 @@ export async function loadRegistry(state: EngineState): Promise<VerifierRegistry
         !name.trim() ||
         name.length > 256 ||
         typeof implementation !== "function" ||
-        registry.has(name)
+        registry.has(name) ||
+        name === "replicate-events/v1"
       )
         throw new AssuranceError("INVALID_INPUT", "Invalid or conflicting verifier registration");
       registry.set(name, implementation);
