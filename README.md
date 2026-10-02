@@ -66,32 +66,41 @@ replay success     != production safety
 | Disposable paired Rust gate | ✅ Merged — PR #31 |
 | Disposable production-path wiring | ✅ Compiled/tested — PR #32 |
 | Controlled N=3 devnet smoke | ✅ PASS — PR #33 |
-| Repeated 180 s controlled campaign | ⏭️ Next gate |
+| Repeated 180 s controlled campaign | ✅ PASS — PR #34 |
+| C171 pace-effect causal gate | ⏭️ Next gate |
 | Byzantine consensus / production safety claim | ❌ Not claimed |
 
-## Current milestone: PR #33
+## Current milestone: PR #34
 
-[PR #33 — controlled C192/C171 devnet smoke](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/33) is the first network-level comparison of the pinned upstream control against the disposable production-path candidate.
+[PR #34 — repeated C192 control/candidate campaign](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/34) repeated the N=3 comparison with the original 60/60/180 timing and three unfiltered attempts per arm.
 
-The N=3, no-autopropose smoke used the upstream n149 sampler and the same pinned revision on both arms.
+The result was deterministic across all six network attempts:
 
-Observed in the green run:
+| Arm | Attempt 1 | Attempt 2 | Attempt 3 | Finality |
+|---|---:|---:|---:|---|
+| unmodified control | 3 blocks | 3 blocks | 3 blocks | never in 180 s, all 3 attempts |
+| disposable candidate | 12 blocks | 12 blocks | 12 blocks | **3 s, all 3 attempts** |
 
-- **control:** 3 post-deploy blocks, 3 senders, no finality in the 90 s window;
-- **candidate:** 12 post-deploy blocks, 3 senders, finality in **3 s**;
-- zero failed block reads;
+Every attempt had:
+
+- 3 sampled nodes;
+- 3 post-deploy senders;
+- exactly one deploy-bearing block;
 - zero idle-window blocks;
-- one deploy-bearing block in each arm.
+- zero failed block reads;
+- zero void attempts.
 
-The candidate stayed below the pre-run CI smoke ceiling of 36 post-deploy blocks. That ceiling is intentionally **not** presented as a protocol bound or C171 closure; its original rationale misread an upstream height-rate as a block-rate, so the numeric boundary was retained rather than moved after observing candidate data.
+So the smoke result from PR #33 was not a one-run accident.
 
-The accurate claim is:
+The bounded claim now supported is:
 
-> **On one controlled N=3 devnet smoke attempt, the disposable candidate restored finality where the pinned control reproduced C192, while remaining below the frozen smoke-growth ceiling.**
+> **On the pinned N=3 no-autopropose rig, the unmodified control reproduced the C192 no-finality condition in all three unfiltered 180-second attempts, while the disposable production-path candidate finalized in 3 seconds in all three attempts under the same protocol.**
 
-This does not close C192 or C171. The next gate is the repeated 180-second campaign with unfiltered attempts and an explicit block-rate reading.
+This still does **not** close C171. The same run recorded 12 candidate blocks versus 3 control blocks per 180-second window, but the control is stalled; treating its smaller count as a rate win would be exactly the wrong conclusion.
 
-See [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md).
+The next gate therefore isolates C171's cadence term with a matched negative control.
+
+See [RChain C192 Repeated Campaign](docs/RCHAIN_C192_REPEATED_CAMPAIGN.md).
 
 ## Quickstart
 
@@ -120,7 +129,7 @@ The C192 integration is reproduced in CI from the pinned upstream revision and t
 
 The earlier PoS/slashing work established the evidence-first method; already-resolved trust/slash paths are **not** presented as current open problems.
 
-The RChain path has now crossed four increasingly external boundaries:
+The RChain path has now crossed five increasingly external boundaries:
 
 ```text
 PR #28
@@ -137,23 +146,27 @@ disposable production-path wiring
         ↓
 PR #33
 controlled N=3 devnet smoke
+        ↓
+PR #34
+three-attempt 60/60/180 C192 campaign
 ```
 
-The PR #33 control reproduced the registered C192 shape: three post-deploy blocks from three senders and no finality in the 90-second window.
+PR #34 reproduced the baseline defect three times: each control attempt produced 3 post-deploy blocks from 3 senders and never finalized inside 180 seconds.
 
-The disposable candidate changed that observed network behavior: twelve post-deploy blocks, three senders, and finality in 3 seconds, with no failed block reads and no idle-window blocks.
+The same pinned rig with the disposable candidate produced 12 post-deploy blocks in every attempt and finalized in 3 seconds every time.
 
-That is enough to justify a heavier campaign. It is not enough to claim the defect fixed.
+That is strong repeatability evidence for the C192 half of the change. It is not yet a C171 result.
 
-The next boundary is therefore:
+The next boundary is deliberately causal rather than threshold-driven:
 
-- repeat the N=3 control/candidate comparison for at least three unfiltered attempts;
-- restore the original 180-second reading window;
-- keep block counts and height counts separate;
-- preregister the C171 rate quantity and unit explicitly;
-- retain the unmodified pinned tree as the control.
+- keep the C192 self-trigger and strict-height behavior fixed;
+- run the candidate with its own-quiet cadence term;
+- run a matched negative control with only that cadence term removed;
+- use three unfiltered N=3 attempts per arm under the same 60/60/180 protocol;
+- record distinct post-deploy block hashes per 180-second window and time-to-finality together;
+- require the negative control to become observably worse before claiming the pace term has a network-level effect.
 
-No upstream PR should be opened from this repository until that repeated gate is green.
+No absolute C171 block ceiling is inferred from PR #34, and no upstream production-readiness claim follows from it.
 
 ## Repository map
 
@@ -163,7 +176,9 @@ No upstream PR should be opened from this repository until that repeated gate is
 - [RChain C192 Live Witness](docs/RCHAIN_C192_LIVE_WITNESS.md)
 - [RChain C192 / C171 Paired Evaluator](docs/RCHAIN_C192_C171_PAIRED_EVALUATOR.md)
 - [RChain C192 / C171 Disposable Rust Gate](docs/RCHAIN_C192_C171_RUST_GATE.md)
-- [RChain C192 / C171 Production Wiring Gate](docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md)\n- [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md)\n- [RChain C192 Repeated Campaign](docs/RCHAIN_C192_REPEATED_CAMPAIGN.md)
+- [RChain C192 / C171 Production Wiring Gate](docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md)
+- [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md)
+- [RChain C192 Repeated Campaign](docs/RCHAIN_C192_REPEATED_CAMPAIGN.md)
 - [Four-Repository Assurance](docs/FOUR_REPO_ASSURANCE.md)
 - [Casper CBC Research Status](docs/CASPER_CBC_RESEARCH_STATUS.md)
 - [Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)
