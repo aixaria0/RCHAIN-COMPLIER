@@ -98,10 +98,16 @@ jobs:
 
       - name: Inject cadence-off negative control
         run: |
+          cp upstream/node/src/runtime/node_runtime.rs \
+            "$RUNNER_TEMP/node_runtime.candidate.rs"
           python3 tools/inject_rchain_attestation_cadence_off.py upstream
           git -C upstream diff --check
           git -C upstream diff -- node/src/runtime/node_runtime.rs \
             > "$RUNNER_TEMP/c171-cadence-off.patch"
+          diff -u \
+            "$RUNNER_TEMP/node_runtime.candidate.rs" \
+            upstream/node/src/runtime/node_runtime.rs \
+            > "$RUNNER_TEMP/c171-cadence-off-only.patch" || test $? -eq 1
 
       - name: Build cadence-off binary incrementally
         run: cargo build --manifest-path upstream/Cargo.toml --release -p rchain-node --bin rnode
@@ -156,6 +162,7 @@ jobs:
             ${{ runner.temp }}/c171-cadence-off.log
             ${{ runner.temp }}/c171-candidate.patch
             ${{ runner.temp }}/c171-cadence-off.patch
+            ${{ runner.temp }}/c171-cadence-off-only.patch
             ${{ runner.temp }}/c171-pace-effect.json
           if-no-files-found: warn
           retention-days: 14
