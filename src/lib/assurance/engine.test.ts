@@ -99,7 +99,6 @@ test(
   },
 );
 
-
 test("operator verifier cache is keyed by the pinned module digest", async () => {
   const root = mkdtempSync(join(tmpdir(), "assurance-plugin-cache-"));
   const module = join(root, "plugin.mjs");
