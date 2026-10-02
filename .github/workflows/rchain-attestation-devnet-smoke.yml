@@ -24,6 +24,9 @@ jobs:
       - name: Checkout assurance repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      - name: Regression-test smoke evaluator
+        run: python3 tools/test_rchain_attestation_devnet_smoke.py
+
       - name: Checkout pinned rchain-rust
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
