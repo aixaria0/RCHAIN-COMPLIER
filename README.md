@@ -62,21 +62,36 @@ replay success     != production safety
 | Deterministic exported-event replay | ✅ Tested |
 | Signed build provenance | ✅ Gated |
 | Active unresolved `rchain-rust` witness through this lifecycle | ✅ C192 / Issue #172 — PR #28 |
+| Paired C192/C171 candidate evaluator | ✅ Merged — PR #30 |
+| Disposable paired Rust gate | ✅ Merged — PR #31 |
+| Disposable production-path wiring | ✅ Compiled/tested — PR #32 |
+| Controlled N=3 devnet smoke | ✅ PASS — PR #33 |
+| Repeated 180 s controlled campaign | ⏭️ Next gate |
 | Byzantine consensus / production safety claim | ❌ Not claimed |
 
-## Current milestone: PR #28
+## Current milestone: PR #33
 
-[PR #28 — unresolved RChain C192 witness](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/28) is the first active upstream RChain finding carried through the evidence lifecycle end to end.
+[PR #33 — controlled C192/C171 devnet smoke](https://github.com/aixaria0/RCHAIN-COMPLIER/pull/33) is the first network-level comparison of the pinned upstream control against the disposable production-path candidate.
 
-The CI gate checks out `rchain-community/rchain-rust@51935310789a1a75a183ad0af7152e4eef450c88`, executes the upstream C192 falsifier `a_round_that_comes_to_rest_at_one_height_is_sealed_by_its_own_bound`, binds the source/evidence/output digests into a TaskEnvelope, obtains two independent verification receipts, kills and restarts the coordinator, rejoins the three-process lifecycle, and independently replays the exported event history.
+The N=3, no-autopropose smoke used the upstream n149 sampler and the same pinned revision on both arms.
 
-The demonstrated claim is deliberately narrow:
+Observed in the green run:
 
-> **The pinned upstream C192 unit falsifier executed successfully at the declared revision, and that execution artifact remained task-bound and replayable through the three-process evidence lifecycle.**
+- **control:** 3 post-deploy blocks, 3 senders, no finality in the 90 s window;
+- **candidate:** 12 post-deploy blocks, 3 senders, finality in **3 s**;
+- zero failed block reads;
+- zero idle-window blocks;
+- one deploy-bearing block in each arm.
 
-This is a real upstream execution boundary. It is **not** a claim that Issue #172 is fixed, that the multi-validator devnet measurement was rerun, or that a safe C192/C171 repair has been designed.
+The candidate stayed below the pre-run CI smoke ceiling of 36 post-deploy blocks. That ceiling is intentionally **not** presented as a protocol bound or C171 closure; its original rationale misread an upstream height-rate as a block-rate, so the numeric boundary was retained rather than moved after observing candidate data.
 
-See [RChain C192 Live Witness](docs/RCHAIN_C192_LIVE_WITNESS.md).
+The accurate claim is:
+
+> **On one controlled N=3 devnet smoke attempt, the disposable candidate restored finality where the pinned control reproduced C192, while remaining below the frozen smoke-growth ceiling.**
+
+This does not close C192 or C171. The next gate is the repeated 180-second campaign with unfiltered attempts and an explicit block-rate reading.
+
+See [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md).
 
 ## Quickstart
 
@@ -105,34 +120,40 @@ The C192 integration is reproduced in CI from the pinned upstream revision and t
 
 The earlier PoS/slashing work established the evidence-first method; already-resolved trust/slash paths are **not** presented as current open problems.
 
-PR #28 now crosses the first external RChain boundary:
+The RChain path has now crossed four increasingly external boundaries:
 
 ```text
-pinned rchain-rust source
+PR #28
+pinned upstream C192 witness
         ↓
-real upstream C192 cargo test
+PR #30
+paired C192/C171 candidate model
         ↓
-source / evidence / output digests
+PR #31
+paired Rust scheduling gate
         ↓
-TaskEnvelope
+PR #32
+disposable production-path wiring
         ↓
-two independent verification workers
-        ↓
-reproduction certificate
-        ↓
-SIGKILL + SQLite journal recovery
-        ↓
-three-process convergence
-        ↓
-independent deterministic replay
+PR #33
+controlled N=3 devnet smoke
 ```
 
-The next boundary is not another fixture. It is to evaluate a candidate repair against **both sides of the same attestation-tap tension**:
+The PR #33 control reproduced the registered C192 shape: three post-deploy blocks from three senders and no finality in the 90-second window.
 
-- C192 / Issue #172: a round that comes to rest at one height must be able to advance;
-- C171 / Issue #149: the advance mechanism must remain bounded and must not reintroduce the all-live block storm.
+The disposable candidate changed that observed network behavior: twelve post-deploy blocks, three senders, and finality in 3 seconds, with no failed block reads and no idle-window blocks.
 
-That repair should be tested first against the paired unit falsifiers, then against the relevant controlled multi-validator devnet arms before any production-liveness claim is made.
+That is enough to justify a heavier campaign. It is not enough to claim the defect fixed.
+
+The next boundary is therefore:
+
+- repeat the N=3 control/candidate comparison for at least three unfiltered attempts;
+- restore the original 180-second reading window;
+- keep block counts and height counts separate;
+- preregister the C171 rate quantity and unit explicitly;
+- retain the unmodified pinned tree as the control.
+
+No upstream PR should be opened from this repository until that repeated gate is green.
 
 ## Repository map
 
