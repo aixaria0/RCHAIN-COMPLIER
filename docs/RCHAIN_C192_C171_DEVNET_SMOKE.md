@@ -65,3 +65,21 @@ It does not replace:
 - consensus-safety analysis.
 
 It only earns the candidate permission to move to that heavier campaign.
+
+
+## Observed green run
+
+PR #33 completed the smoke gate successfully against the pinned upstream revision.
+
+| Arm | Post-deploy blocks | Senders | Finality | Idle blocks | Failed block reads |
+|---|---:|---:|---:|---:|---:|
+| unmodified control | 3 | 3 | never in 90 s | 0 | 0 |
+| disposable candidate | 12 | 3 | 3 s | 0 | 0 |
+
+The control reproduced the registered C192 shape: one block from each validator and no finality.
+
+The candidate crossed that boundary: it finalized the deploy in 3 seconds while producing 12 post-deploy blocks, below the frozen 36-block smoke ceiling.
+
+This is one controlled attempt only. It is evidence that the production-path candidate is worth taking to the repeated campaign; it is not C192 closure, C171 closure, or a production-safety claim.
+
+The first smoke execution is intentionally retained in the evidence history even though its evaluator returned BLOCKED. The network data were valid, but the evaluator counted only nodes with numeric finality and therefore reported `sampledNodes=0` on the no-finality control. The parser was corrected to count sampled nodes independently from finality, a regression test was added, and the next execution passed without changing the network acceptance boundary.
