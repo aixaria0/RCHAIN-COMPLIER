@@ -98,3 +98,42 @@ test(
     }
   },
 );
+
+
+test("operator verifier cache is keyed by the pinned module digest", async () => {
+  const root = mkdtempSync(join(tmpdir(), "assurance-plugin-cache-"));
+  const module = join(root, "plugin.mjs");
+  const firstWorkspace = join(root, "first");
+  const secondWorkspace = join(root, "second");
+  const source = (marker: string) =>
+    `export const VERIFIERS = new Map([["cache-test/v1", () => ({verdict:"SUPPORTED",artifact:{marker:"${marker}"}})]]);`;
+  try {
+    writeFileSync(module, source("first"));
+    initializeEngine(firstWorkspace, { verifierModule: module });
+    const first = await loadRegistry(loadState(firstWorkspace));
+    assert.match(first.get("cache-test/v1")!.toString(), /first/);
+
+    writeFileSync(module, source("second"));
+    initializeEngine(secondWorkspace, { verifierModule: module });
+    const second = await loadRegistry(loadState(secondWorkspace));
+    assert.match(second.get("cache-test/v1")!.toString(), /second/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("operator verifier cannot shadow the reserved replication capability", async () => {
+  const root = mkdtempSync(join(tmpdir(), "assurance-plugin-reserved-"));
+  const module = join(root, "plugin.mjs");
+  const workspace = join(root, "engine");
+  try {
+    writeFileSync(
+      module,
+      'export const VERIFIERS = new Map([["replicate-events/v1", () => ({verdict:"SUPPORTED",artifact:{}})]]);',
+    );
+    initializeEngine(workspace, { verifierModule: module });
+    await assert.rejects(() => loadRegistry(loadState(workspace)), { code: "INVALID_INPUT" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
