@@ -33,11 +33,11 @@ Both images are built from host release binaries in the same job. The candidate 
 
 The upstream audit explicitly warns that the old 126 and 276 figures may mix block count and height, so this gate does not use them as a threshold.
 
-Instead, upstream separately records a healthy three-validator envelope of about 12-16 blocks/min. For CI smoke only, this gate uses 24 blocks/min: 1.5x the high end of that healthy envelope.
+The first version of this smoke gate incorrectly paraphrased upstream's 12-16 figure as blocks/min. The upstream preregistration explicitly corrects it to **heights/min** (with roughly three blocks per height on the three-validator rig).
 
-For the 90 second read window, the candidate ceiling is therefore 36 post-deploy blocks.
+The numeric smoke boundary — 24 blocks/min, therefore 36 post-deploy blocks in the 90 second read window — was frozen before the first smoke run. It is retained unchanged here rather than moving the goalpost after candidate data was observed.
 
-This number is deliberately labeled a CI smoke threshold. It is not a protocol invariant and it does not close C171.
+It must therefore be read only as a **pre-run CI smoke ceiling**. It is not a healthy-rate estimate, a protocol invariant, or C171 closure.
 
 ## PASS
 
