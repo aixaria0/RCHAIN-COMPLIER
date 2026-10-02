@@ -31,15 +31,15 @@ new = r'''fn attestation_cadence_due(height: i64, own_latest_height: Option<i64>
 }
 '''
 
+if new in text:
+    print("cadence-off negative control already injected")
+    raise SystemExit(0)
+
 if old not in text:
     raise SystemExit(
         "production candidate cadence helper not found; apply "
         "inject_rchain_attestation_production_wiring.py first"
     )
-
-if new in text:
-    print("cadence-off negative control already injected")
-    raise SystemExit(0)
 
 text = text.replace(old, new, 1)
 path.write_text(text, encoding="utf-8")
