@@ -179,6 +179,7 @@ No absolute C171 block ceiling is inferred from PR #34, and no upstream producti
 - [RChain C192 / C171 Production Wiring Gate](docs/RCHAIN_C192_C171_PRODUCTION_WIRING.md)
 - [RChain C192 / C171 Devnet Smoke](docs/RCHAIN_C192_C171_DEVNET_SMOKE.md)
 - [RChain C192 Repeated Campaign](docs/RCHAIN_C192_REPEATED_CAMPAIGN.md)
+- [RChain C171 Pace Effect Preregistration](docs/RCHAIN_C171_PACE_EFFECT_PREREGISTRATION.md)
 - [Four-Repository Assurance](docs/FOUR_REPO_ASSURANCE.md)
 - [Casper CBC Research Status](docs/CASPER_CBC_RESEARCH_STATUS.md)
 - [Research Branch Atlas](docs/RESEARCH_BRANCH_ATLAS.md)
