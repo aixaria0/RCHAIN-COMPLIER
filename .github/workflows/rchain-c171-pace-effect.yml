@@ -1,0 +1,169 @@
+name: RChain C171 Pace Effect
+on:
+  pull_request:
+    paths:
+      - "tools/inject_rchain_attestation_production_wiring.py"
+      - "tools/inject_rchain_attestation_cadence_off.py"
+      - "tools/evaluate_rchain_c171_pace_effect.py"
+      - "tools/test_rchain_c171_pace_effect.py"
+      - "docs/RCHAIN_C171_PACE_EFFECT_PREREGISTRATION.md"
+      - ".github/workflows/rchain-c171-pace-effect.yml"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RCHAIN_SHA: 51935310789a1a75a183ad0af7152e4eef450c88
+
+jobs:
+  pace-effect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout assurance repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Regression-test C171 evaluator
+        run: python3 tools/test_rchain_c171_pace_effect.py
+
+      - name: Checkout pinned rchain-rust
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: rchain-community/rchain-rust
+          ref: ${{ env.RCHAIN_SHA }}
+          path: upstream
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@46817827a5bfabe028bf34e1cce71fd40e2ff697
+
+      - name: Install build prerequisites
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler libprotobuf-dev
+
+      - name: Verify exact upstream revision
+        run: test "$(git -C upstream rev-parse HEAD)" = "$RCHAIN_SHA"
+
+      - name: Inject production-path candidate
+        run: |
+          python3 tools/inject_rchain_attestation_production_wiring.py upstream
+          git -C upstream diff --check
+          git -C upstream diff -- node/src/runtime/node_runtime.rs \
+            > "$RUNNER_TEMP/c171-candidate.patch"
+          cp upstream/node/src/runtime/node_runtime.rs \
+            "$RUNNER_TEMP/c171-candidate-node_runtime.rs"
+
+      - name: Build candidate binary
+        run: cargo build --manifest-path upstream/Cargo.toml --release -p rchain-node --bin rnode
+
+      - name: Prepare thin runtime image recipe
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/Rnode.runtime.Dockerfile" <<'EOF'
+          FROM debian:trixie-slim
+          RUN apt-get update \
+              && apt-get install -y --no-install-recommends ca-certificates curl \
+              && rm -rf /var/lib/apt/lists/*
+          COPY rnode /usr/local/bin/rnode
+          RUN useradd --create-home rnode \
+              && mkdir -p /var/lib/rnode \
+              && chown -R rnode:rnode /var/lib/rnode
+          USER rnode
+          WORKDIR /var/lib/rnode
+          ENTRYPOINT ["rnode"]
+          EOF
+
+      - name: Build candidate runtime image
+        run: |
+          docker build -t rnode:local \
+            -f "$RUNNER_TEMP/Rnode.runtime.Dockerfile" \
+            upstream/target/release
+
+      - name: Run candidate 3-attempt pace arm
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/c171-candidate"
+          mkdir -p "$RUNNER_TEMP/c171-candidate"
+          REPO="$GITHUB_WORKSPACE/upstream" \
+          ATTEMPTS=3 \
+          NS="3" \
+          CONTROL_ATTEMPTS=0 \
+          CAP=4g \
+          SETTLE_S=60 \
+          IDLE_S=60 \
+          READ_S=180 \
+          JOIN_TIMEOUT=180 \
+          DEPLOY_TIMEOUT=45 \
+          OUT_ROOT="$RUNNER_TEMP/c171-candidate" \
+            bash upstream/spec/audit/evidence/n149-sweep-run.sh \
+            2>&1 | tee "$RUNNER_TEMP/c171-candidate.log"
+
+      - name: Inject cadence-off negative control
+        run: |
+          python3 tools/inject_rchain_attestation_cadence_off.py upstream
+          git -C upstream diff --check
+          git -C upstream diff -- node/src/runtime/node_runtime.rs \
+            > "$RUNNER_TEMP/c171-cadence-off.patch"
+
+      - name: Verify cadence-off isolation
+        run: |
+          python3 tools/verify_rchain_attestation_cadence_off_isolation.py \
+            "$RUNNER_TEMP/c171-candidate-node_runtime.rs" \
+            "upstream/node/src/runtime/node_runtime.rs"
+
+      - name: Build cadence-off binary incrementally
+        run: cargo build --manifest-path upstream/Cargo.toml --release -p rchain-node --bin rnode
+
+      - name: Build cadence-off runtime image
+        run: |
+          docker build -t rnode:local \
+            -f "$RUNNER_TEMP/Rnode.runtime.Dockerfile" \
+            upstream/target/release
+
+      - name: Run cadence-off 3-attempt negative control
+        shell: bash
+        run: |
+          rm -rf "$RUNNER_TEMP/c171-cadence-off"
+          mkdir -p "$RUNNER_TEMP/c171-cadence-off"
+          REPO="$GITHUB_WORKSPACE/upstream" \
+          ATTEMPTS=3 \
+          NS="3" \
+          CONTROL_ATTEMPTS=0 \
+          CAP=4g \
+          SETTLE_S=60 \
+          IDLE_S=60 \
+          READ_S=180 \
+          JOIN_TIMEOUT=180 \
+          DEPLOY_TIMEOUT=45 \
+          OUT_ROOT="$RUNNER_TEMP/c171-cadence-off" \
+            bash upstream/spec/audit/evidence/n149-sweep-run.sh \
+            2>&1 | tee "$RUNNER_TEMP/c171-cadence-off.log"
+
+      - name: Evaluate C171 pace effect
+        run: |
+          python3 tools/evaluate_rchain_c171_pace_effect.py \
+            "$RUNNER_TEMP/c171-candidate" \
+            "$RUNNER_TEMP/c171-cadence-off" \
+            "$RUNNER_TEMP/c171-pace-effect.json"
+
+      - name: Cleanup devnet
+        if: ${{ always() }}
+        run: |
+          cd upstream
+          tools/devnet.sh down || true
+
+      - name: Upload C171 pace evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rchain-c171-pace-effect
+          path: |
+            ${{ runner.temp }}/c171-candidate
+            ${{ runner.temp }}/c171-cadence-off
+            ${{ runner.temp }}/c171-candidate.log
+            ${{ runner.temp }}/c171-cadence-off.log
+            ${{ runner.temp }}/c171-candidate.patch
+            ${{ runner.temp }}/c171-cadence-off.patch
+            ${{ runner.temp }}/c171-pace-effect.json
+          if-no-files-found: warn
+          retention-days: 14
