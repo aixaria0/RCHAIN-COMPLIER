@@ -3,3 +3,4 @@ export * from "./protocol.ts";
 export * from "./replay.ts";
 export * from "./verification.ts";
 export * from "./journal.ts";
+export { startNode, exchange, readPeerEvents, type NodeConfig } from "./node.ts";

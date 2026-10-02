@@ -12,6 +12,7 @@ import {
   type MembershipPolicy,
 } from "./protocol.ts";
 import { replay } from "./replay.ts";
+import { DEFAULT_VERIFIERS, type VerifierRegistry } from "./verification.ts";
 export const MAX_STORED_EVENTS = 4096;
 interface Row {
   position: number;
@@ -24,8 +25,15 @@ export class EventJournal {
   readonly policy: MembershipPolicy;
   private readonly db: DatabaseSync;
   private readonly capacity: number;
-  constructor(directory: string, policy: MembershipPolicy, capacity = MAX_STORED_EVENTS) {
+  private readonly registry: VerifierRegistry;
+  constructor(
+    directory: string,
+    policy: MembershipPolicy,
+    capacity = MAX_STORED_EVENTS,
+    registry: VerifierRegistry = DEFAULT_VERIFIERS,
+  ) {
     this.capacity = capacity;
+    this.registry = registry;
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > MAX_STORED_EVENTS)
       throw new Error("invalid capacity");
     this.policy = JSON.parse(canonical(policy)) as MembershipPolicy;
@@ -163,9 +171,12 @@ export class EventJournal {
     };
   }
   view() {
-    return replay(this.allEvents(), this.policy);
+    return replay(this.allEvents(), this.policy, this.registry);
   }
+  private closed = false;
   close() {
+    if (this.closed) return;
+    this.closed = true;
     this.db.close();
   }
 }

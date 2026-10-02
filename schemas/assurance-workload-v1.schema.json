@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:assurance:workload:v1",
+  "$comment": "Structural schema only. Runtime canonicalization, limits, hashing, signatures and task-bound replay are authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "domain", "operation", "predicate", "input", "value"],
+  "properties": {
+    "schema": {
+      "const": "assurance-workload/v1"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "predicate": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "input": {
+      "$ref": "#/$defs/json"
+    },
+    "value": {
+      "$ref": "#/$defs/json"
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    }
+  }
+}

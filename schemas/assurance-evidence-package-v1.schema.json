@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:assurance:evidence-package:v1",
+  "$comment": "Structural schema only. Runtime canonicalization, limits, hashing, signatures and task-bound replay are authoritative. This describes the first NDJSON record; following records are intelligence-lattice-event/v1, ascending unique IDs, LF-terminated. Entire package <=8 MiB, each record <=16 KiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "canonicalProfile",
+    "policy",
+    "policyDigest",
+    "taskId",
+    "taskEventId",
+    "claimId",
+    "eventRoot",
+    "eventCount"
+  ],
+  "properties": {
+    "schema": {
+      "const": "assurance-evidence-package/v1"
+    },
+    "canonicalProfile": {
+      "const": "intelligence-lattice-canonical/v1"
+    },
+    "policy": {
+      "$ref": "intelligence-lattice-policy-v1.json"
+    },
+    "policyDigest": {
+      "$ref": "#/$defs/hash"
+    },
+    "taskId": {
+      "$ref": "#/$defs/hash"
+    },
+    "taskEventId": {
+      "$ref": "#/$defs/hash"
+    },
+    "claimId": {
+      "$ref": "#/$defs/hash"
+    },
+    "eventRoot": {
+      "$ref": "#/$defs/hash"
+    },
+    "eventCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    }
+  }
+}

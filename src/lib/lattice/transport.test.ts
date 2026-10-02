@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, type ServerResponse } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type ClientRequest,
+  type ServerResponse,
+} from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -21,6 +26,55 @@ async function fakePeer(reply: (r: ServerResponse) => void) {
     },
   };
 }
+test(
+  "slow HTTP bodies encounter bounded backpressure and diagnostics recover after disconnect",
+  { timeout: 5000 },
+  async () => {
+    const f = fixture(),
+      dir = mkdtempSync(join(tmpdir(), "lattice-pressure-"));
+    const node = await startNode({ directory: dir, identity: f.a, policy: f.policy });
+    const held: ClientRequest[] = [];
+    const pendingResponses: ServerResponse[] = [];
+    try {
+      let admitted = 0;
+      const received = new Promise<void>((resolve) =>
+        node.server.on("request", (_request, response) => {
+          pendingResponses.push(response);
+          if (++admitted === 16) resolve();
+        }),
+      );
+      for (let i = 0; i < 16; i++) {
+        const request = httpRequest(node.url + "/events", { method: "POST", agent: false });
+        request.on("error", () => {});
+        request.write("{");
+        held.push(request);
+      }
+      await received;
+      const rejected = await fetch(node.url + "/health");
+      assert.equal(rejected.status, 429);
+      assert.equal((await rejected.json()).code, "BUSY");
+      const disconnected = new Promise<void>((resolve) => {
+        let closed = 0;
+        for (const response of pendingResponses.slice(0, 16))
+          response.once("close", () => {
+            if (++closed === 16) resolve();
+          });
+      });
+      for (const request of held) request.destroy();
+      await disconnected;
+      const health = await fetch(node.url + "/health");
+      assert.equal(health.status, 200);
+      const metrics = await (await fetch(node.url + "/metrics")).json();
+      assert.equal(metrics.schema, "assurance-node-metrics/v1");
+      assert.equal(metrics.rejectedRequests, 1);
+      assert.equal(node.journal.allEvents().length, 1);
+    } finally {
+      for (const request of held) request.destroy();
+      await node.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
 test("HTTP rejects malformed contributions and supplied peers; unsupported work stays blocked", async () => {
   const f = fixture(),
     dir = mkdtempSync(join(tmpdir(), "lattice-http-")),

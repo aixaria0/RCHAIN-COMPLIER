@@ -9,7 +9,7 @@
     "nf3": "0.3.17"
   },
   "scripts": {
-    "demo": "npm run demo:lattice-three",
+    "demo": "npm run assurance -- demo",
     "dev": "vite dev --host 0.0.0.0 --port 8080",
     "build": "vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
@@ -59,7 +59,15 @@
     "check:lattice-vectors": "python3 tools/check_lattice_vectors.py",
     "demo:lattice-three": "node --experimental-strip-types examples/lattice-three-node.ts",
     "demo:rchain-c192": "node --experimental-strip-types examples/lattice-rchain-c192.ts",
-    "eval:rchain-attestation-pair": "node --experimental-strip-types examples/lattice-rchain-attestation-pair.ts"
+    "eval:rchain-attestation-pair": "node --experimental-strip-types examples/lattice-rchain-attestation-pair.ts",
+    "assurance": "node --experimental-strip-types src/lib/assurance/cli.ts",
+    "test:assurance": "node --experimental-strip-types --test src/lib/assurance/*.test.ts",
+    "typecheck:assurance": "tsc -p tsconfig.assurance.json --noEmit",
+    "lint:assurance": "eslint src/lib/assurance src/lib/integrations scripts/package-assurance.mjs scripts/verify-assurance-package.mjs --max-warnings 0",
+    "format:assurance": "prettier --check src/lib/assurance src/lib/integrations scripts/package-assurance.mjs scripts/verify-assurance-package.mjs tsconfig.assurance.json schemas/assurance-*.json schemas/intelligence-lattice-task-v1.schema.json",
+    "build:assurance": "node scripts/package-assurance.mjs",
+    "pack:assurance": "npm run build:assurance && npm pack ./dist/assurance-engine --pack-destination dist",
+    "verify:assurance-package": "node scripts/verify-assurance-package.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

@@ -13,3 +13,6 @@ screenshots/app-builder-preview*.png
 screenshots/app-builder-preview*.json
 *.log
 .DS_Store
+
+# Product demo retains private keys locally; CI publishes only explicit public evidence.
+artifacts/assurance-demo/

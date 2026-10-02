@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:intelligence-lattice:task:v1",
+  "$comment": "Structural schema only. Runtime canonicalization, limits, hashing, signatures and task-bound replay are authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "taskId",
+    "domain",
+    "operation",
+    "input",
+    "dependencies",
+    "authority",
+    "output"
+  ],
+  "properties": {
+    "schema": {
+      "const": "intelligence-lattice-task/v1"
+    },
+    "taskId": {
+      "$ref": "#/$defs/hash"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "\\S"
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "mediaType", "content"],
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/hash"
+        },
+        "mediaType": {
+          "const": "application/json"
+        },
+        "content": {
+          "$ref": "#/$defs/json"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/hash"
+      },
+      "maxItems": 16,
+      "uniqueItems": true
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "issuer"],
+      "properties": {
+        "mode": {
+          "const": "observe-only"
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mediaType", "claimPredicate"],
+      "properties": {
+        "mediaType": {
+          "const": "application/json"
+        },
+        "claimPredicate": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "json": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/json"
+          }
+        },
+        {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/json"
+          }
+        }
+      ]
+    }
+  }
+}

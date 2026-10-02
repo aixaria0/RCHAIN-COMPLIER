@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:assurance:engine-state:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policy", "integration", "verifierModule", "verifierModuleDigest"],
+  "properties": {
+    "schema": {
+      "const": "assurance-engine-state/v1"
+    },
+    "policy": {
+      "$ref": "intelligence-lattice-policy-v1.json",
+      "properties": {
+        "members": {
+          "minItems": 3,
+          "maxItems": 3
+        }
+      }
+    },
+    "integration": {
+      "enum": ["core", "rchain"]
+    },
+    "verifierModule": {
+      "type": ["string", "null"]
+    },
+    "verifierModuleDigest": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "$comment": "Runtime requires paired module/digest, ordinary private files and absolute local module path; no URL or evidence-supplied code."
+}
