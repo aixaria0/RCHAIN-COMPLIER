@@ -62,3 +62,31 @@ If green, this campaign supports only:
 It does not prove Byzantine safety, hard-fork neutrality, public-testnet behavior, production readiness, or C171 closure.
 
 No upstream branch or pull request is modified by this gate.
+
+
+## Observed green campaign
+
+PR #34 completed successfully on the pinned upstream revision.
+
+| Arm | Attempt | Post-deploy blocks | Senders | Finality | Idle blocks | Failed block reads |
+|---|---:|---:|---:|---:|---:|---:|
+| unmodified control | 1 | 3 | 3 | never in 180 s | 0 | 0 |
+| unmodified control | 2 | 3 | 3 | never in 180 s | 0 | 0 |
+| unmodified control | 3 | 3 | 3 | never in 180 s | 0 | 0 |
+| disposable candidate | 1 | 12 | 3 | 3 s | 0 | 0 |
+| disposable candidate | 2 | 12 | 3 | 3 s | 0 | 0 |
+| disposable candidate | 3 | 12 | 3 | 3 s | 0 | 0 |
+
+There were zero void attempts.
+
+The control therefore reproduced C192 in **3/3** unfiltered runs, and the candidate restored finality in **3/3** matched runs.
+
+The C171 observation is intentionally kept separate:
+
+- control block counts: `[3, 3, 3]`;
+- candidate block counts: `[12, 12, 12]`;
+- quantity: distinct post-deploy block hashes per 180-second reading window.
+
+Those numbers are **not** a C171 verdict because the control is stalled. A stalled chain producing fewer blocks is not a successful pace bound.
+
+The next experiment isolates the candidate's own-quiet cadence term with a cadence-off negative control while keeping the C192 self-trigger fixed.
