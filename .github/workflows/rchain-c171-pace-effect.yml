@@ -50,6 +50,8 @@ jobs:
           git -C upstream diff --check
           git -C upstream diff -- node/src/runtime/node_runtime.rs \
             > "$RUNNER_TEMP/c171-candidate.patch"
+          cp upstream/node/src/runtime/node_runtime.rs \
+            "$RUNNER_TEMP/c171-candidate-node_runtime.rs"
 
       - name: Build candidate binary
         run: cargo build --manifest-path upstream/Cargo.toml --release -p rchain-node --bin rnode
@@ -102,6 +104,12 @@ jobs:
           git -C upstream diff --check
           git -C upstream diff -- node/src/runtime/node_runtime.rs \
             > "$RUNNER_TEMP/c171-cadence-off.patch"
+
+      - name: Verify cadence-off isolation
+        run: |
+          python3 tools/verify_rchain_attestation_cadence_off_isolation.py \
+            "$RUNNER_TEMP/c171-candidate-node_runtime.rs" \
+            "upstream/node/src/runtime/node_runtime.rs"
 
       - name: Build cadence-off binary incrementally
         run: cargo build --manifest-path upstream/Cargo.toml --release -p rchain-node --bin rnode
