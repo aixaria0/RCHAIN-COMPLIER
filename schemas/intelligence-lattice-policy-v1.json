@@ -35,6 +35,7 @@
             "items": {
               "enum": [
                 "capability",
+                "task",
                 "claim",
                 "evidence",
                 "challenge",
@@ -45,7 +46,7 @@
               ]
             },
             "minItems": 0,
-            "maxItems": 8,
+            "maxItems": 9,
             "uniqueItems": true
           },
           "domains": {
