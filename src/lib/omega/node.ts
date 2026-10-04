@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AssuranceEngine } from "../assurance/engine.ts";
 import { loadEngineIdentity } from "../assurance/runtime.ts";
-import { canonical, policyDigest } from "../lattice/protocol.ts";
+import { policyDigest } from "../lattice/protocol.ts";
 import { replay } from "../lattice/replay.ts";
 import { createOmegaProof } from "./attestation.ts";
 import type { OmegaProcessStatus, OmegaProof, OmegaStatus, OmegaTrust } from "./types.ts";
@@ -41,7 +41,7 @@ export class OmegaNode {
     options: { onDiagnostic?: (value: unknown) => void } = {},
   ): Promise<OmegaNode> {
     const engine = await AssuranceEngine.open(directory, {
-      onDiagnostic: options.onDiagnostic as ((value: never) => void) | undefined,
+      onDiagnostic: options.onDiagnostic ? (diagnostic) => options.onDiagnostic!(diagnostic) : undefined,
     });
     return new OmegaNode(engine);
   }
@@ -108,7 +108,6 @@ export class OmegaNode {
       equivocations = view.equivocations.length;
       replayValid = true;
       if (equivocations) reasons.push(`${equivocations} equivocation(s) detected`);
-      canonical(view.eventRoot);
     } catch (cause) {
       reasons.push(`independent replay failed: ${cause instanceof Error ? cause.message : "unknown error"}`);
     }
@@ -116,7 +115,8 @@ export class OmegaNode {
     const alive = members.filter((member) => member.healthy).length;
     const unique = new Set(this.engine.processIds).size;
     const verifiedWorkers = members.slice(1).filter((member) => member.healthy && member.identityValid).length;
-    const compromised = identityFailed || equivocations > 0;
+    const ownerHealthy = members[0]?.healthy === true;
+    const compromised = identityFailed || equivocations > 0 || (ownerHealthy && !replayValid);
     const online =
       !compromised &&
       alive === 3 &&
