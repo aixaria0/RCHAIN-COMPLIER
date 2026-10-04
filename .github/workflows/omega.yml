@@ -1,0 +1,35 @@
+name: Omega Node
+
+on:
+  push:
+    branches: ["omega-node-v0.1"]
+  pull_request:
+    paths:
+      - "src/lib/omega/**"
+      - "src/lib/assurance/**"
+      - "src/lib/lattice/**"
+      - "tsconfig.omega.json"
+      - ".github/workflows/omega.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.18.0"
+          cache: npm
+      - run: npm ci
+      - name: Typecheck Omega
+        run: npx tsc -p tsconfig.omega.json --noEmit
+      - name: Lint Omega
+        run: npx eslint src/lib/omega --max-warnings 0
+      - name: Test Omega
+        run: node --experimental-strip-types --test src/lib/omega/*.test.ts
+      - name: Re-run assurance regression suite
+        run: npm run test:assurance
