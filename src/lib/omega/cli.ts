@@ -103,7 +103,7 @@ export async function main(args: string[]): Promise<number> {
       expectedOwnerPublicKeyHex: owner.publicKeyHex,
     };
     atomicWrite(trustFile, canonical(trust) + "\n");
-    output({ schema: "omega-init/v1", directory, trustFile, ...trust });
+    output({ schema: "omega-init/v1", directory, trustFile, trust });
     return 0;
   }
   if (command === "start" && (rest.length === 1 || rest.length === 2)) {
