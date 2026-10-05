@@ -1,0 +1,28 @@
+{
+  "schema": "chimera-provider/v1",
+  "repository": "aixaria0/RCHAIN-COMPLIER",
+  "role": "assurance",
+  "control_plane": "aixaria0/CHIMERA-ONE",
+  "version": "0.3.0-assurance",
+  "entrypoints": [
+    {
+      "capability": "assurance.run",
+      "command": ["npm", "run", "assurance", "--", "run"],
+      "mode": "verification",
+      "network": "loopback",
+      "mutation": "workspace"
+    },
+    {
+      "capability": "assurance.verify",
+      "command": ["npm", "run", "assurance", "--", "verify"],
+      "mode": "verification",
+      "network": "none",
+      "mutation": "none"
+    }
+  ],
+  "boundaries": [
+    "PASS is task-bound and reviewer-pin-bound; it is not universal correctness.",
+    "Multiple local verifier processes establish process separation, not organizational independence.",
+    "Trust pins must be established through a channel independent from an untrusted evidence producer."
+  ]
+}
