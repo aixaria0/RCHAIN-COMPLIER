@@ -35,10 +35,6 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
-      - name: Diagnostic exact Prettier diff for CXP adapter
-        run: |
-          npx prettier src/lib/integrations/quantum-cxp.mjs > "$RUNNER_TEMP/quantum-cxp.prettier.mjs"
-          diff -u src/lib/integrations/quantum-cxp.mjs "$RUNNER_TEMP/quantum-cxp.prettier.mjs" || true
       - run: npm run format:assurance
       - run: npm run lint:assurance
       - run: npm run typecheck:assurance
