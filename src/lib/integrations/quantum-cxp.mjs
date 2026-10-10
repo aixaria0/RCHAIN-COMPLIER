@@ -13,17 +13,22 @@ function canonical(value) {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (typeof value === "object") {
     const keys = Object.keys(value).sort();
-    if (keys.some((key) => !/^[\x20-\x7e]+$/.test(key))) throw new Error("non-ASCII object key");
+    if (keys.some((key) => !/^[\x20-\x7e]+$/.test(key)))
+      throw new Error("non-ASCII object key");
     return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
   }
   throw new Error("unsupported value");
 }
 
 export function digestCxpRun(input) {
-  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("CXP run must be an object");
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw new Error("CXP run must be an object");
   const body = { ...input };
   delete body.cxp_sha256;
-  return createHash("sha256").update(PREFIX).update(Buffer.from(canonical(body), "utf8")).digest("hex");
+  return createHash("sha256")
+    .update(PREFIX)
+    .update(Buffer.from(canonical(body), "utf8"))
+    .digest("hex");
 }
 
 function verifyQuantumCxp(claim, evidence) {
@@ -55,16 +60,22 @@ function verifyQuantumCxp(claim, evidence) {
       run?.policy?.replay_required === true &&
       run?.policy?.quorum_required === 2;
     checks.claimsRemainHypotheses =
-      Array.isArray(run?.claims) && run.claims.length > 0 && run.claims.every((entry) => entry?.status === "HYPOTHESIS");
+      Array.isArray(run?.claims) &&
+      run.claims.length > 0 &&
+      run.claims.every((entry) => entry?.status === "HYPOTHESIS");
     checks.assuredProviderCertificate =
       run?.certificate?.status === "ASSURED" &&
       typeof run?.certificate?.provider_certificate_sha256 === "string" &&
       /^[0-9a-f]{64}$/.test(run.certificate.provider_certificate_sha256);
     checks.twoProcessQuorum = run?.authority?.two_process_quorum === "CONFIRMED";
     checks.replay = run?.verification?.replay === "CONFIRMED";
-    checks.qpuNotPromoted = run?.authority?.qpu_execution === "UNKNOWN" && run?.verification?.qpu_execution === "UNKNOWN";
-    checks.externalTruthNotPromoted = run?.authority?.external_truth === "UNKNOWN" && run?.verification?.external_truth === "UNKNOWN";
-    checks.consensusNotPromoted = run?.consensus?.status === "NOT_RUN" && run?.consensus?.finality === "UNKNOWN";
+    checks.qpuNotPromoted =
+      run?.authority?.qpu_execution === "UNKNOWN" && run?.verification?.qpu_execution === "UNKNOWN";
+    checks.externalTruthNotPromoted =
+      run?.authority?.external_truth === "UNKNOWN" &&
+      run?.verification?.external_truth === "UNKNOWN";
+    checks.consensusNotPromoted =
+      run?.consensus?.status === "NOT_RUN" && run?.consensus?.finality === "UNKNOWN";
   } catch {
     // Deterministic malformed-input refutation. The assurance engine owns report semantics.
   }
