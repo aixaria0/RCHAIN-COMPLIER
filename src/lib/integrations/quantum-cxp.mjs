@@ -15,7 +15,9 @@ function canonical(value) {
     const keys = Object.keys(value).sort();
     if (keys.some((key) => !/^[\x20-\x7e]+$/.test(key)))
       throw new Error("non-ASCII object key");
-    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+    return `{${keys
+      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
+      .join(",")}}`;
   }
   throw new Error("unsupported value");
 }
@@ -70,7 +72,8 @@ function verifyQuantumCxp(claim, evidence) {
     checks.twoProcessQuorum = run?.authority?.two_process_quorum === "CONFIRMED";
     checks.replay = run?.verification?.replay === "CONFIRMED";
     checks.qpuNotPromoted =
-      run?.authority?.qpu_execution === "UNKNOWN" && run?.verification?.qpu_execution === "UNKNOWN";
+      run?.authority?.qpu_execution === "UNKNOWN" &&
+      run?.verification?.qpu_execution === "UNKNOWN";
     checks.externalTruthNotPromoted =
       run?.authority?.external_truth === "UNKNOWN" &&
       run?.verification?.external_truth === "UNKNOWN";
