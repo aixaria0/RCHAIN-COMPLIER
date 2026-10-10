@@ -41,6 +41,11 @@ jobs:
       - run: npm run test:assurance
       - run: npm run test:lattice
       - run: npm run check:lattice-vectors
+      - name: Run retained Quantum CXP through actual AssuranceEngine
+        run: >-
+          node --experimental-strip-types scripts/quantum-cxp-assurance.mjs
+          examples/quantum-cxp/chimera-run-v2.json
+          "$RUNNER_TEMP/quantum-cxp-assurance"
       - run: npm run demo -- "$RUNNER_TEMP/assurance-demo"
       - run: npm run pack:assurance
       - run: npm run verify:assurance-package
@@ -54,5 +59,6 @@ jobs:
             dist/SHA256SUMS
             ${{ runner.temp }}/assurance-demo/*.ndjson
             ${{ runner.temp }}/assurance-demo/*.json
+            ${{ runner.temp }}/quantum-cxp-assurance/*
           if-no-files-found: error
           retention-days: 30
