@@ -89,6 +89,64 @@ function renderFaults(c,replay){
   if(c.faultNode)$(`.n-${c.faultNode}`)?.classList.add('fault');
   c.faultEdges.forEach(k=>$(`.${k}`)?.classList.add('fault'));
   if(replay&&!reduceMotion){const stage=$('#causalStage');stage.classList.remove('replaying');void stage.offsetWidth;stage.classList.add('replaying');setTimeout(()=>stage.classList.remove('replaying'),1500)}
+  restartTracePulse(c,replay);
+}
+
+const PULSE_POINTS={
+  event:[7,49], rho:[27,25], trace:[47,49], block:[66,23], observation:[83,49], verification:[94,70],
+  shortcut1:[28,76], shortcut2:[58,76]
+};
+const MAIN_ROUTE=['event','rho','trace','block','observation','verification'];
+const SHORT_ROUTE=['event','shortcut1','shortcut2','observation','verification'];
+let pulseAnimation=null,pulseTimer=null,pulseCycle=0;
+
+function routeForCase(c,replay=false){
+  const fault=c.faultNode;
+  const main=[...MAIN_ROUTE], short=[...SHORT_ROUTE];
+  if(fault){
+    const mi=main.indexOf(fault);
+    if(mi>=0) main.splice(mi+1);
+    if(fault==='observation') short.splice(short.indexOf('observation')+1);
+    else if(fault==='verification'){}
+    else short.length=0;
+  }
+  const choices=[];
+  if(activeMode==='evidence'&&short.length) choices.push(short,main);
+  else if(activeMode==='replay') choices.push([...main].reverse(),main);
+  else if(activeMode==='causality') choices.push(main,short.length?short:[...main].reverse());
+  else choices.push(main,short.length?short:[...main].reverse());
+  const clean=choices.filter(r=>r.length>1);
+  const route=clean[pulseCycle++%clean.length]||main;
+  return replay?[...route].reverse():route;
+}
+
+function animateTracePulse(c,replay=false){
+  const pulse=$('.trace-pulse');
+  if(!pulse||reduceMotion)return;
+  pulseAnimation?.cancel(); clearTimeout(pulseTimer);
+  const route=routeForCase(c,replay);
+  const frames=route.map((key,i)=>{
+    const [x,y]=PULSE_POINTS[key];
+    const edge=i/(Math.max(1,route.length-1));
+    return {left:x+'%',top:y+'%',opacity:i===0||i===route.length-1?0:1,transform:`scale(${.9+Math.sin(edge*Math.PI)*.45})`,offset:edge};
+  });
+  if(frames.length<2)return;
+  frames[0].opacity=0; frames[Math.min(1,frames.length-1)].opacity=1; frames[frames.length-1].opacity=1;
+  pulse.classList.toggle('diverged',Boolean(c.faultNode));
+  pulse.classList.toggle('replay',activeMode==='replay'||replay);
+  pulseAnimation=pulse.animate(frames,{duration:3400+route.length*310,easing:'cubic-bezier(.45,.02,.25,1)',fill:'forwards'});
+  pulseAnimation.onfinish=()=>{
+    if(c.faultNode){
+      pulse.animate([{transform:'scale(1)',opacity:1},{transform:'scale(2.8)',opacity:.25},{transform:'scale(1)',opacity:1}],{duration:620,easing:'ease-out'});
+      pulseTimer=setTimeout(()=>animateTracePulse(caseData(),false),900);
+    }else{
+      pulseTimer=setTimeout(()=>animateTracePulse(caseData(),false),320);
+    }
+  };
+}
+function restartTracePulse(c=caseData(),replay=false){
+  pulseCycle=0;
+  requestAnimationFrame(()=>animateTracePulse(c,replay));
 }
 
 function renderInvariants(c){
@@ -140,6 +198,7 @@ function setMode(mode){
   if(!['claim','causality','evidence','replay'].includes(mode))mode='claim'; activeMode=mode;
   $$('.mode').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode)); $$('.mode-pane').forEach(p=>p.classList.toggle('active',p.dataset.pane===mode));
   const u=new URL(location.href); if(mode==='claim')u.searchParams.delete('mode'); else u.searchParams.set('mode',mode); history.replaceState(null,'',u);
+  if(typeof CASES!=='undefined'&&CASES[activeCase]) restartTracePulse(caseData(),false);
 }
 $$('.mode').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
 $$('.case').forEach(b=>b.addEventListener('click',()=>renderCase(b.dataset.case)));
