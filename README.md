@@ -4,6 +4,8 @@ Reusable infrastructure for task-bound evidence, independent process identities,
 
 RChain is our first serious external integration and adversarial workload. Its C192/C171 witnesses, disposable patches, devnets and campaign artifacts stay in integration workflows; they do not define the core protocol.
 
+Interactive public surfaces: [Assurance Lab](https://aixaria0.github.io/RCHAIN-COMPLIER/) · [Provenance Explorer](https://aixaria0.github.io/RCHAIN-COMPLIER/explorer/) · [ARIA Core](https://aixaria0.github.io/RCHAIN-COMPLIER/aria-core.html). These browser surfaces are explicitly bounded explanatory models unless they link to repository evidence.
+
 ## Run it
 
 Node.js **22.18+**, Linux:

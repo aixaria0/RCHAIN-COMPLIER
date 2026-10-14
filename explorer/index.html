@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e11" />
+  <meta name="description" content="Interactive provenance, causality, evidence, and replay explorer for RCHAIN-COMPLIER. Synthetic verification instrument; not live RChain evidence." />
+  <meta property="og:title" content="RCHAIN-COMPLIER — Provenance Explorer" />
+  <meta property="og:description" content="Trace a bounded claim from synthetic source evidence to first divergence, witness, and verdict." />
+  <title>RCHAIN-COMPLIER — Provenance Explorer</title>
+  <link rel="icon" href="../public/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./explorer.css?v=1" />
+</head>
+<body>
+  <div class="scan-beam" aria-hidden="true"></div>
+  <div class="grid-noise" aria-hidden="true"></div>
+
+  <header class="xbar">
+    <a class="xbrand" href="../">
+      <span class="xmark">PX</span>
+      <span><b>PROVENANCE EXPLORER</b><small>RCHAIN-COMPLIER / FORENSIC INSTRUMENT</small></span>
+    </a>
+    <nav class="mode-tabs" aria-label="Explorer mode">
+      <button class="mode active" data-mode="claim">CLAIM</button>
+      <button class="mode" data-mode="causality">CAUSALITY</button>
+      <button class="mode" data-mode="evidence">EVIDENCE</button>
+      <button class="mode" data-mode="replay">REPLAY</button>
+    </nav>
+    <div class="xmeta"><span class="synthetic-led"><i></i>SYNTHETIC</span><a href="../">ASSURANCE LAB ↗</a></div>
+  </header>
+
+  <main class="workspace">
+    <aside class="case-rail">
+      <div class="rail-head"><span>ADVERSARIAL FIXTURE</span><b id="caseCounter">00 / 08</b></div>
+      <button class="case active" data-case="BASELINE"><em>00</em><span><b>Baseline</b><small>all evidence paths agree</small></span></button>
+      <button class="case" data-case="A"><em>A</em><span><b>Height mismatch</b><small>node C reports 184274</small></span></button>
+      <button class="case" data-case="B"><em>B</em><span><b>Hash mismatch</b><small>node D diverges at same height</small></span></button>
+      <button class="case" data-case="C"><em>C</em><span><b>Missing block</b><small>full payload unavailable</small></span></button>
+      <button class="case" data-case="D"><em>D</em><span><b>Node unreachable</b><small>observation basis narrows</small></span></button>
+      <button class="case" data-case="E"><em>E</em><span><b>Missing justification</b><small>provenance chain incomplete</small></span></button>
+      <button class="case" data-case="F"><em>F</em><span><b>Duplicate validator</b><small>identity double-count risk</small></span></button>
+      <button class="case" data-case="G"><em>G</em><span><b>Malformed justification</b><small>structure cannot be trusted</small></span></button>
+      <button class="case" data-case="H"><em>H</em><span><b>Canonical mismatch</b><small>parent evidence disagrees</small></span></button>
+      <div class="rail-boundary"><b>BOUNDARY</b><p>Deterministic synthetic fixture. No live node is queried. Verdicts describe the model and evidence path only.</p></div>
+    </aside>
+
+    <section class="instrument">
+      <header class="instrument-head">
+        <div>
+          <p class="eyebrow">VERIFY THE PATH, NOT THE STORY</p>
+          <h1 id="caseTitle">Observed finalized block is consistent across the available evidence paths.</h1>
+        </div>
+        <div class="verdict-chip" data-state="pass"><small>VERDICT</small><strong id="verdict">PASS</strong><span id="verdictDetail">7 / 7 invariants satisfied</span></div>
+      </header>
+
+      <div class="instrument-grid">
+        <section class="causal-stage panel" id="causalStage">
+          <div class="panel-head"><span>CAUSALITY SPINE</span><span id="firstDivergence">FIRST DIVERGENCE / NONE</span></div>
+          <div class="causal-canvas">
+            <svg class="spine-svg" viewBox="0 0 980 430" role="img" aria-label="Synthetic provenance chain">
+              <path class="trace-edge e-event-rho" d="M92 210 C150 210 160 115 245 115"/>
+              <path class="trace-edge e-rho-trace" d="M285 115 C355 115 360 210 438 210"/>
+              <path class="trace-edge e-trace-block" d="M478 210 C545 210 550 105 628 105"/>
+              <path class="trace-edge e-block-obs" d="M668 105 C735 105 735 210 807 210"/>
+              <path class="trace-edge e-obs-verify" d="M847 210 C895 210 900 305 930 305"/>
+              <path class="trace-edge e-event-obs" d="M92 210 C240 340 600 340 807 210"/>
+              <g class="trace-node n-event" data-node="event" transform="translate(68 210)"><circle r="30"/><text y="5">E</text></g>
+              <g class="trace-node n-rho" data-node="rho" transform="translate(265 115)"><circle r="30"/><text y="5">ρ</text></g>
+              <g class="trace-node n-trace" data-node="trace" transform="translate(458 210)"><circle r="32"/><text y="5">T</text></g>
+              <g class="trace-node n-block" data-node="block" transform="translate(648 105)"><circle r="31"/><text y="5">B</text></g>
+              <g class="trace-node n-observation" data-node="observation" transform="translate(827 210)"><circle r="34"/><text y="5">O</text></g>
+              <g class="trace-node n-verification" data-node="verification" transform="translate(930 305)"><circle r="31"/><text y="5">V</text></g>
+            </svg>
+            <button class="node-label nl-event" data-node="event"><b>SOURCE EVENT</b><span>synthetic task declaration</span></button>
+            <button class="node-label nl-rho" data-node="rho"><b>RHOLANG PROCESS</b><span>derived execution input</span></button>
+            <button class="node-label nl-trace" data-node="trace"><b>EXECUTION TRACE</b><span>deterministic transformation</span></button>
+            <button class="node-label nl-block" data-node="block"><b>BLOCK EVIDENCE</b><span>height + hash + parent</span></button>
+            <button class="node-label nl-observation" data-node="observation"><b>NODE OBSERVATIONS</b><span>four synthetic observers</span></button>
+            <button class="node-label nl-verification" data-node="verification"><b>VERIFICATION</b><span>invariants + checks</span></button>
+            <div class="trace-pulse" aria-hidden="true"></div>
+          </div>
+          <div class="stage-footer">
+            <div><small>NETWORK</small><b>synthetic-testnet / root</b></div>
+            <div><small>BLOCK HEIGHT</small><b id="commonHeight">184273</b></div>
+            <div><small>AGREEMENT</small><b id="agreement">1.00</b></div>
+            <div><small>QUORUM OBSERVED</small><b id="quorum">YES</b></div>
+          </div>
+        </section>
+
+        <aside class="inspector panel">
+          <div class="panel-head"><span>PROVENANCE INSPECTOR</span><span id="nodeClass">SOURCE EVENT</span></div>
+          <div class="inspector-body">
+            <div class="inspector-id"><small id="nodeType">EventEnvelope</small><strong id="nodeIdentifier">evt.synthetic.finality</strong><span id="nodeTime">T+000ms</span></div>
+            <dl id="nodeFields"></dl>
+            <div class="witness-box" id="witnessBox">
+              <small>FAILURE WITNESS</small>
+              <strong id="witnessInvariant">NONE</strong>
+              <p id="witnessText">No failure witness. Activate an adversarial case to expose the first violated boundary.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <section class="mode-deck panel">
+        <div class="mode-pane active" data-pane="claim">
+          <div class="deck-head"><div><span>CLAIM LAB</span><h2>Decompose the claim before you decide whether it survived.</h2></div><p id="claimSummary">The baseline claim is accepted only because all seven declared invariants remain within the synthetic evidence boundary.</p></div>
+          <div class="invariant-grid" id="invariantGrid"></div>
+        </div>
+        <div class="mode-pane" data-pane="causality">
+          <div class="deck-head"><div><span>CAUSALITY EXPLORER</span><h2>Every transformation keeps a provenance reference.</h2></div><p>Derived links are structural references. Observed evidence is not silently upgraded into stronger protocol claims.</p></div>
+          <div class="causal-ledger" id="causalLedger"></div>
+        </div>
+        <div class="mode-pane" data-pane="evidence">
+          <div class="deck-head"><div><span>EVIDENCE GRAPH</span><h2>Every verdict must terminate in inspectable evidence.</h2></div><p>Select an edge to see the exact source, field, relation, and value that supports it.</p></div>
+          <div class="evidence-layout"><div class="edge-list" id="edgeList"></div><div class="edge-inspector"><small>EDGE DETAIL</small><h3 id="edgeRelation">OBSERVES</h3><dl id="edgeFields"></dl></div></div>
+        </div>
+        <div class="mode-pane" data-pane="replay">
+          <div class="deck-head"><div><span>REPLAY / DIVERGENCE</span><h2>Same pipeline. One mutated fact. First divergence wins.</h2></div><button id="replayBtn">↻ REPLAY CURRENT CASE</button></div>
+          <div class="replay-grid">
+            <div class="replay-card"><small>BASELINE</small><strong>PASS</strong><dl><div><dt>height</dt><dd>184273</dd></div><div><dt>hash</dt><dd>0x7f4a…91c2</dd></div><div><dt>agreement</dt><dd>1.00</dd></div><div><dt>status</dt><dd>PASS</dd></div></dl></div>
+            <div class="replay-card adversarial" id="activeReplay"><small>ACTIVE FIXTURE</small><strong id="replayVerdict">PASS</strong><dl id="replayFields"></dl></div>
+            <div class="diff-table"><div class="diff-head"><span>FIELD</span><span>BASELINE</span><span>ACTIVE</span></div><div id="diffRows"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="verification panel">
+        <div class="panel-head"><span>VERIFICATION MATRIX</span><span id="checkCount">7 CHECKS</span></div>
+        <div class="check-table"><div class="check-head"><span>CHECK</span><span>STATUS</span><span>SEVERITY</span><span>MESSAGE</span><span>SOURCE</span></div><div id="checkRows"></div></div>
+      </section>
+    </section>
+  </main>
+
+  <footer class="xfooter">
+    <div><b>PROVENANCE EXPLORER</b><span>synthetic verification instrument</span></div>
+    <p>No live RNode is queried. Synthetic fixtures exist to expose causality, claim boundaries, deterministic divergence, and evidence provenance.</p>
+    <div><a href="../">ASSURANCE LAB ↗</a><a href="https://github.com/aixaria0/RCHAIN-COMPLIER" target="_blank" rel="noreferrer">SOURCE ↗</a></div>
+  </footer>
+  <script src="./explorer.js?v=1" defer></script>
+</body>
+</html>
