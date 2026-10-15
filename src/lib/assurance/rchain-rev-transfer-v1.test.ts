@@ -88,3 +88,19 @@ test("conflict remains FAIL with third observer unavailable", () =>
   ));
 test("raw freshness independently checked", () =>
   run((p) => (p.observers[0].evidence.status.observed_at = NOW - 120000), "BLOCKED", true));
+
+test("reproduction mismatch rejects even with repaired outer digest", async () => {
+  const pkg = await fixture();
+  pkg.reproduction_digest = "0".repeat(64);
+  const { assurancePayloadDigest } = await import("./rchain-assurance-validation.ts");
+  pkg.provenance.payload_digest = await assurancePayloadDigest(pkg);
+  const verdict = await verifyRevTransferAssurance(pkg, fixturePolicy(pkg));
+  assert.equal(verdict.status, "FAIL");
+  assert.equal(verdict.checks.deterministic_reproduction, "FAIL");
+});
+test("incomplete external trust configuration blocks", async () => {
+  const pkg = await fixture();
+  const policy = fixturePolicy(pkg);
+  policy.observers.pop();
+  assert.equal((await verifyRevTransferAssurance(pkg, policy)).status, "BLOCKED");
+});

@@ -154,6 +154,26 @@ export async function verifyRevTransferAssurance(
   check("schema", "PASS");
   const pkg = input as any;
   try {
+    if (
+      !policy ||
+      !Array.isArray(policy.observers) ||
+      policy.observers.length < 2 ||
+      !policy.source_revision ||
+      !policy.expected_payload_digest
+    ) {
+      result.package_digest = await assurancePayloadDigest(pkg);
+      check(
+        "payload_integrity",
+        result.package_digest === pkg.provenance.payload_digest ? "PASS" : "FAIL",
+        "Payload digest mismatch",
+      );
+      check(
+        "external_policy",
+        "BLOCKED",
+        "External observer/revision/digest trust pins are incomplete",
+      );
+      return finish();
+    }
     const requiredStrings = [
       policy?.action_id,
       policy?.deploy_id,
