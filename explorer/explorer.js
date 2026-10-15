@@ -107,7 +107,7 @@ function routeForCase(c,replay=false){
     const mi=main.indexOf(fault);
     if(mi>=0) main.splice(mi+1);
     if(fault==='observation') short.splice(short.indexOf('observation')+1);
-    else if(fault==='verification'){}
+    else if(fault==='verification'){ /* Terminal node: there are no later edges to trim. */ }
     else short.length=0;
   }
   const choices=[];
