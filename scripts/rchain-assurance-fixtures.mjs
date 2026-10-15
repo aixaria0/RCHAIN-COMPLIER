@@ -1,9 +1,10 @@
+import { revTransferTerm } from "../src/lib/assurance/rchain-rev-transfer-v1.ts";
 import { writeFileSync } from "node:fs";
 import { assuranceDigest, rawAssuranceDigest, assurancePayloadDigest, assuranceReproductionDigest } from "../src/lib/assurance/rchain-assurance-validation.ts";
 export const NOW = 1792080000000;
 export const DEPLOY = "ab".repeat(70);
 export const RECIPIENT = "1111syntheticRecipient";
-export const TERM = `new revVault(\`rho:rchain:revVault\`), deployerId(\`rho:rchain:deployerId\`), deployId(\`rho:rchain:deployId\`), resultCh in {\n    revVault!("transfer", *deployerId, "${RECIPIENT}", 100, *resultCh) |\n    for (@result <- resultCh) { deployId!(result) }\n  }`;
+export const TERM = revTransferTerm(RECIPIENT, 100);
 /** @param {string} address */
 export function balanceTerm(address) { return `new return, revVault(\`rho:rchain:revVault\`), balanceCh in { revVault!("getBalance", "${address}", *balanceCh) | for (@balance <- balanceCh) { return!(balance) } }`; }
 export function block(hash = "aa".repeat(32), height = 10) { return { blockHash: hash, blockNumber: height, shardId: "root", sender: "synthetic-validator", seqNum: height, preStateHash: "pre", postStateHash: "post", justifications: [], bonds: [{ validator: "synthetic-validator", stake: 100 }], sigAlgorithm: "secp256k1", sig: "synthetic-block-signature", parents: [] }; }

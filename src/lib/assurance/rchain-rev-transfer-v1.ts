@@ -53,7 +53,7 @@ export interface RevTransferVerdict {
 export function revTransferTerm(to: string, amount: number): string {
   if (!/^[A-Za-z0-9]{1,128}$/.test(to) || !Number.isSafeInteger(amount) || amount <= 0)
     throw new Error("Invalid REV transfer parameters");
-  return `new revVault(\`rho:rchain:revVault\`), deployerId(\`rho:rchain:deployerId\`), deployId(\`rho:rchain:deployId\`), resultCh in {\n    revVault!("transfer", *deployerId, "${to}", ${amount}, *resultCh) |\n    for (@result <- resultCh) { deployId!(result) }\n  }`;
+  return `new return, revVault(\`rho:rchain:revVault\`), deployerId(\`rho:rchain:deployerId\`), deployId(\`rho:rchain:deployId\`), resultCh in {\n    revVault!("transfer", *deployerId, "${to}", ${amount}, *resultCh) |\n    for (@result <- resultCh) { return!(result) | deployId!(result) }\n  }`;
 }
 export function revBalanceTerm(to: string): string {
   if (!/^[A-Za-z0-9]{1,128}$/.test(to)) throw new Error("Invalid REV recipient");
@@ -84,7 +84,7 @@ function compareBlock(a: any, b: any): boolean {
   );
 }
 function trueResult(results: any): boolean | undefined {
-  const bool = results?.[0]?.ExprTuple?.ps?.[0]?.ExprBool;
+  const bool = results?.[0]?.ExprTuple?.ps?.[0]?.ExprBool ?? results?.[0]?.ExprBool;
   return typeof bool === "boolean" ? bool : typeof bool?.data === "boolean" ? bool.data : undefined;
 }
 const finality = (v: any): boolean | undefined =>

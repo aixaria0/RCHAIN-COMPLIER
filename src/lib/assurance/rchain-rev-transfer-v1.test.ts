@@ -104,3 +104,16 @@ test("incomplete external trust configuration blocks", async () => {
   policy.observers.pop();
   assert.equal((await verifyRevTransferAssurance(pkg, policy)).status, "BLOCKED");
 });
+
+test("direct boolean Vault result is reproduced without fabricating a tuple", () =>
+  run(
+    async (pkg) => {
+      for (const observer of pkg.observers) {
+        const deploy = JSON.parse(observer.evidence.deploy.body);
+        deploy.ProcessedWithSuccess.deployResult = [{ ExprBool: { data: true } }];
+        observer.evidence.deploy = await raw(observer.evidence.deploy.path, deploy);
+      }
+    },
+    "PASS",
+    true,
+  ));
