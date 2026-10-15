@@ -353,14 +353,20 @@ export async function verifyRevTransferAssurance(
       if (raw.status) {
         check(
           "network_identity",
-          raw.status.networkId === policy.network_id && raw.status.shardId === policy.shard_id
-            ? "PASS"
-            : "FAIL",
+          raw.status.networkId == null || raw.status.shardId == null
+            ? "BLOCKED"
+            : raw.status.networkId === policy.network_id && raw.status.shardId === policy.shard_id
+              ? "PASS"
+              : "FAIL",
           "Observer reports wrong network/shard",
         );
         check(
           "observer_identity",
-          identity === pin.node_identity && identity === observer.node_identity ? "PASS" : "FAIL",
+          identity == null
+            ? "BLOCKED"
+            : identity === pin.node_identity && identity === observer.node_identity
+              ? "PASS"
+              : "FAIL",
           "Raw node identity does not match observer pin",
         );
       }
@@ -380,7 +386,11 @@ export async function verifyRevTransferAssurance(
       ))
         check(
           "network_identity",
-          info(b)?.shardId === policy.shard_id ? "PASS" : "FAIL",
+          info(b)?.shardId == null
+            ? "BLOCKED"
+            : info(b).shardId === policy.shard_id
+              ? "PASS"
+              : "FAIL",
           "Block shard does not match expected shard",
         );
       const processed = raw.deploy?.ProcessedWithSuccess;
