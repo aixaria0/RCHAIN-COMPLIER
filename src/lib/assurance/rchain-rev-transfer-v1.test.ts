@@ -133,3 +133,16 @@ test("finalized read-back canonical metadata mismatch fails", () =>
     "FAIL",
     true,
   ));
+
+test("incomplete canonical fields block without inventing a contradiction", () =>
+  run(
+    async (pkg) => {
+      const observer = pkg.observers[0];
+      const value = JSON.parse(observer.evidence.finalized_block.body);
+      delete value.blockInfo.postStateHash;
+      observer.evidence.finalized_block = await raw(observer.evidence.finalized_block.path, value);
+      pkg.finalized_state = { status: "UNAVAILABLE", reason: "Canonical fields unavailable" };
+    },
+    "BLOCKED",
+    true,
+  ));

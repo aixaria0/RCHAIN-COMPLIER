@@ -75,14 +75,19 @@ const protocolFields = [
   "sigAlgorithm",
   "sig",
 ];
-function compareBlock(a: any, b: any): boolean {
-  return protocolFields.every(
-    (key) =>
-      Object.hasOwn(info(a) ?? {}, key) &&
-      Object.hasOwn(info(b) ?? {}, key) &&
-      canonicalAssurance(info(a)[key]) === canonicalAssurance(info(b)[key]),
-  );
+function compareBlock(a: any, b: any): boolean | undefined {
+  let missing = false;
+  for (const key of protocolFields) {
+    if (!Object.hasOwn(info(a) ?? {}, key) || !Object.hasOwn(info(b) ?? {}, key)) {
+      missing = true;
+      continue;
+    }
+    if (canonicalAssurance(info(a)[key]) !== canonicalAssurance(info(b)[key])) return false;
+  }
+  return missing ? undefined : true;
 }
+const canonicalClass = (match: boolean | undefined): AssuranceClass =>
+  match === undefined ? "BLOCKED" : match ? "PASS" : "FAIL";
 function trueResult(results: any): boolean | undefined {
   const bool = results?.[0]?.ExprTuple?.ps?.[0]?.ExprBool ?? results?.[0]?.ExprBool;
   return typeof bool === "boolean" ? bool : typeof bool?.data === "boolean" ? bool.data : undefined;
@@ -364,7 +369,8 @@ export async function verifyRevTransferAssurance(
       if (raw.finalized)
         check(
           "canonical_consistency",
-          hash === observer.finalized_hash && height === observer.finalized_height
+          (hash ?? null) === observer.finalized_hash &&
+            (height ?? null) === observer.finalized_height
             ? "PASS"
             : "FAIL",
           "Finalized summary differs from raw evidence",
@@ -380,7 +386,11 @@ export async function verifyRevTransferAssurance(
       const processed = raw.deploy?.ProcessedWithSuccess;
       const includedBlock = processed?.block ?? raw.deploy?.ProcessedWithError?.block;
       const entry = raw.block?.deploys?.find((d: any) => d.sig === policy.deploy_id);
-      const included = !!entry && !!includedBlock;
+      const included =
+        !!entry &&
+        !!includedBlock &&
+        !!blockHash(includedBlock) &&
+        Number.isSafeInteger(blockHeight(includedBlock));
       if (entry)
         check(
           "signed_action_binding",
@@ -394,13 +404,13 @@ export async function verifyRevTransferAssurance(
       if (raw.block && includedBlock)
         check(
           "canonical_consistency",
-          compareBlock(includedBlock, raw.block) ? "PASS" : "FAIL",
+          canonicalClass(compareBlock(includedBlock, raw.block)),
           "Included/canonical representation mismatch",
         );
       if (raw.finalized && raw.finalized_block)
         check(
           "canonical_consistency",
-          compareBlock(raw.finalized, raw.finalized_block) ? "PASS" : "FAIL",
+          canonicalClass(compareBlock(raw.finalized, raw.finalized_block)),
           "Finalized/canonical representation mismatch",
         );
       const returned = trueResult(processed?.deployResult);
@@ -416,7 +426,7 @@ export async function verifyRevTransferAssurance(
       if (raw.balance?.block && raw.finalized_block && blockHash(raw.balance.block) === hash) {
         check(
           "canonical_consistency",
-          compareBlock(raw.balance.block, raw.finalized_block) ? "PASS" : "FAIL",
+          canonicalClass(compareBlock(raw.balance.block, raw.finalized_block)),
           "Finalized read-back block metadata differs from canonical block",
         );
       }
