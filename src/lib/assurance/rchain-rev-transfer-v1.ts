@@ -515,19 +515,20 @@ export async function verifyRevTransferAssurance(
         Number.isSafeInteger(o.height) &&
         pkg.observers.find((p: any) => p.observer_id === o.id)?.status === "OBSERVED",
     );
-    result.agreement = conflict
-      ? "CONFLICT"
-      : Object.values(result.checks).includes("FAIL") && pkg.agreement.status === "CONFLICT"
+    result.agreement =
+      conflict || declaredConflict || summaryConflict
         ? "CONFLICT"
-        : comparable.length < policy.observers.length
-          ? "INSUFFICIENT_EVIDENCE"
-          : skew
-            ? "HEIGHT_SKEW"
-            : lag
-              ? "PROVEN_LAG"
-              : comparable.length >= 2
-                ? "EXACT_AGREEMENT"
-                : "INSUFFICIENT_EVIDENCE";
+        : Object.values(result.checks).includes("FAIL") && pkg.agreement.status === "CONFLICT"
+          ? "CONFLICT"
+          : comparable.length < policy.observers.length
+            ? "INSUFFICIENT_EVIDENCE"
+            : skew
+              ? "HEIGHT_SKEW"
+              : lag
+                ? "PROVEN_LAG"
+                : comparable.length >= 2
+                  ? "EXACT_AGREEMENT"
+                  : "INSUFFICIENT_EVIDENCE";
     check(
       "cross_node_agreement",
       conflict
