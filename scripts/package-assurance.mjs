@@ -19,6 +19,10 @@ const manifest = {
   bin: { assurance: "./lib/lib/assurance/cli.js" },
   exports: {
     ".": { types: "./lib/lib/assurance/index.d.ts", import: "./lib/lib/assurance/index.js" },
+    "./rchain-assurance/v1": {
+      types: "./lib/lib/assurance/rchain-rev-transfer-v1.d.ts",
+      import: "./lib/lib/assurance/rchain-rev-transfer-v1.js",
+    },
     "./lattice": { types: "./lib/lib/lattice/index.d.ts", import: "./lib/lib/lattice/index.js" },
     "./integrations/rchain": {
       types: "./lib/lib/integrations/rchain-c192.d.ts",
@@ -47,5 +51,10 @@ for (const name of [
   "assurance-evidence-package-v1.schema.json",
 ])
   copyFileSync(`schemas/${name}`, `${output}/schemas/${name}`);
+mkdirSync(`${output}/schemas/rchain-assurance`, { recursive: true });
+copyFileSync(
+  "contracts/rchain-assurance/v1.schema.json",
+  `${output}/schemas/rchain-assurance/v1.schema.json`,
+);
 chmodSync(`${output}/lib/lib/assurance/cli.js`, 0o755);
 process.stdout.write(`${output}\n`);

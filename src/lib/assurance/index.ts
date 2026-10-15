@@ -18,3 +18,10 @@ export {
   type VerifierRegistry,
   type ReproducedResult,
 } from "../lattice/verification.ts";
+export {
+  verifyRevTransferAssurance,
+  revTransferTerm,
+  revBalanceTerm,
+  type RevTransferPolicy,
+  type RevTransferVerdict,
+} from "./rchain-rev-transfer-v1.ts";

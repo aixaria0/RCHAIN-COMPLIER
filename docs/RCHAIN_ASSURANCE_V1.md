@@ -13,3 +13,11 @@ EXACT_AGREEMENT means identical finalized height/hash across configured observer
 PASS requires all bounded checks and an externally selected policy. BLOCKED means incomplete, unavailable, stale or insufficient evidence. FAIL means contradicted invariants, wrong task/claim/network binding, digest mismatch, canonical mismatch or reproduction divergence. Producer verification fields are advisory, never authoritative.
 
 Trust pins must come from operator configuration or a trusted transport receipt: expected task, deploy, claim, network, shard, exact term, signer, transfer context, observer identities/URLs/failure domains, producer revision, package digest, freshness limits and minimum observer/domain counts. The evidence package cannot select these values. The package digest is a content commitment, not authentication; a trusted channel or separately authenticated receipt must supply that pin. Replay only reproduces local checks over observations and does not prove external execution.
+
+## Commands
+
+`npm run test:rchain-assurance` validates the canonical schema with Ajv and the shipped validator, checks generated-schema drift, and runs adversarial verifier controls. `node scripts/rchain-rev-transfer-assurance.mjs PACKAGE.json EXTERNAL_POLICY.json` returns exit 0 (PASS), 2 (BLOCKED) or 1 (FAIL). The policy is a separate operator-selected file. Do not copy trust roots from the observation package.
+
+`npm run pack:assurance` ships the verifier at `@aixaria/assurance-engine/rchain-assurance/v1`. `node scripts/export-rchain-assurance.mjs OUTPUT_DIRECTORY` exports the same browser-safe implementation and file hashes for Rholox. No separate verification implementation belongs in Rholox.
+
+The v1 changes repair the explorer no-empty lint failure and apply only compatible lockfile fixes for brace-expansion and source-map-js. The production package remains free of runtime npm dependencies. Repository and product audit must both remain clean.
