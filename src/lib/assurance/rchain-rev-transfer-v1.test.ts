@@ -146,3 +146,12 @@ test("incomplete canonical fields block without inventing a contradiction", () =
     "BLOCKED",
     true,
   ));
+
+test("incomplete trust pins never downgrade a conflict to BLOCKED", async () => {
+  const pkg = await fixture("conflict");
+  const policy = fixturePolicy(pkg);
+  policy.observers.pop();
+  const verdict = await verifyRevTransferAssurance(pkg, policy);
+  assert.equal(verdict.status, "FAIL");
+  assert.equal(verdict.agreement, "CONFLICT");
+});

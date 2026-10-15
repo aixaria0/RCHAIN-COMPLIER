@@ -159,6 +159,32 @@ export async function verifyRevTransferAssurance(
   check("schema", "PASS");
   const pkg = input as any;
   try {
+    const declaredConflict =
+      pkg.agreement.status === "CONFLICT" || pkg.finalized_state.status === "CONFLICT";
+    const summaryConflict = pkg.observers.some((a: any, i: number) =>
+      pkg.observers
+        .slice(i + 1)
+        .some(
+          (b: any) =>
+            a.finalized_height !== null &&
+            a.finalized_height === b.finalized_height &&
+            a.finalized_hash !== null &&
+            b.finalized_hash !== null &&
+            a.finalized_hash !== b.finalized_hash,
+        ),
+    );
+    if (declaredConflict || summaryConflict) {
+      result.agreement = "CONFLICT";
+      check(
+        "cross_node_agreement",
+        "FAIL",
+        "Finalized/canonical conflict remains a contradiction even without complete trust pins",
+      );
+    }
+    if (pkg.execution.status === "FAILED")
+      check("execution", "FAIL", "Producer retains a failed transfer execution");
+    for (const [key, status] of Object.entries(pkg.verification))
+      if (status === "FAIL") check(key, "FAIL", `Producer contradiction: ${key}`);
     if (
       !policy ||
       !Array.isArray(policy.observers) ||
