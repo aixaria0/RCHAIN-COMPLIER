@@ -32,7 +32,10 @@ export interface RevTransferPolicy {
   }[];
   producer: string;
   source_revision: string;
-  expected_payload_digest: string;
+  /** Local receipt bookkeeping; never an independent trust root. */
+  received_payload_digest: string;
+  /** Independently selected reviewer/operator commitment to this exact snapshot. */
+  external_payload_digest?: string | null;
 }
 export type AssuranceClass = "PASS" | "BLOCKED" | "FAIL";
 export interface RevTransferVerdict {
@@ -42,6 +45,7 @@ export interface RevTransferVerdict {
   checks: Record<string, AssuranceClass>;
   package_digest: string | null;
   policy_digest: string | null;
+  payload_trust: "UNPINNED" | "EXTERNALLY_PINNED" | "PIN_MISMATCH";
   agreement: string;
   stages: {
     execution: boolean;
@@ -133,6 +137,7 @@ export async function verifyRevTransferAssurance(
     checks: {},
     package_digest: null,
     policy_digest: null,
+    payload_trust: "UNPINNED",
     agreement: "INSUFFICIENT_EVIDENCE",
     stages: { execution: false, inclusion: false, finalized_state: false, corroborated: false },
   };
@@ -159,6 +164,49 @@ export async function verifyRevTransferAssurance(
   check("schema", "PASS");
   const pkg = input as any;
   try {
+    result.package_digest = await assurancePayloadDigest(pkg);
+    check(
+      "payload_integrity",
+      result.package_digest === pkg.provenance.payload_digest ? "PASS" : "FAIL",
+      "Internal payload digest mismatch",
+    );
+    check(
+      "received_payload_integrity",
+      !policy?.received_payload_digest
+        ? "BLOCKED"
+        : result.package_digest === policy.received_payload_digest
+          ? "PASS"
+          : "FAIL",
+      "Received-package digest missing or mismatched (receipt bookkeeping only)",
+    );
+    const externalPin = policy?.external_payload_digest;
+    if (externalPin == null) {
+      check(
+        "external_payload_pin",
+        "BLOCKED",
+        "Independent reviewer/operator package pin not supplied",
+      );
+    } else if (!/^[0-9a-f]{64}$/.test(externalPin) || externalPin !== result.package_digest) {
+      result.payload_trust = "PIN_MISMATCH";
+      check(
+        "external_payload_pin",
+        "FAIL",
+        "Package differs from the independent reviewer/operator pin",
+      );
+    } else {
+      check("external_payload_pin", "PASS");
+      if (
+        result.checks.payload_integrity === "PASS" &&
+        result.checks.received_payload_integrity === "PASS"
+      )
+        result.payload_trust = "EXTERNALLY_PINNED";
+    }
+    if (policy && Object.hasOwn(policy, "expected_payload_digest"))
+      check(
+        "external_policy",
+        "FAIL",
+        "Ambiguous legacy expected_payload_digest is not an independent pin; migrate policy explicitly",
+      );
     const declaredConflict =
       pkg.agreement.status === "CONFLICT" || pkg.finalized_state.status === "CONFLICT";
     const summaryConflict = pkg.observers.some((a: any, i: number) =>
@@ -190,18 +238,12 @@ export async function verifyRevTransferAssurance(
       !Array.isArray(policy.observers) ||
       policy.observers.length < 2 ||
       !policy.source_revision ||
-      !policy.expected_payload_digest
+      !policy.received_payload_digest
     ) {
-      result.package_digest = await assurancePayloadDigest(pkg);
-      check(
-        "payload_integrity",
-        result.package_digest === pkg.provenance.payload_digest ? "PASS" : "FAIL",
-        "Payload digest mismatch",
-      );
       check(
         "external_policy",
         "BLOCKED",
-        "External observer/revision/digest trust pins are incomplete",
+        "External observer/revision policy or received-package digest is incomplete",
       );
       return finish();
     }
@@ -220,7 +262,7 @@ export async function verifyRevTransferAssurance(
     if (
       policy?.verifier !== result.verifier ||
       requiredStrings.some((s) => typeof s !== "string" || !s.length) ||
-      !/^[0-9a-f]{64}$/.test(policy.expected_payload_digest) ||
+      !/^[0-9a-f]{64}$/.test(policy.received_payload_digest) ||
       !Array.isArray(policy.observers) ||
       policy.observers.length < 2 ||
       policy.observers.length > 16 ||
@@ -280,15 +322,6 @@ export async function verifyRevTransferAssurance(
         ? "PASS"
         : "FAIL",
       "Unpinned evidence producer/revision",
-    );
-    result.package_digest = await assurancePayloadDigest(pkg);
-    check(
-      "payload_integrity",
-      result.package_digest === pkg.provenance.payload_digest &&
-        result.package_digest === policy.expected_payload_digest
-        ? "PASS"
-        : "FAIL",
-      "Payload digest mismatch",
     );
     const fresh = (time: number) =>
       time <= policy.now_ms + policy.max_future_skew_ms &&

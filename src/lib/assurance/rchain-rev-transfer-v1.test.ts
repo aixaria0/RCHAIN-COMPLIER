@@ -15,12 +15,64 @@ async function run(mutate: (p: any, policy: any) => unknown, expected: string, r
   await mutate(pkg, policy);
   if (reseal) {
     await seal(pkg);
-    policy.expected_payload_digest = pkg.provenance.payload_digest;
+    policy.received_payload_digest = pkg.provenance.payload_digest;
+    policy.external_payload_digest = pkg.provenance.payload_digest;
   }
   const verdict = await verifyRevTransferAssurance(pkg, policy);
   assert.equal(verdict.status, expected, JSON.stringify(verdict));
 }
 test("bounded supported claim passes", () => run(() => {}, "PASS"));
+test("coherently substituted receipt cannot manufacture independent package trust", async () => {
+  const pkg = await fixture();
+  const policy = fixturePolicy(pkg);
+  const reviewerPin = policy.external_payload_digest;
+  const observer = pkg.observers[0];
+  const status = JSON.parse(observer.evidence.status.body);
+  status.version = { node: "substituted-but-self-consistent" };
+  observer.evidence.status = await raw("/api/status", status);
+  await seal(pkg);
+  // Recomputing a received digest is allowed; promoting it to a reviewer pin is not.
+  policy.received_payload_digest = pkg.provenance.payload_digest;
+  policy.external_payload_digest = null;
+  const unpinned = await verifyRevTransferAssurance(pkg, policy);
+  assert.equal(unpinned.status, "BLOCKED");
+  assert.equal(unpinned.payload_trust, "UNPINNED");
+  assert.equal(unpinned.checks.payload_integrity, "PASS");
+  assert.equal(unpinned.checks.received_payload_integrity, "PASS");
+  assert.equal(unpinned.checks.external_payload_pin, "BLOCKED");
+  assert.ok(
+    Object.entries(unpinned.checks).every(
+      ([key, value]) => key === "external_payload_pin" || value === "PASS",
+    ),
+    JSON.stringify(unpinned),
+  );
+  policy.external_payload_digest = reviewerPin;
+  const pinned = await verifyRevTransferAssurance(pkg, policy);
+  assert.equal(pinned.status, "FAIL");
+  assert.equal(pinned.payload_trust, "PIN_MISMATCH");
+  assert.equal(pinned.checks.external_payload_pin, "FAIL");
+});
+test("independent matching pin is explicit and ambiguous legacy pins are rejected", async () => {
+  const pkg = await fixture();
+  const policy = fixturePolicy(pkg);
+  assert.equal((await verifyRevTransferAssurance(pkg, policy)).payload_trust, "EXTERNALLY_PINNED");
+  delete policy.external_payload_digest;
+  (policy as any).expected_payload_digest = policy.received_payload_digest;
+  const legacy = await verifyRevTransferAssurance(pkg, policy);
+  assert.equal(legacy.status, "FAIL");
+  assert.equal(legacy.payload_trust, "UNPINNED");
+});
+test("missing external pin never skips raw-evidence tamper checks", async () => {
+  const pkg = await fixture();
+  pkg.observers[0].evidence.status.body = "{}";
+  await seal(pkg);
+  const policy = fixturePolicy(pkg);
+  policy.external_payload_digest = null;
+  const verdict = await verifyRevTransferAssurance(pkg, policy);
+  assert.equal(verdict.status, "FAIL");
+  assert.equal(verdict.payload_trust, "UNPINNED");
+  assert.equal(verdict.checks.raw_integrity, "FAIL");
+});
 test("wrong expected network fails", () => run((_p, t) => (t.network_id = "wrong"), "FAIL"));
 test("wrong task fails", () => run((_p, t) => (t.action_id = "wrong"), "FAIL"));
 test("wrong claim fails", () => run((_p, t) => (t.claim_id = "wrong"), "FAIL"));
