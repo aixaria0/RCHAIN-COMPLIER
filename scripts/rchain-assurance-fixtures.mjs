@@ -28,7 +28,7 @@ export async function fixture(kind = "pass") {
       finalized: await raw("/api/last-finalized-block", { blockInfo: b }),
       finalized_block: await raw(`/api/block/${b.blockHash}`, { blockInfo: b, deploys: [{ sig: DEPLOY, deployer: "synthetic-signer", term: TERM, errored: false }] }),
       is_finalized: await raw(`/api/is-finalized/${b.blockHash}`, { finalized: true }),
-      balance: await raw("/api/explore-deploy", { expr: [{ ExprInt: { data: 1100 } }], block: b }, balanceTerm(RECIPIENT)), ancestry: [],
+      balance: await raw(`/api/explore-deploy?blockHash=${b.blockHash}`, { expr: [{ ExprInt: { data: 1100 } }], block: b }, balanceTerm(RECIPIENT)), ancestry: [],
     };
     return { observer_id: `synthetic-${id}`, node_identity: id, source: `https://synthetic-${id}.invalid`, failure_domain: `fixture-${id}`, observed_at: NOW, finalized_height: 10, finalized_hash: b.blockHash, observation_digest: "0".repeat(64), status: "OBSERVED", reason: null, evidence };
   }));

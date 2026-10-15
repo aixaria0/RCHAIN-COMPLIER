@@ -330,7 +330,7 @@ export async function verifyRevTransferAssurance(
         finalized: "/api/last-finalized-block",
         finalized_block: `/api/block/${blockHash(raw.finalized)}`,
         is_finalized: `/api/is-finalized/${blockHash(raw.deploy?.ProcessedWithSuccess?.block ?? raw.deploy?.ProcessedWithError?.block)}`,
-        balance: "/api/explore-deploy",
+        balance: `/api/explore-deploy?blockHash=${encodeURIComponent(blockHash(raw.finalized) ?? "")}`,
       };
       for (const [key, path] of Object.entries(paths))
         if (observer.evidence[key])
@@ -413,6 +413,13 @@ export async function verifyRevTransferAssurance(
           "BLOCKED",
           "Node has not finalized the included action",
         );
+      if (raw.balance?.block && raw.finalized_block && blockHash(raw.balance.block) === hash) {
+        check(
+          "canonical_consistency",
+          compareBlock(raw.balance.block, raw.finalized_block) ? "PASS" : "FAIL",
+          "Finalized read-back block metadata differs from canonical block",
+        );
+      }
       const balance = balanceValue(raw.balance);
       const readback =
         executed &&

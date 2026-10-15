@@ -21,3 +21,5 @@ Trust pins must come from operator configuration or a trusted transport receipt:
 `npm run pack:assurance` ships the verifier at `@aixaria/assurance-engine/rchain-assurance/v1`. `node scripts/export-rchain-assurance.mjs OUTPUT_DIRECTORY` exports the same browser-safe implementation and file hashes for Rholox. No separate verification implementation belongs in Rholox.
 
 The v1 changes repair the explorer no-empty lint failure and apply only compatible lockfile fixes for brace-expansion and source-map-js. The production package remains free of runtime npm dependencies. Repository and product audit must both remain clean.
+
+Finalized balance observations explicitly request `/api/explore-deploy?blockHash=<observed finalized hash>`. The response block identity and protocol fields must match the canonical finalized block; HTTP success or an ignored query never establishes the selected read-back.

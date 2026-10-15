@@ -117,3 +117,19 @@ test("direct boolean Vault result is reproduced without fabricating a tuple", ()
     "PASS",
     true,
   ));
+
+test("finalized read-back canonical metadata mismatch fails", () =>
+  run(
+    async (pkg) => {
+      const observer = pkg.observers[0];
+      const value = JSON.parse(observer.evidence.balance.body);
+      value.block.postStateHash = "wrong-state";
+      observer.evidence.balance = await raw(
+        observer.evidence.balance.path,
+        value,
+        observer.evidence.balance.request,
+      );
+    },
+    "FAIL",
+    true,
+  ));
